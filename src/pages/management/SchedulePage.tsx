@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Alert, Badge, Button, Card, EmptyState, FormField, Modal, Select, useToast } from "@/components/ui";
+import { Alert, Button, Card, EmptyState, FormField, Modal, Select, useToast } from "@/components/ui";
 import { MonthCalendar } from "@/components/wedash/MonthCalendar";
 import { ColorLegend, type LegendItem } from "@/components/wedash/ColorLegend";
 import { PersonAvatar } from "@/components/wedash/PersonAvatar";
@@ -8,7 +8,7 @@ import { MonthStep, monthNavBtn } from "@/pages/cash-close/MonthYearPicker";
 import { SectionHeader, useScopedStores } from "@/pages/operation/shared";
 import { Icon, icons } from "@/pages/users/Icons";
 import { calendarTodayIso } from "@/data/wedash/clock";
-import { addDays, addMonths, endOfMonth, isoToDate, startOfMonth } from "@/data/wedash/engine/format";
+import { addDays, addMonths, endOfMonth, isoToDate, shiftName, startOfMonth } from "@/data/wedash/engine/format";
 import { fetchGoals } from "@/data/wedash/goalsRepo";
 import { monthCoveredByGoal, scheduleStartMonth, type GoalSpan } from "@/data/wedash/goalMonths";
 import { branchRoleLabel, fetchStoreSellers, fetchStoreShifts, isBranchTeamMember, type StoreSeller, type StoreShift } from "@/data/wedash/stores";
@@ -24,15 +24,6 @@ const STATUS_LABEL: Record<DayStatus, string> = {
   holiday_work: "Feriado trabalhado",
   comp_off: "Folga compensatória",
 };
-const CYCLE: DayStatus[] = ["work", "off", "holiday_work", "comp_off"];
-
-const STATUS_BADGE: Record<DayStatus, "success" | "warning" | "info" | "neutral"> = {
-  work: "success",
-  holiday_work: "warning",
-  off: "neutral",
-  comp_off: "info",
-};
-
 const SCHEDULE_LEGEND: LegendItem[] = [
   { key: "work", color: "bg-ok", label: "Trabalha", hint: "Na loja" },
   { key: "off", color: "bg-chip-gray", label: "Folga", hint: "Descanso" },
@@ -423,6 +414,8 @@ export function SchedulePage() {
           doublePay={Boolean(schedule?.holidayRules.some((rule) => rule.date === dayOpen && rule.pay === "double"))}
           rows={dayRows.get(dayOpen) ?? []}
           storeId={store.id}
+          shopping={store.tradeName || store.name}
+          shifts={shifts}
           names={byPerson}
           onClose={() => setDayOpen(null)}
           onSave={async (next) => {
@@ -515,6 +508,8 @@ function DayEditor({
   doublePay,
   rows,
   storeId,
+  shopping,
+  shifts,
   names,
   onClose,
   onSave,
@@ -525,6 +520,8 @@ function DayEditor({
   doublePay: boolean;
   rows: StoredDay[];
   storeId: string;
+  shopping: string;
+  shifts: StoreShift[];
   names: Map<string, StoreSeller>;
   onClose: () => void;
   onSave: (rows: StoredDay[]) => Promise<void>;
@@ -581,31 +578,32 @@ function DayEditor({
         {ordered.map((row) => {
           const person = names.get(row.sellerId);
           const name = person?.name ?? "Pessoa";
+          const shift = shifts.find((item) => item.id === person?.shiftId);
+          const place = [shift ? shiftName(shift.name) : "Sem grupo", shopping].filter(Boolean).join(" · ");
           return (
-            <li key={row.sellerId} className="flex min-w-0 items-center justify-between gap-3">
+            <li key={row.sellerId} className="flex min-w-0 flex-col gap-2 border-b border-line py-2 sm:flex-row sm:items-center sm:justify-between">
               <span className="flex min-w-0 items-center gap-2">
                 <PersonAvatar name={name} employeeId={person?.code} storeId={storeId} size="sm" />
-                <span className="truncate text-[13.5px] font-semibold text-t0">{name}</span>
+                <span className="min-w-0">
+                  <span className="block truncate text-[13.5px] font-semibold text-t0">{name}</span>
+                  <span className="block truncate text-[12px] text-t2">{place}</span>
+                </span>
               </span>
-              <span className="flex shrink-0 items-center gap-1">
-                <button
-                  type="button"
-                  className="shrink-0"
-                  aria-label={`Mudar a situação de ${name}`}
-                  onClick={() =>
-                    setDraft((current) =>
-                      current.map((item) => {
-                        if (item.sellerId !== row.sellerId) return item;
-                        const next = CYCLE[(CYCLE.indexOf(item.status) + 1) % CYCLE.length];
-                        return { ...item, status: next, origin: "manual" };
-                      }),
-                    )
-                  }
+              <span className="flex min-w-0 items-center gap-2 sm:shrink-0">
+                <Select
+                  className="h-9! min-w-0 flex-1 px-2! sm:w-[13.5rem] sm:flex-none"
+                  aria-label={`Situação de ${name}`}
+                  value={row.status}
+                  onChange={(event) => {
+                    const status = event.target.value as DayStatus;
+                    setDraft((current) => current.map((item) => (item.sellerId === row.sellerId ? { ...item, status, origin: "manual" } : item)));
+                  }}
                 >
-                  <Badge variant={row.status === "holiday_work" && doublePay ? "accent" : STATUS_BADGE[row.status]}>
-                    {STATUS_LABEL[row.status]}{row.status === "holiday_work" && doublePay ? " 2×" : ""}
-                  </Badge>
-                </button>
+                  <option value="work">Trabalha</option>
+                  <option value="off">Folga</option>
+                  <option value="holiday_work">{doublePay ? "Feriado trabalhado 2×" : "Feriado trabalhado"}</option>
+                  <option value="comp_off">Folga compensatória</option>
+                </Select>
                 <Button type="button" variant="ghost" size="sm" onClick={() => setDraft((current) => current.filter((item) => item.sellerId !== row.sellerId))}>
                   Remover do dia
                 </Button>
