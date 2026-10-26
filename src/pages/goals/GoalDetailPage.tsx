@@ -541,7 +541,7 @@ function GoalPayoutCard({
                     </div>
                   </td>
                   <td className={`py-2.5 pr-3 font-semibold ${r.level ? "text-acc" : "text-t2"}`}>{r.level ?? "Abaixo do 1º nível"}</td>
-                  <td className={`py-2.5 pr-3 text-right font-mono font-bold ${r.revenue < 0 ? "text-bad" : "text-acc"}`}>{brlCent(r.revenue)}</td>
+                  <td className={`py-2.5 pr-3 text-right font-mono font-bold ${r.revenue < 0 ? "text-bad" : "text-t0"}`}>{brlCent(r.revenue)}</td>
                   <td className="py-2.5 pr-3 text-right">
                     <p className={`font-mono font-bold ${r.prizeAmount > 0 ? "text-ok" : "text-t2"}`}>{r.prizeAmount > 0 ? brlCent(r.prizeAmount) : "—"}</p>
                     {r.pct > 0 && <p className="text-[11px] font-semibold text-t2">{num(r.pct, 1)}%</p>}

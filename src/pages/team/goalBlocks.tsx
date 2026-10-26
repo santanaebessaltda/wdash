@@ -158,7 +158,7 @@ function SellerCell({ l }: { l: LineRank }) {
 function RevenueCell({ l }: { l: LineRank }) {
   return (
     <div>
-      <p className={`font-mono text-[12.5px] font-bold ${l.revenueAmount < 0 ? "text-bad" : "text-acc"}`}>{l.revenue}</p>
+      <p className={`font-mono text-[12.5px] font-bold ${l.revenueAmount < 0 ? "text-bad" : "text-t0"}`}>{l.revenue}</p>
       <p className="text-[11px] text-t2">
         {num(l.salesCount, 0)} {l.salesCount === 1 ? "venda" : "vendas"}
       </p>
