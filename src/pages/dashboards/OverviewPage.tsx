@@ -103,7 +103,7 @@ const KPI_ICONS = [IconRevenue, IconCmv, IconSales, IconTicket];
 
 /** # e nome/produto parados no scroll horizontal. A largura do # (w-8) e o left-8 da coluna seguinte. */
 const RANK_STICKY = "sticky left-0 z-20 w-8 min-w-8 max-w-8";
-const NAME_STICKY = "sticky left-8 z-10 min-w-0 border-r border-line";
+const NAME_STICKY = "sticky left-8 z-10 min-w-0";
 const STICKY_BG = "bg-bg-2 transition-colors group-hover:bg-bg-3 group-focus-visible:bg-bg-3";
 /** No card estreito o nome nao ocupa a tela inteira, para sobrar numero ao lado. */
 const NAME_CLIP = "min-w-0 max-w-[9.5rem] sm:max-w-[12.5rem] lg:max-w-[14rem] xl:max-w-none";
