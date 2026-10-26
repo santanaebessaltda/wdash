@@ -45,12 +45,12 @@ function monthDates(from: string, to: string): string[] {
   return dates;
 }
 
-function statusFace(status: DayStatus, doublePay: boolean): { fill: string; chip: string; label: string; full: string } {
-  if (status === "holiday_work" && doublePay) return { fill: "bg-acc-soft", chip: "bg-acc", label: "Dobro", full: "Pagamento em dobro" };
-  if (status === "holiday_work") return { fill: "bg-warn-soft", chip: "bg-warn", label: "Feriado", full: "Feriado trabalhado" };
-  if (status === "comp_off") return { fill: "bg-info-soft", chip: "bg-info", label: "Compensa", full: "Folga compensatória" };
-  if (status === "off") return { fill: "bg-bg-3", chip: "bg-chip-gray", label: "Folga", full: "Folga" };
-  return { fill: "bg-ok-soft", chip: "bg-ok", label: "Trabalha", full: "Trabalha" };
+function statusChip(status: DayStatus, doublePay: boolean): { color: string; label: string } {
+  if (status === "holiday_work" && doublePay) return { color: "bg-acc", label: "Pagamento em dobro" };
+  if (status === "holiday_work") return { color: "bg-warn", label: "Feriado trabalhado" };
+  if (status === "comp_off") return { color: "bg-info", label: "Folga compensatória" };
+  if (status === "off") return { color: "bg-chip-gray", label: "Folga" };
+  return { color: "bg-ok", label: "Trabalha" };
 }
 
 type SelectedPerson = { id: string; fixedOffDow: number | null; sex: Sex; groupId: string | null };
@@ -486,16 +486,17 @@ function ScheduleGrid({
       <table className="w-max min-w-full border-separate border-spacing-0 text-left">
         <thead>
           <tr>
-            <th className={cn(STICKY, "z-30 min-w-[190px] border-b px-3 py-2 text-[12px] font-bold text-t0")}>Funcionário</th>
-            {dates.map((iso) => {
+            <th className={cn(STICKY, "z-30 min-w-[190px] border-b px-3 py-3 text-[11px] font-bold text-t2")}>Funcionário</th>
+            {dates.map((iso, index) => {
               const holiday = holidayLabel(holidays, iso);
               const dow = weekday(iso);
+              const last = index === dates.length - 1;
               return (
-                <th key={iso} className="min-w-[4.75rem] border-b border-line p-1 text-center align-bottom">
-                  <button type="button" className="flex w-full flex-col items-center gap-0.5 rounded-[9px] px-1 py-1 hover:bg-bg-3" aria-label={`Ajustar ${Number(iso.slice(8))} de ${MONTHS[isoToDate(iso).getMonth()].toLowerCase()}`} onClick={() => onOpenDay(iso)}>
-                    <span className={cn("flex h-6 w-6 items-center justify-center rounded-full text-[12px] font-bold", iso === today ? "bg-acc text-white" : dow === 0 ? "text-t1" : "text-t0")}>{Number(iso.slice(8))}</span>
-                    <span className="text-[10px] font-bold text-t2">{SHORT_WEEK[dow]}</span>
-                    {holiday ? <span className="w-full truncate text-[10px] font-semibold text-warn">{holiday}</span> : null}
+                <th key={iso} className={cn("min-w-[108px] border-b border-line px-1 py-3 text-center align-bottom", !last && "border-r")}>
+                  <button type="button" className="flex w-full flex-col items-center" aria-label={`Ajustar ${Number(iso.slice(8))} de ${MONTHS[isoToDate(iso).getMonth()].toLowerCase()}`} onClick={() => onOpenDay(iso)}>
+                    <span className={cn("flex h-6 w-6 items-center justify-center rounded-full text-[12px] font-bold", iso === today ? "bg-acc text-white" : "text-t1")}>{Number(iso.slice(8))}</span>
+                    <span className="mt-1 text-[10px] font-bold leading-tight text-t2 sm:text-[11px]">{SHORT_WEEK[dow]}</span>
+                    {holiday ? <span className="mt-1 line-clamp-2 text-[10px] font-semibold leading-tight text-warn">{holiday}</span> : null}
                   </button>
                 </th>
               );
@@ -509,17 +510,20 @@ function ScheduleGrid({
                 <span className="block truncate text-[13px] font-semibold text-t0">{person.name}</span>
                 {person.detail ? <span className="block truncate text-[11px] text-t2">{person.detail}</span> : null}
               </th>
-              {dates.map((iso) => {
+              {dates.map((iso, index) => {
                 const row = (byDay.get(iso) ?? []).find((item) => item.sellerId === person.id);
                 const holiday = holidayLabel(holidays, iso);
                 const doublePay = schedule.holidayRules.some((rule) => rule.date === iso && rule.pay === "double");
-                if (!row) return <td key={iso} className="border-b border-line bg-bg-1/40" />;
-                const face = statusFace(row.status, doublePay && row.status === "holiday_work");
+                const last = index === dates.length - 1;
+                const cell = cn("relative min-h-[84px] border-b border-line p-1.5 align-top sm:p-2", !last && "border-r");
+                if (!row) return <td key={iso} className={cell} />;
+                const chip = statusChip(row.status, doublePay);
                 return (
-                  <td key={iso} className={cn("border-b border-line p-1 align-middle", face.fill)}>
-                    <button type="button" className="flex min-h-[52px] w-full items-center" aria-label={`${person.name}, ${Number(iso.slice(8))}: ${face.full}${holiday ? `, ${holiday}` : ""}`} onClick={() => onOpenDay(iso)}>
-                      <DayChip color={face.chip}>{face.label}</DayChip>
-                    </button>
+                  <td key={iso} className={cell}>
+                    <button type="button" className="absolute inset-0 z-0" aria-label={`${person.name}, ${Number(iso.slice(8))}: ${chip.label}${holiday ? `, ${holiday}` : ""}`} onClick={() => onOpenDay(iso)} />
+                    <div className="pointer-events-none relative z-10">
+                      <DayChip color={chip.color}>{chip.label}</DayChip>
+                    </div>
                   </td>
                 );
               })}
@@ -529,12 +533,12 @@ function ScheduleGrid({
         <tfoot>
           <tr>
             <th className={cn(STICKY, "px-3 py-2 text-left text-[12px] font-bold text-t0")}>Pessoas presentes</th>
-            {dates.map((iso) => {
+            {dates.map((iso, index) => {
               const { working, short, floor } = presence(iso);
               const text = floor.closed ? "Fechado" : floor.min > 0 ? `${working} · mín. ${floor.min}${floor.perGroup ? "/grupo" : ""}` : String(working);
               const title = floor.closed ? "A loja fecha neste dia" : floor.perGroup ? "Mínimo em cada grupo" : "Mínimo do dia";
               return (
-                <td key={iso} title={title} className={cn("px-1 py-2 text-center text-[11px] font-bold tabular-nums", floor.closed ? "text-t2" : short ? "text-bad" : "text-ok")}>
+                <td key={iso} title={title} className={cn("border-line px-1.5 py-2 text-center text-[11px] font-bold tabular-nums", index < dates.length - 1 && "border-r", floor.closed ? "text-t2" : short ? "text-bad" : "text-ok")}>
                   {text}
                 </td>
               );
