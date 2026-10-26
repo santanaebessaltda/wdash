@@ -67,7 +67,7 @@ function monthsBetween(from: string, to: string): string[] {
 }
 
 const STICKY = "sticky left-0 z-20 border-r border-line bg-bg-2";
-/** Cabeçalho e card do Calendar (src/pages/apps/Calendar.tsx). A grade só acrescenta a coluna, a sequência dos dias e o rodapé. */
+/** Card do Calendar (src/pages/apps/Calendar.tsx). O cabeçalho tem a mesma altura, sem divisor entre os dias, no formato 1 · Quinta-feira. */
 const CALENDAR_HEADER = "border-b border-line px-2 py-3 text-center text-[11px] font-bold uppercase tracking-wide text-t2";
 const CALENDAR_CELL = "relative min-h-[84px] border-b border-r border-line p-1.5 text-left sm:min-h-[110px] sm:p-2";
 const CALENDAR_CHIP = "truncate rounded-md px-1.5 py-1 text-[10px] font-semibold text-white sm:text-[11px]";
@@ -492,11 +492,11 @@ function ScheduleGrid({
         <div className={cn(STICKY, CALENDAR_HEADER, "z-30 text-left")}>Funcionário</div>
         {dates.map((iso) => {
           const holiday = holidayLabel(holidays, iso);
+          const day = Number(iso.slice(8));
           return (
-            <div key={iso} className={CALENDAR_HEADER}>
-              <span className="hidden sm:inline">{WEEKDAY[weekday(iso)]}</span>
-              <span className="sm:hidden">{WEEKDAY[weekday(iso)].slice(0, 1)}</span>
-              {holiday ? <span className="mt-1 block truncate text-[11px] font-bold normal-case tracking-normal text-warn">{holiday}</span> : null}
+            <div key={iso} title={holiday ?? undefined} className={cn(CALENDAR_HEADER, "min-w-0 truncate", holiday && "text-warn")}>
+              <span className={iso === today ? "text-acc" : undefined}>{day}</span>
+              <span> · {WEEKDAY[weekday(iso)]}</span>
             </div>
           );
         })}
@@ -516,12 +516,7 @@ function ScheduleGrid({
                 <div key={iso} className={cn(CALENDAR_CELL, index === dates.length - 1 && "border-r-0")}>
                   <button type="button" className="absolute inset-0 z-0" aria-label={`${person.name}, ${day}: ${chip?.label ?? "sem escala"}${holiday ? `, ${holiday}` : ""}`} onClick={() => onOpenDay(iso)} />
                   <div className="pointer-events-none relative z-10">
-                    <span className={cn("inline-flex h-6 w-6 items-center justify-center rounded-full text-[12px] font-bold", iso === today ? "bg-acc text-white" : "text-t1")}>{day}</span>
-                    {chip ? (
-                      <div className="mt-1.5 flex flex-col gap-1">
-                        <div className={cn(CALENDAR_CHIP, chip.color)}>{chip.label}</div>
-                      </div>
-                    ) : null}
+                    {chip ? <div className={cn(CALENDAR_CHIP, chip.color)}>{chip.label}</div> : null}
                   </div>
                 </div>
               );
