@@ -259,7 +259,7 @@ function BoardGoalCard({ board, pulse }: { board: GoalBoard; pulse: boolean }) {
         </div>
       </div>
       <div className="mt-1.5 flex items-end justify-between gap-3">
-        <p className={`font-mono text-[22px] font-extrabold leading-none tabular-nums sm:text-[26px] ${summary.achieved < 0 ? "text-bad" : "text-acc"}`} data-secret="">{brlCent(summary.achieved)}</p>
+        <p className={`font-mono text-[22px] font-extrabold leading-none tabular-nums sm:text-[26px] ${summary.achieved < 0 ? "text-bad" : "text-t0"}`} data-secret="">{brlCent(summary.achieved)}</p>
         <div className="text-right">
           <p className={`font-mono text-[22px] font-extrabold leading-none tabular-nums sm:text-[26px] ${progressTextClass(summary.pct)}`}>{num(summary.pct, 1)}%</p>
           <p className="mt-0.5 text-[12px] text-t2">de <span data-secret="">{brlCent(goal.target)}</span></p>

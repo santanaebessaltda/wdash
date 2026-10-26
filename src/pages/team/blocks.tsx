@@ -78,7 +78,7 @@ function IndividualPctCell({ l }: { l: LineRank }) {
 function LevelCell({ l }: { l: LineRank }) {
   if (l.noGoal || !l.currentTierName || l.currentLevel == null) return <span className="text-t2">—</span>;
   return (
-    <Badge variant="accent" className="whitespace-nowrap">
+    <Badge variant="neutral" className="whitespace-nowrap">
       N{l.currentLevel} · {l.currentTierName}
     </Badge>
   );
@@ -466,7 +466,7 @@ export function GoalProgressBar({
 
       <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
         <p className="text-[18px] font-extrabold tracking-tight text-t0 sm:text-[20px]">
-          <span className={`font-mono ${goal.achieved < 0 ? "text-bad" : "text-acc"}`}>{brlCent(goal.achieved)}</span>
+          <span className={`font-mono ${goal.achieved < 0 ? "text-bad" : "text-t0"}`}>{brlCent(goal.achieved)}</span>
           <span className="mx-1.5 text-[14px] font-semibold text-t2">/</span>
           <span className="font-mono text-[14px] font-bold text-t2 sm:text-[15px]">{brlCent(goal.total)}</span>
         </p>

@@ -417,7 +417,7 @@ function GoalCard({
         {status === "upcoming" ? (
           <span className="font-mono text-[13px] font-extrabold text-t0">{brlCent(g.target)}</span>
         ) : (
-          <span className={`font-mono text-[13px] font-extrabold ${achieved < 0 ? "text-bad" : "text-acc"}`}>{brlCent(achieved)}</span>
+          <span className={`font-mono text-[13px] font-extrabold ${achieved < 0 ? "text-bad" : "text-t0"}`}>{brlCent(achieved)}</span>
         )}
         <span className="text-right text-[11.5px] text-t2">
           {status === "upcoming" ? (
