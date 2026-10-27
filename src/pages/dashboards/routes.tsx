@@ -3,14 +3,15 @@ import type { RouteObject } from "react-router-dom";
 import { Navigate } from "react-router-dom";
 import { paths } from "@/router/paths";
 import { RequireRole } from "@/session/RequireSession";
+import FinancePage from "./FinancePage";
+import ProductsPage from "./ProductsPage";
+import OverviewPage from "./OverviewPage";
 const AnalyticsDashboardPage = lazyPage(() => import("./AnalyticsDashboardPage"), "AnalyticsDashboardPage");
 const SalesDashboardPage = lazyPage(() => import("./SalesDashboardPage"), "SalesDashboardPage");
 const ProjectDashboardPage = lazyPage(() => import("./ProjectDashboardPage"), "ProjectDashboardPage");
 const SaasDashboardPage = lazyPage(() => import("./SaasDashboardPage"), "SaasDashboardPage");
 const BiDashboardPage = lazyPage(() => import("./BiDashboardPage"), "BiDashboardPage");
-const FinancePage = lazyPage(() => import("./FinancePage"), "default");
-const ProductsPage = lazyPage(() => import("./ProductsPage"), "default");
-const OverviewPage = lazyPage(() => import("./OverviewPage"), "default");
+/* Visão geral / Financeiro / Produtos: sync — cabeçalho na hora; só KPIs/cards em skeleton. */
 
 /**
  * NOTE: paths.dashboards.{crm,ecommerce,finance,logistics} and the marketing

@@ -1,10 +1,9 @@
 import { Navigate } from "react-router-dom";
-import { lazyPage } from "@/lib/lazyPage";
 import type { RouteObject } from "react-router-dom";
 import { paths } from "@/router/paths";
 import { RequireRole } from "@/session/RequireSession";
-
-const TeamPage = lazyPage(() => import("./TeamPage"), "TeamPage");
+import { TeamPage } from "./TeamPage";
+/* Equipe sync — cabeçalho na hora; só KPIs/cards em skeleton (igual às outras 3 do Dashboard). */
 
 export const teamRoutes: RouteObject[] = [
   {

@@ -1,6 +1,11 @@
 import { Skeleton } from "@/components/ui/Skeleton";
 
-/** Fallback da troca de tela: o skeleton da página, sem spinner antes. */
+/**
+ * Fallback do Suspense na troca de rota lazy.
+ * Só a área de conteúdo (KPIs/cards) — sem fingir breadcrumb/título/filtros,
+ * para não piscar um cabeçalho falso antes da página real montar.
+ * As 4 telas do Dashboard entram sync e quase nunca passam por aqui.
+ */
 export function PageLoader({ variant = "app" }: { variant?: "app" | "auth" }) {
   if (variant === "auth") {
     return (
@@ -17,14 +22,7 @@ export function PageLoader({ variant = "app" }: { variant?: "app" | "auth" }) {
 
   return (
     <div aria-busy="true" aria-label="Carregando">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <Skeleton className="h-6 w-44" />
-          <Skeleton className="mt-2 h-3.5 w-64 max-w-full" />
-        </div>
-        <Skeleton className="h-9 w-28" />
-      </div>
-      <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {Array.from({ length: 4 }, (_, index) => (
           <Skeleton key={index} className="h-28 w-full rounded-xl" />
         ))}
