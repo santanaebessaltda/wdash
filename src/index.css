@@ -617,11 +617,9 @@ input[type="range"]::-moz-range-thumb {
 }
 @keyframes velaRise {
   from {
-    opacity: 0;
-    transform: translateY(12px);
+    transform: translateY(10px);
   }
   to {
-    opacity: 1;
     transform: none;
   }
 }
@@ -641,33 +639,31 @@ input[type="range"]::-moz-range-thumb {
 
 /* ---- Page-open + element entrance animations ---- */
 /* Each route content is keyed by pathname in AppShell, so this re-runs on
-   every navigation. Direct children stagger in for an "elements appear" feel. */
-.vela-page-enter {
-  animation: velaFade 0.3s ease both;
-}
+   every navigation. Só sobe (translateY) — sem opacity:0 + fill-mode both,
+   que deixava a tela invisível quando o JS travava no meio da animação. */
 .vela-page-enter > * {
-  animation: velaRise 0.5s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+  animation: velaRise 0.4s cubic-bezier(0.22, 0.61, 0.36, 1);
 }
 .vela-page-enter > *:nth-child(1) {
-  animation-delay: 0.03s;
+  animation-delay: 0.02s;
 }
 .vela-page-enter > *:nth-child(2) {
-  animation-delay: 0.09s;
+  animation-delay: 0.05s;
 }
 .vela-page-enter > *:nth-child(3) {
-  animation-delay: 0.15s;
+  animation-delay: 0.08s;
 }
 .vela-page-enter > *:nth-child(4) {
-  animation-delay: 0.21s;
+  animation-delay: 0.11s;
 }
 .vela-page-enter > *:nth-child(5) {
-  animation-delay: 0.27s;
+  animation-delay: 0.14s;
 }
 .vela-page-enter > *:nth-child(6) {
-  animation-delay: 0.33s;
+  animation-delay: 0.17s;
 }
 .vela-page-enter > *:nth-child(n + 7) {
-  animation-delay: 0.38s;
+  animation-delay: 0.2s;
 }
 
 /* Line/area charts use non-scaling-stroke, which makes stroke-dash draw-in

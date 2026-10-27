@@ -6,6 +6,7 @@ import { MobileDrawer } from "./MobileDrawer";
 import { Topbar } from "./Topbar";
 import { CommandPalette } from "./CommandPalette";
 import { PageLoader } from "./PageLoader";
+import { ChunkErrorBoundary } from "./ChunkErrorBoundary";
 import { fetchThemePreference, saveThemePreference, touchLastSeen } from "@/session/authApi";
 import { installPrintMode } from "@/lib/printMode";
 import { storedThemePreference, useTheme } from "@/theme/ThemeProvider";
@@ -114,11 +115,13 @@ export function AppShell() {
           className="relative flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto overscroll-y-contain px-4 pt-5 sm:px-8 sm:pt-6 print:overflow-visible print:p-0"
         >
           <ProfilePhotosProvider>
-            <Suspense fallback={<PageLoader />}>
-              <div key={location.pathname} className="pad-base vela-page-enter min-w-0 print:pb-0" style={padBottom("32px")}>
-                <Outlet />
-              </div>
-            </Suspense>
+            <ChunkErrorBoundary key={location.pathname}>
+              <Suspense fallback={<PageLoader />}>
+                <div className="pad-base vela-page-enter min-w-0 print:pb-0" style={padBottom("32px")}>
+                  <Outlet />
+                </div>
+              </Suspense>
+            </ChunkErrorBoundary>
           </ProfilePhotosProvider>
         </main>
       </div>

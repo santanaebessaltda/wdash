@@ -68,32 +68,60 @@ export const moneyOrDash = (v: number | null) => (v == null ? "—" : brlCent(v)
 /* ---------- Dados ---------- */
 
 /** Tudo o que a tela Produtos le  -  tambem usado pelo detalhe aberto de outras telas. */
-export async function fetchProductsAggInput(tenantId: string, scope: Scope, storeIds = scope.storeIds): Promise<ProductsAggInput> {
+/** Onda 1: KPIs / evolucao (dia + hora). Produtos e CMV ficam na onda 2. */
+export async function fetchProductsKpiAggs(
+  tenantId: string,
+  scope: Scope,
+  storeIds = scope.storeIds,
+): Promise<Pick<ProductsAggInput, "dayAggs" | "hourAggs" | "prevHourAggs">> {
   const period = resolvePeriod(scope.period, calendarTodayIso());
   const range = financeFetchRange(scope);
+  const [dayAggs, hourAggs, prevHourAggs] = await Promise.all([
+    fetchSalesDayAggs({ tenantId, storeIds, from: range.from, to: range.to, brand: null }),
+    period.start === period.end
+      ? fetchSalesHourAggs({ tenantId, storeIds, day: period.start, brand: null })
+      : Promise.resolve([] as SalesHourAgg[]),
+    range.prevHourDay
+      ? fetchSalesHourAggs({ tenantId, storeIds, day: range.prevHourDay, brand: null })
+      : Promise.resolve([] as SalesHourAgg[]),
+  ]);
+  return { dayAggs, hourAggs, prevHourAggs };
+}
+
+/** Onda 2: SKU, CMV, categorias e catalogo. */
+export async function fetchProductsCatalogAggs(
+  tenantId: string,
+  scope: Scope,
+  storeIds = scope.storeIds,
+): Promise<
+  Pick<
+    ProductsAggInput,
+    "productDayAggs" | "productCostDayAggs" | "categoryDayAggs" | "catalogDescriptions" | "catalogTypes"
+  >
+> {
   const prodRange = productsFetchRange(scope);
-  const [dayAggs, hourAggs, prevHourAggs, productDayAggs, productCostDayAggs, catalogDescriptions, catalogTypes, typeNames] =
-    await Promise.all([
-      fetchSalesDayAggs({ tenantId, storeIds, from: range.from, to: range.to, brand: null }),
-      period.start === period.end
-        ? fetchSalesHourAggs({ tenantId, storeIds, day: period.start, brand: null })
-        : Promise.resolve([] as SalesHourAgg[]),
-      range.prevHourDay
-        ? fetchSalesHourAggs({ tenantId, storeIds, day: range.prevHourDay, brand: null })
-        : Promise.resolve([] as SalesHourAgg[]),
-      fetchSalesProductDayAggs({ tenantId, storeIds, from: prodRange.from, to: prodRange.to }),
-      fetchSalesProductCostDayAggs({ tenantId, storeIds, from: prodRange.from, to: prodRange.to }),
-      fetchProductCatalogDescriptions(),
-      fetchProductCatalogTypes(),
-      fetchProductTypeNames(),
-    ]);
+  const [productDayAggs, productCostDayAggs, catalogDescriptions, catalogTypes, typeNames] = await Promise.all([
+    fetchSalesProductDayAggs({ tenantId, storeIds, from: prodRange.from, to: prodRange.to }),
+    fetchSalesProductCostDayAggs({ tenantId, storeIds, from: prodRange.from, to: prodRange.to }),
+    fetchProductCatalogDescriptions(),
+    fetchProductCatalogTypes(),
+    fetchProductTypeNames(),
+  ]);
   const categoryDayAggs = rollupCategoryDays({
     products: productDayAggs,
     costs: productCostDayAggs,
     typeByProductId: catalogTypes,
     typeNameById: typeNames,
   });
-  return { dayAggs, hourAggs, prevHourAggs, categoryDayAggs, productDayAggs, productCostDayAggs, catalogDescriptions, catalogTypes };
+  return { productDayAggs, productCostDayAggs, categoryDayAggs, catalogDescriptions, catalogTypes };
+}
+
+export async function fetchProductsAggInput(tenantId: string, scope: Scope, storeIds = scope.storeIds): Promise<ProductsAggInput> {
+  const [kpi, catalog] = await Promise.all([
+    fetchProductsKpiAggs(tenantId, scope, storeIds),
+    fetchProductsCatalogAggs(tenantId, scope, storeIds),
+  ]);
+  return { ...kpi, ...catalog };
 }
 
 export interface ProductsDetailData {

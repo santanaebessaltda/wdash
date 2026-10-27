@@ -1,6 +1,7 @@
 import { lazy, type ComponentType, type LazyExoticComponent } from "react";
 
 const RELOAD_KEY = "wedash.chunk-reload";
+const RELOAD_MAX = 2;
 
 /**
  * Wrap a named page export in React.lazy so each route becomes its own async
@@ -10,7 +11,8 @@ const RELOAD_KEY = "wedash.chunk-reload";
  * AuthLayout).
  *
  * Apos um deploy, o shell antigo ainda tenta baixar chunks com hash velho
- * (404). Sem recovery a rota fica em branco ate o F5. Aqui recarregamos 1x.
+ * (404). Sem recovery a rota fica em branco ate o F5. Aqui recarregamos ate
+ * RELOAD_MAX vezes; se ainda falhar, a Promise rejeita (o Suspense/erro sobe).
  */
 export function lazyPage<M, K extends keyof M>(
   loader: () => Promise<M>,
@@ -24,12 +26,17 @@ export function lazyPage<M, K extends keyof M>(
         } catch {
           /* private mode */
         }
-        return { default: m[name] as ComponentType<unknown> };
+        const page = m[name];
+        if (page == null) {
+          throw new Error(`lazyPage: export "${String(name)}" missing`);
+        }
+        return { default: page as ComponentType<unknown> };
       })
       .catch((err: unknown) => {
         try {
-          if (!sessionStorage.getItem(RELOAD_KEY)) {
-            sessionStorage.setItem(RELOAD_KEY, "1");
+          const n = Number(sessionStorage.getItem(RELOAD_KEY) || "0");
+          if (n < RELOAD_MAX) {
+            sessionStorage.setItem(RELOAD_KEY, String(n + 1));
             window.location.reload();
             return new Promise(() => {
               /* nunca resolve: a pagina esta recarregando */

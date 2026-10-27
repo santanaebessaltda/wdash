@@ -18,7 +18,8 @@ import { ProductNameCell } from "@/components/wedash/ProductNameCell";
 import {
   BadgeVsPrevious,
   TipHelp,
-  fetchProductsAggInput,
+  fetchProductsCatalogAggs,
+  fetchProductsKpiAggs,
   moneyOrDash,
   pctFmt,
   useProductDetail,
@@ -147,15 +148,30 @@ export default function ProductsPage() {
     }
     try {
       const storeIds = queryStoreIds(session.role, scope.storeIds, session.stores);
-      const [next, cov] = await Promise.all([
-        fetchProductsAggInput(session.tenantId, scope, storeIds),
+      // Onda 1: KPIs e cobertura — libera a tela sem esperar dezenas de milhares de SKUs.
+      const [kpi, cov] = await Promise.all([
+        fetchProductsKpiAggs(session.tenantId, scope, storeIds),
         fetchSalesCoverage(session.tenantId, storeIds),
       ]);
       if (gen !== reloadGen.current) return;
       const covFrom = cov.from ? isoToDate(cov.from) : null;
-      filterCacheSet(key, { aggs: next, covFrom });
-      setAggs(next);
+      const early: ProductsAggInput = {
+        ...kpi,
+        productDayAggs: cached?.aggs.productDayAggs,
+        productCostDayAggs: cached?.aggs.productCostDayAggs,
+        categoryDayAggs: cached?.aggs.categoryDayAggs,
+        catalogDescriptions: cached?.aggs.catalogDescriptions,
+        catalogTypes: cached?.aggs.catalogTypes,
+      };
+      setAggs(early);
       setCoverageFrom(covFrom);
+      settle(key);
+
+      const catalog = await fetchProductsCatalogAggs(session.tenantId, scope, storeIds);
+      if (gen !== reloadGen.current) return;
+      const full: ProductsAggInput = { ...early, ...catalog };
+      filterCacheSet(key, { aggs: full, covFrom });
+      setAggs(full);
       settle(key);
     } catch (e) {
       if (gen !== reloadGen.current) return;

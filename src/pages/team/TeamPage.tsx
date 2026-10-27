@@ -225,9 +225,22 @@ export function TeamPage() {
     }
     try {
       const storeIds = queryStoreIds(session.role, scope.storeIds, session.stores);
-      const [next, cov, goals, challenges] = await Promise.all([
+      // Onda 1: ranking e cobertura — metas/desafios (mais pesados) vêm depois.
+      const [next, cov] = await Promise.all([
         fetchTeamAggInput(session.tenantId, scope, storeIds),
         fetchSalesCoverage(session.tenantId, storeIds),
+      ]);
+      if (gen !== reloadGen.current) return;
+      const covFrom = cov.from ? isoToDate(cov.from) : null;
+      setAggs(next);
+      setCoverageFrom(covFrom);
+      if (cached) {
+        setGoalsData(cached.goals);
+        setChallengesData(cached.challenges);
+      }
+      settle(key);
+
+      const [goals, challenges] = await Promise.all([
         fetchGoalsData(session.tenantId, scope, session.stores),
         fetchPeriodChallenges(session.tenantId, scope, session.stores).catch((e: unknown) => {
           console.error("Team challenges:", e);
@@ -235,10 +248,7 @@ export function TeamPage() {
         }),
       ]);
       if (gen !== reloadGen.current) return;
-      const covFrom = cov.from ? isoToDate(cov.from) : null;
       filterCacheSet(key, { aggs: next, covFrom, goals, challenges });
-      setAggs(next);
-      setCoverageFrom(covFrom);
       setGoalsData(goals);
       setChallengesData(challenges);
       settle(key);
