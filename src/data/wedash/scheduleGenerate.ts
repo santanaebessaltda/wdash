@@ -1,7 +1,7 @@
 /** Geração da escala do mês, com a mesma busca do gerador de escalas. */
 
 import { addDays, addMonths, endOfMonth } from "./engine/format";
-import { generate } from "./scheduleEngine";
+import { continuation, generate } from "./scheduleEngine";
 
 export type SchedulePattern = "6x1" | "5x2" | "4x3" | "12x36";
 export type ScheduleScenario = "before_6x1" | "after_6x1";
@@ -44,7 +44,65 @@ export type GeneratedDay = {
   status: DayStatus;
 };
 
-export type GeneratedMonth = { days: GeneratedDay[]; compDue: CompDue[] };
+/** Snapshot do motor para o mês seguinte (continuation + ids na ordem da matriz). */
+export type GeneratorSnapshot = {
+  version: 1;
+  personIds: string[];
+  month: string;
+  model: string;
+  employees: { name: string; sex: "M" | "F" }[];
+  days: string[];
+  matrix: string[][];
+  assignment: { base: number; phase: number; workPhase?: number }[];
+  startWeek: number;
+  firstSpanish: number;
+  open: boolean[];
+  minimum: number[];
+  holidays: unknown[];
+  compDeadline: "seven" | "month";
+  compensation: { employee: number; holiday: string; day: string; deadline?: string }[];
+};
+
+export type GeneratedMonth = { days: GeneratedDay[]; compDue: CompDue[]; snapshot: GeneratorSnapshot };
+
+/** Encaixa o snapshot do mês anterior na equipe atual (mesmos ids). */
+export function previousFromSnapshot(
+  snapshot: GeneratorSnapshot | null | undefined,
+  people: SchedulePerson[],
+  nextMonth: string,
+): { previous: Record<string, unknown>; orderedPeople: SchedulePerson[] } | null {
+  if (!snapshot || snapshot.version !== 1) return null;
+  if (snapshot.month >= nextMonth) return null;
+  const expectedNext = addMonths(`${snapshot.month}-01`, 1).slice(0, 7);
+  if (expectedNext !== nextMonth) return null;
+  if (!Array.isArray(snapshot.personIds) || snapshot.personIds.length !== people.length) return null;
+  if (!snapshot.personIds.every((id) => people.some((person) => person.id === id))) return null;
+  const orderedPeople = snapshot.personIds.map((id) => people.find((person) => person.id === id)!);
+  return {
+    orderedPeople,
+    previous: {
+      // Validação estrita do gerador exige nomes idênticos; ids já conferidos acima.
+      carryOnly: true,
+      month: snapshot.month,
+      model: snapshot.model,
+      employees: orderedPeople.map((person, index) => ({
+        name: snapshot.employees[index]?.name || person.name?.trim() || "Pessoa",
+        sex: person.sex === "man" ? "M" : "F",
+      })),
+      days: snapshot.days,
+      matrix: snapshot.matrix,
+      assignment: snapshot.assignment,
+      startWeek: snapshot.startWeek,
+      firstSpanish: snapshot.firstSpanish,
+      open: snapshot.open,
+      minimum: snapshot.minimum,
+      holidays: snapshot.holidays,
+      compDeadline: snapshot.compDeadline,
+      // Compensatórias no mês seguinte já vêm em incomingComp / placeIncoming.
+      compensation: (snapshot.compensation ?? []).filter((link) => link.day.startsWith(nextMonth)),
+    },
+  };
+}
 
 export function patternFits(scenario: ScheduleScenario, pattern: SchedulePattern): boolean {
   if (scenario === "after_6x1") return pattern !== "6x1";
@@ -158,6 +216,8 @@ type EngineMonth = {
   days: string[];
   matrix: string[][];
   compensation?: { employee: number; holiday: string; day: string; deadline?: string }[];
+  assignment?: { base: number; phase: number; workPhase?: number }[];
+  config?: Record<string, unknown>;
 };
 
 export function generateMonth(input: {
@@ -174,6 +234,8 @@ export function generateMonth(input: {
   groupNeeds?: GroupNeed[];
   holidayRules?: HolidayRule[];
   incomingComp?: CompDue[];
+  /** Snapshot do mês anterior (mesma equipe) — revezamento de domingo e dia-base. */
+  previousSnapshot?: GeneratorSnapshot | null;
   /** O ciclo começa nesta data. Sem ela, a escala usa o mês inteiro. */
   from?: string;
   to?: string;
@@ -195,16 +257,30 @@ export function generateMonth(input: {
     const row = input.dayNeeds?.find((item) => item.dow === (genDow + 1) % 7);
     return row?.open ? row.min : 0;
   });
+  const linked = previousFromSnapshot(input.previousSnapshot, input.people, month);
+  const people = linked?.orderedPeople ?? input.people;
+  const previousAssignment = linked?.previous?.assignment as
+    | { base: number; phase: number; workPhase?: number }[]
+    | undefined;
   const rules = (input.holidayRules ?? []).filter((rule) => rule.date.startsWith(month));
   const result = generate({
     month,
     regime: "before",
     model: input.pattern,
-    employees: input.people.map((person) => ({
-      name: person.name?.trim() || "Pessoa",
-      sex: person.sex === "man" ? "M" : "F",
-      fixed: person.fixedOffDow == null ? -1 : generatorDow(person.fixedOffDow),
-    })),
+    previous: linked?.previous,
+    employees: people.map((person, index) => {
+      const fixedChosen = person.fixedOffDow == null ? -1 : generatorDow(person.fixedOffDow);
+      // Sem folga fixa na tela: herda o dia-base do mês anterior (como continuar no gerador).
+      const inherited =
+        fixedChosen < 0 && previousAssignment?.[index] && Number.isInteger(previousAssignment[index].base)
+          ? previousAssignment[index].base
+          : -1;
+      return {
+        name: person.name?.trim() || "Pessoa",
+        sex: person.sex === "man" ? "M" : "F",
+        fixed: fixedChosen >= 0 ? fixedChosen : inherited,
+      };
+    }),
     open,
     minimum,
     sundayF: sundayCadence(input.womenSunday, input.sundayMin),
@@ -225,13 +301,13 @@ export function generateMonth(input: {
   const knownHoliday = new Set(rules.map((rule) => rule.date));
   const days: GeneratedDay[] = [];
   const calendar: string[] = result.days;
-  for (let person = 0; person < input.people.length; person++) {
+  for (let person = 0; person < people.length; person++) {
     for (let index = 0; index < calendar.length; index++) {
       const date = calendar[index];
       if (date < from || date > to) continue;
       let status = markStatus(result.matrix[person][index]);
       if (status === "work" && plain.has(date) && !knownHoliday.has(date)) status = "holiday_work";
-      days.push({ personId: input.people[person].id, date, status });
+      days.push({ personId: people[person].id, date, status });
     }
   }
   const compDue: CompDue[] = [];
@@ -245,7 +321,7 @@ export function generateMonth(input: {
   };
   for (const link of result.compensation ?? []) {
     if (link.day >= from && link.day <= to) continue;
-    const person = input.people[link.employee];
+    const person = people[link.employee];
     if (!person) continue;
     pushDue({ personId: person.id, holiday: link.holiday, until: link.deadline || monthEnd });
   }
@@ -253,7 +329,7 @@ export function generateMonth(input: {
   for (const rule of rules) {
     if (rule.pay !== "extra_off" || rule.window !== "next_month" || !rule.open) continue;
     const until = holidayDeadline(rule, monthEnd);
-    for (const person of input.people) {
+    for (const person of people) {
       if (!days.some((row) => row.personId === person.id && row.date === rule.date && row.status === "holiday_work")) {
         continue;
       }
@@ -263,7 +339,13 @@ export function generateMonth(input: {
   for (const due of input.incomingComp ?? []) {
     if (!placeIncoming(days, input.dayNeeds, rules, due)) pushDue(due);
   }
-  return { days, compDue };
+  const cont = continuation(result) as Omit<GeneratorSnapshot, "version" | "personIds">;
+  const snapshot: GeneratorSnapshot = {
+    version: 1,
+    personIds: people.map((person) => person.id),
+    ...cont,
+  };
+  return { days, compDue, snapshot };
 }
 
 export type EditableDay = { sellerId: string; day: string; status: DayStatus; origin?: "generated" | "manual" };

@@ -1,4 +1,15 @@
-import type { DayStatus, OffMode, SchedulePattern, Sex, SundayRule, DayNeed, GroupNeed, HolidayRule, CompDue } from "./scheduleGenerate";
+import type {
+  DayStatus,
+  OffMode,
+  SchedulePattern,
+  Sex,
+  SundayRule,
+  DayNeed,
+  GroupNeed,
+  HolidayRule,
+  CompDue,
+  GeneratorSnapshot,
+} from "./scheduleGenerate";
 import { addMonths, endOfMonth, startOfMonth } from "./engine/format";
 
 export type ExtraHoliday = { day: number; name: string };
@@ -14,6 +25,7 @@ export type StoredSchedule = {
   groupNeeds: GroupNeed[];
   holidayRules: HolidayRule[];
   compDue: CompDue[];
+  generatorSnapshot: GeneratorSnapshot | null;
   extraHolidays: ExtraHoliday[];
   periodStart: string | null;
   periodEnd: string | null;
@@ -39,6 +51,7 @@ type ScheduleRecord = {
   group_needs?: GroupNeed[] | null;
   holiday_rules?: HolidayRule[] | null;
   comp_due?: CompDue[] | null;
+  generator_snapshot?: GeneratorSnapshot | null;
   period_start?: string | null;
   period_end?: string | null;
   store_schedule_person: { seller_id: string; fixed_off_dow: number | null; sex?: Sex | null }[] | null;
@@ -60,6 +73,10 @@ function asSchedule(row: ScheduleRecord): StoredSchedule {
     groupNeeds: asList(row.group_needs),
     holidayRules: asList(row.holiday_rules),
     compDue: asList(row.comp_due),
+    generatorSnapshot:
+      row.generator_snapshot && typeof row.generator_snapshot === "object" && row.generator_snapshot.version === 1
+        ? row.generator_snapshot
+        : null,
     extraHolidays: asList(row.extra_holidays),
     periodStart: row.period_start ? String(row.period_start).slice(0, 10) : null,
     periodEnd: row.period_end ? String(row.period_end).slice(0, 10) : null,
@@ -84,7 +101,7 @@ export async function fetchSchedule(storeId: string, monthStart: string): Promis
   const [scheduleResult, dayResult] = await Promise.all([
     sb
       .from("store_schedule")
-      .select("id, pattern, off_mode, sunday_min, extra_holidays, women_sunday, men_sunday, day_needs, group_needs, holiday_rules, comp_due, period_start, period_end, store_schedule_person(seller_id, fixed_off_dow, sex)")
+      .select("id, pattern, off_mode, sunday_min, extra_holidays, women_sunday, men_sunday, day_needs, group_needs, holiday_rules, comp_due, generator_snapshot, period_start, period_end, store_schedule_person(seller_id, fixed_off_dow, sex)")
       .eq("store_id", storeId)
       .eq("month_start", startOfMonth(monthStart))
       .maybeSingle(),
@@ -122,6 +139,7 @@ export async function saveSchedule(input: {
   groupNeeds: GroupNeed[];
   holidayRules: HolidayRule[];
   compDue: CompDue[];
+  generatorSnapshot?: GeneratorSnapshot | null;
   people: { sellerId: string; fixedOffDow: number | null; sex: Sex }[];
   days: { sellerId: string; day: string; status: DayStatus }[];
   keepManual: boolean;
@@ -162,6 +180,7 @@ export async function saveSchedule(input: {
         group_needs: input.groupNeeds,
         holiday_rules: input.holidayRules,
         comp_due: input.compDue,
+        generator_snapshot: input.generatorSnapshot ?? null,
         period_start: input.rangeStart,
         period_end: input.rangeEnd,
         generated_at: new Date().toISOString(),
@@ -218,6 +237,21 @@ export async function fetchCompDue(storeId: string, monthStart: string): Promise
   const result = await sb.from("store_schedule").select("comp_due").eq("store_id", storeId).eq("month_start", previous).maybeSingle();
   if (result.error || !result.data || !Array.isArray(result.data.comp_due)) return [];
   return result.data.comp_due as CompDue[];
+}
+
+/** Snapshot do motor do mês anterior (revezamento de domingo / dia-base). */
+export async function fetchPreviousSnapshot(storeId: string, monthStart: string): Promise<GeneratorSnapshot | null> {
+  const sb = await client();
+  const previous = addMonths(startOfMonth(monthStart), -1);
+  const result = await sb
+    .from("store_schedule")
+    .select("generator_snapshot")
+    .eq("store_id", storeId)
+    .eq("month_start", previous)
+    .maybeSingle();
+  if (result.error || !result.data?.generator_snapshot) return null;
+  const snap = result.data.generator_snapshot as GeneratorSnapshot;
+  return snap && typeof snap === "object" && snap.version === 1 ? snap : null;
 }
 
 export async function fetchScheduleDays(storeId: string, from: string, to: string): Promise<StoredDay[]> {

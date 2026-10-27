@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { applyDayChoices, generateMonth, weekday, type EditableDay, type HolidayRule } from "./scheduleGenerate";
+import { applyDayChoices, generateMonth, previousFromSnapshot, weekday, type EditableDay, type HolidayRule } from "./scheduleGenerate";
 import { easter, nationalHolidays, storePlace } from "./scheduleHolidays";
 
 describe("feriados nacionais", () => {
@@ -125,6 +125,56 @@ describe("geração da escala", () => {
       holidayRules: [{ date: "2026-10-12", name: "Aparecida", open: true, workers: 1, pay: "extra_off", window: "next_month" }],
     });
     expect(generated.compDue).toEqual([{ personId: "a", holiday: "2026-10-12", until: "2026-11-30" }]);
+  });
+
+  it("usa o mês anterior no revezamento de domingo", () => {
+    const people = ["a", "b", "c", "d"].map((id) => ({ id, sex: "woman" as const }));
+    const dayNeeds = Array.from({ length: 7 }, (_, dow) => ({ dow, open: true, min: 2 }));
+    const october = generateMonth({
+      year: 2026,
+      month: 10,
+      pattern: "6x1",
+      offMode: "rotating",
+      sundayMin: 0,
+      womenSunday: "every_2",
+      menSunday: "every_3",
+      people,
+      holidayDates: [],
+      dayNeeds,
+      holidayRules: [],
+    });
+    expect(october.snapshot.month).toBe("2026-10");
+    expect(october.snapshot.personIds).toEqual(["a", "b", "c", "d"]);
+    expect(previousFromSnapshot(october.snapshot, people, "2026-11")).not.toBeNull();
+    expect(previousFromSnapshot(october.snapshot, [{ id: "a" }, { id: "x" }], "2026-11")).toBeNull();
+
+    const november = generateMonth({
+      year: 2026,
+      month: 11,
+      pattern: "6x1",
+      offMode: "rotating",
+      sundayMin: 0,
+      womenSunday: "every_2",
+      menSunday: "every_3",
+      people,
+      holidayDates: [],
+      dayNeeds,
+      holidayRules: [],
+      previousSnapshot: october.snapshot,
+    });
+    // Com every_2, não pode haver 2 domingos seguidos sem folga na virada out→nov.
+    for (const person of people) {
+      const sundays = ["2026-10-25", "2026-11-01", "2026-11-08"]
+        .map((date) => {
+          const row =
+            october.days.find((item) => item.personId === person.id && item.date === date) ??
+            november.days.find((item) => item.personId === person.id && item.date === date);
+          return row?.status === "off" || row?.status === "comp_off";
+        });
+      for (let i = 0; i + 1 < sundays.length; i++) {
+        expect(sundays[i] || sundays[i + 1]).toBe(true);
+      }
+    }
   });
 
   it("não trava o revezamento de domingo quando a compensatória vai para o mês seguinte", () => {

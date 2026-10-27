@@ -14,6 +14,27 @@
   const historyCell=(c,i,day)=>c.previous?.matrix?.[i]?.[c.previous.days?.indexOf(day)];
   const carriedLinks=c=>c.previous?.compensation||[];
   const forcedComp=(c,i,day)=>carriedLinks(c).some(l=>l.employee===i&&l.day===day);
+  /** Recorte do mês gerado para virar `previous` no mês seguinte (igual ao gerador). */
+  function continuation(r) {
+    if (!r?.ok) throw new Error("Corrija os erros desta escala antes de continuar para o próximo mês.");
+    const indexes = r.days.map((day, j) => ({ day, j })).filter((x) => x.day.startsWith(r.config.month));
+    const c = r.config;
+    return {
+      month: c.month,
+      model: c.model,
+      employees: c.employees.map((e) => ({ name: e.name, sex: e.sex })),
+      days: indexes.map((x) => x.day),
+      matrix: r.matrix.map((row) => indexes.map((x) => row[x.j])),
+      assignment: r.assignment.map((a) => ({ base: a.base, phase: a.phase, workPhase: a.workPhase })),
+      startWeek: c.startWeek,
+      firstSpanish: c.firstSpanish,
+      open: c.open,
+      minimum: c.minimum,
+      holidays: c.holidays,
+      compDeadline: c.compDeadline,
+      compensation: r.compensation.filter((l) => l.holiday.startsWith(c.month)),
+    };
+  }
   function validateHistory(c) {
     const p=c.previous;if(!p||p.carryOnly)return;
     const bad=()=>{throw new Error('A escala anterior não corresponde a este mês e à mesma equipe. Abra a cópia do mês anterior e use “Continuar no mês seguinte”.');};
@@ -506,4 +527,4 @@
     const checks=definitions.map(([id,label,applicable])=>{const details=issues.filter(issue=>issue.kind===id).map(issue=>issue.message);return{id,label,status:details.length?'error':id==='domingos'&&sundayRisk.length?'attention':applicable?'ok':'na',details};});
     return { errors, warnings, weekly, present, checks, payroll, sundayRisk, status: errors.length ? 'Revisar escala' : sundayRisk.length ? 'Escala montada — atenção aos domingos das funcionárias' : payroll.length ? 'Escala montada — atenção à folha de pagamento' : 'Critérios da escala atendidos' };
   }
-export { generate };
+export { generate, continuation };

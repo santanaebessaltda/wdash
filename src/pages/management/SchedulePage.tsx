@@ -20,7 +20,7 @@ import { branchRoleLabel, fetchStoreSellers, fetchStoreShifts, isBranchTeamMembe
 import { DOW_LABELS } from "@/data/wedash/storeHours";
 import { applyDayChoices, dayEditOptions, defaultDayNeeds, generateMonth, inferCompLinks, PREVIOUS_MONTH_EDIT, weekday, type CellChoice, type DayNeed, type DayStatus, type HolidayRule, type SchedulePattern, type Sex } from "@/data/wedash/scheduleGenerate";
 import { holidayLabel, holidaysForStore, loadHolidaySeed, loadNationalHolidays, storePlace, type Holiday } from "@/data/wedash/scheduleHolidays";
-import { deleteSchedule, fetchCompDue, fetchSchedule, saveManualDay, saveSchedule, type StoredDay, type StoredSchedule } from "@/data/wedash/scheduleRepo";
+import { deleteSchedule, fetchCompDue, fetchPreviousSnapshot, fetchSchedule, saveManualDay, saveSchedule, type StoredDay, type StoredSchedule } from "@/data/wedash/scheduleRepo";
 import { ScheduleWizard, type ScheduleWizardValue, type WizardBranch } from "./ScheduleWizard";
 
 const MONTHS = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
@@ -267,7 +267,10 @@ export function SchedulePage() {
 
   async function generateFor(storeId: string, value: ScheduleWizardValue, selected: SelectedPerson[], storeHolidays: Holiday[]) {
     const [year, monthNumber] = value.periodStart.split("-").map(Number);
-    const incoming = await fetchCompDue(storeId, value.periodStart);
+    const [incoming, previousSnapshot] = await Promise.all([
+      fetchCompDue(storeId, value.periodStart),
+      fetchPreviousSnapshot(storeId, value.periodStart),
+    ]);
     const offMode = selected.length > 0 && selected.every((person) => person.fixedOffDow != null) ? "fixed" : "rotating";
     const generated = generateMonth({
       year,
@@ -291,6 +294,7 @@ export function SchedulePage() {
       groupNeeds: value.groupNeeds,
       holidayRules: value.holidayRules,
       incomingComp: incoming,
+      previousSnapshot,
     });
     const known = new Set(storeHolidays.filter((row) => row.kind !== "municipal").map((row) => row.date));
     const months = monthsBetween(value.periodStart, value.periodEnd);
@@ -311,6 +315,7 @@ export function SchedulePage() {
         groupNeeds: value.groupNeeds,
         holidayRules: value.holidayRules,
         compDue: start === months[months.length - 1] ? generated.compDue : [],
+        generatorSnapshot: start === months[0] ? generated.snapshot : null,
         people: selected.map((person) => ({ sellerId: person.id, fixedOffDow: person.fixedOffDow, sex: person.sex })),
         days: generated.days.filter((row) => row.date >= start && row.date <= endOfMonth(start)).map((row) => ({ sellerId: row.personId, day: row.date, status: row.status })),
         keepManual: !value.replaceManual,
@@ -331,6 +336,7 @@ export function SchedulePage() {
       groupNeeds: value.groupNeeds,
       holidayRules: value.holidayRules,
       compDue: generated.compDue,
+      generatorSnapshot: generated.snapshot,
       extraHolidays: [],
       periodStart: value.periodStart,
       periodEnd: value.periodEnd,
