@@ -155,6 +155,16 @@ export type ProductSelection =
 
 const nameSelection = (s: ProductSelection) => (s.kind === "class" ? `Classe ${s.productClass}` : s.name);
 
+/** Identidade estável do topo da pilha — reseta o scroll do modal ao empilhar / voltar. */
+const selectionScrollKey = (s: ProductSelection) =>
+  s.kind === "product"
+    ? `product:${s.rowKey}`
+    : s.kind === "line"
+      ? `line:${s.name}`
+      : s.kind === "category"
+        ? `category:${s.categoryId ?? s.name}`
+        : `class:${s.productClass}`;
+
 function buildDetail(scope: Scope, { aggs, view }: ProductsDetailData, s: ProductSelection): ProductDetail | null {
   switch (s.kind) {
     case "product": {
@@ -220,6 +230,7 @@ export function useProductDetail({
       open={top != null}
       loading={top != null && !source}
       title={top ? nameSelection(top) : undefined}
+      scrollKey={top ? selectionScrollKey(top) : 0}
       detail={detail}
       period={resolvePeriod(scope.period, calendarTodayIso()).label}
       onClose={() => setPilha([])}
@@ -526,6 +537,7 @@ function ProductDetailModal({
   open,
   loading,
   title,
+  scrollKey,
   detail,
   period,
   onClose,
@@ -537,6 +549,7 @@ function ProductDetailModal({
   open: boolean;
   loading: boolean;
   title?: string;
+  scrollKey: string | number;
   detail: ProductDetail | null;
   period: string;
   onClose: () => void;
@@ -562,7 +575,7 @@ function ProductDetailModal({
           ? ["Curva ABC", plural(detail.categories.length, "category"), period].join(" · ")
           : [detail.code, period].filter(Boolean).join(" · ");
   return (
-    <Modal open={open} onClose={onClose} title={detail?.name ?? title} size="lg">
+    <Modal open={open} onClose={onClose} title={detail?.name ?? title} size="lg" scrollKey={scrollKey}>
       {loading ? (
         <DetailSkeleton />
       ) : !detail ? (
