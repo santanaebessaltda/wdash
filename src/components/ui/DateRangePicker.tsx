@@ -61,11 +61,6 @@ function startOfWeek(today: Date): Date {
   return addCalendarDays(d, diff);
 }
 
-function startOfQuarter(today: Date): Date {
-  const month = Math.floor(today.getMonth() / 3) * 3;
-  return new Date(today.getFullYear(), month, 1);
-}
-
 function startOfHalf(today: Date): Date {
   const month = today.getMonth() < 6 ? 0 : 6;
   return new Date(today.getFullYear(), month, 1);
@@ -77,7 +72,8 @@ export const DEFAULT_QUICK_RANGES: QuickRange[] = [
   { id: "yesterday", label: "Ontem", resolve: (h) => { const d = addCalendarDays(startOfCalendarDay(h), -1); return [d, d]; } },
   { id: "thisWeek", label: "Esta semana", resolve: (h) => { const d = startOfCalendarDay(h); return [startOfWeek(d), d]; } },
   { id: "thisMonth", label: "Este mês", resolve: (h) => { const d = startOfCalendarDay(h); return [new Date(d.getFullYear(), d.getMonth(), 1), d]; } },
-  { id: "thisQuarter", label: "Este trimestre", resolve: (h) => { const d = startOfCalendarDay(h); return [startOfQuarter(d), d]; } },
+  // Ultimos 3 meses civis ate hoje (nao o trimestre Q1–Q4).
+  { id: "thisQuarter", label: "Este trimestre", resolve: (h) => { const d = startOfCalendarDay(h); return [new Date(d.getFullYear(), d.getMonth() - 2, 1), d]; } },
   { id: "thisHalf", label: "Este semestre", resolve: (h) => { const d = startOfCalendarDay(h); return [startOfHalf(d), d]; } },
   { id: "thisYear", label: "Este ano", resolve: (h) => { const d = startOfCalendarDay(h); return [new Date(d.getFullYear(), 0, 1), d]; } },
 ];

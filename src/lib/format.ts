@@ -8,6 +8,7 @@ export {
   isoToDate,
   endOfMonth,
   startOfMonth,
+  addMonths,
   eachDay,
   num,
   dateToIso,
