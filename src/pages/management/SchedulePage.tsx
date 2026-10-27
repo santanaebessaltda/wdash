@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Alert, Button, Card, Modal, Select, useToast } from "@/components/ui";
+import { Accordion, Alert, Button, Card, Modal, Select, useToast } from "@/components/ui";
 import { ColorLegend, type LegendItem } from "@/components/wedash/ColorLegend";
 import { ScheduleCardsSkeleton } from "@/components/wedash/LoadingSkeletons";
 import { BranchBadge, PeriodBadge } from "@/components/wedash/RecordBadges";
@@ -61,72 +61,48 @@ function shortDate(iso: string): string {
   return `${day}/${month}/${year}`;
 }
 
-/** Calendário do mês seguinte só com quem tem FC prevista — para repasse ao sindicato. */
-function NextMonthOffsBoard({
-  monthStart,
-  rows,
-  view,
-  schedule,
-  today,
-}: {
-  monthStart: string;
-  rows: CompOffSummaryRow[];
-  view: BranchSchedule;
-  schedule: StoredSchedule;
-  today: string;
-}) {
-  const nextStart = addMonths(monthStart, 1);
-  const nextEnd = endOfMonth(nextStart);
-  const planned = rows.filter((row) => row.offDate && row.offDate >= nextStart && row.offDate <= nextEnd);
-  if (planned.length === 0) return null;
-  const nextDates: string[] = [];
-  for (let day = nextStart; day <= nextEnd; day = addDays(day, 1)) nextDates.push(day);
-  const saved = view.months.find((item) => item.monthStart === nextStart);
-  const personIds = [...new Set(planned.map((row) => row.personId))];
-  const people = view.people.filter((person) => personIds.includes(person.id));
-  const days: StoredDay[] = saved
-    ? view.days.filter((row) => row.day >= nextStart && row.day <= nextEnd && personIds.includes(row.sellerId))
-    : personIds.flatMap((personId) =>
-        nextDates.map((day) => ({
-          sellerId: personId,
-          day,
-          status: (planned.some((row) => row.personId === personId && row.offDate === day) ? "comp_off" : "work") as DayStatus,
-          origin: "generated" as const,
-        })),
-      );
-  const boardSchedule = saved?.schedule ?? {
-    ...schedule,
-    holidayRules: [],
-    dayNeeds: defaultDayNeeds(),
-    people: people.map((person) => ({
-      sellerId: person.id,
-      fixedOffDow: schedule.people.find((row) => row.sellerId === person.id)?.fixedOffDow ?? null,
-      sex: schedule.people.find((row) => row.sellerId === person.id)?.sex ?? ("woman" as Sex),
-    })),
-  };
+/** Lista por pessoa das FC do mês (e as que caem no seguinte) — repasse ao sindicato. */
+function CompOffAccordion({ rows }: { rows: CompOffSummaryRow[] }) {
+  if (rows.length === 0) return null;
+  const byPerson = new Map<string, { name: string; rows: CompOffSummaryRow[] }>();
+  for (const row of rows) {
+    const bucket = byPerson.get(row.personId) ?? { name: row.personName, rows: [] };
+    bucket.rows.push(row);
+    byPerson.set(row.personId, bucket);
+  }
+  const people = [...byPerson.values()].sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
   return (
     <div className="mt-4">
-      <div className="mb-3">
-        <h4 className="text-[13px] font-bold text-t0">Folgas compensatórias · {monthLabel(nextStart).toLocaleLowerCase("pt-BR")}</h4>
-        <p className="mt-0.5 text-[12px] text-t2">
-          {saved
-            ? "Escala do mês seguinte com as folgas pelo feriado trabalhado."
-            : "Prévia das datas previstas no mês seguinte para repasse ao sindicato. A escala completa desse mês é gerada à parte."}
-        </p>
-      </div>
-      <ScheduleBoard
-        dates={nextDates}
-        today={today}
-        readOnly={!saved}
-        section={{
-          storeId: view.store.id,
-          holidays: view.holidays,
-          schedules: [{ monthStart: nextStart, schedule: boardSchedule }],
-          days,
-          people,
-          shifts: view.shifts,
-        }}
-        onOpenDay={() => {}}
+      <Accordion
+        items={[
+          {
+            key: "comp-offs",
+            title: "Folgas compensatórias",
+            content: (
+              <div className="space-y-4">
+                <p className="text-[12px] text-t2">Para repasse ao sindicato: feriado trabalhado e a data da folga.</p>
+                <ul className="space-y-4">
+                  {people.map((person) => (
+                    <li key={person.rows[0]!.personId}>
+                      <p className="text-[13px] font-bold uppercase tracking-wide text-t0">{person.name}</p>
+                      <ul className="mt-1.5 space-y-1">
+                        {person.rows.map((row) => (
+                          <li key={`${row.personId}|${row.holidayDate}`} className="text-[12.5px] leading-snug text-t1">
+                            Feriado {shortDate(row.holidayDate)} · {row.holidayName}
+                            {" — "}
+                            <span className={cn("font-semibold", row.offDate ? "text-info" : "text-warn")}>
+                              {row.offDate ? `Folga em ${shortDate(row.offDate)}` : `Folga até ${shortDate(row.until)}`}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ),
+          },
+        ]}
       />
     </div>
   );
@@ -642,7 +618,7 @@ export function SchedulePage() {
                       }}
                       onOpenDay={(day, sellerId) => setDayOpen({ storeId: view.store.id, day, sellerId })}
                     />
-                    <NextMonthOffsBoard monthStart={item.monthStart} rows={compRows} view={view} schedule={item.schedule} today={today} />
+                    <CompOffAccordion rows={compRows} />
                   </Card>
                 );
               })}
