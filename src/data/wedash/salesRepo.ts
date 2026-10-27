@@ -22,6 +22,7 @@ import {
   deepHistoryProgress,
   monthStart,
 } from "./deepHistory";
+import { endOfMonth } from "./engine/format";
 import type {
   SalesBrand,
   SalesCategoryDayAgg,
@@ -35,6 +36,16 @@ import type {
   SellerAvatarRef,
   SellerShiftRef,
 } from "./salesTypes";
+
+/**
+ * Periodo so com meses civis fechados (dia 1  ->  ultimo dia de algum mes).
+ * Ai o rollup mensal bate com o comparativo; mes aberto (Este mes ate hoje) fica no dia a dia.
+ */
+export function rangeIsCompleteMonths(from: string, to: string): boolean {
+  if (!from || !to || from > to) return false;
+  if (!from.endsWith("-01")) return false;
+  return to === endOfMonth(to);
+}
 
 export type SalesDayQuery = {
   tenantId: string;
@@ -691,12 +702,20 @@ export async function fetchSalesProductDayAggs(
   const client = clientOrNull(clientOverride);
   if (!client) return [];
 
-  const bulk = await readAggJsonb(client, "read_sales_product_day_aggs", {
+  const args = {
     p_tenant_id: query.tenantId,
     p_store_ids: query.storeIds.length > 0 ? query.storeIds : null,
     p_from: query.from,
     p_to: query.to,
-  });
+  };
+
+  // Meses civis fechados: 1 linha por produto/mes em vez de ~30 dias.
+  if (rangeIsCompleteMonths(query.from, query.to)) {
+    const monthly = await readAggJsonb(client, "read_sales_product_month_aggs", args);
+    if (monthly && monthly.length > 0) return (monthly as ProductDayRow[]).map(mapProductDay);
+  }
+
+  const bulk = await readAggJsonb(client, "read_sales_product_day_aggs", args);
   if (bulk) return (bulk as ProductDayRow[]).map(mapProductDay);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -857,25 +876,33 @@ export async function fetchSalesProductCostDayAggs(
   if (!client) return [];
 
   try {
-    const bulk = await readAggJsonb(client, "read_sales_product_cost_day_aggs", {
+    const args = {
       p_tenant_id: query.tenantId,
       p_store_ids: query.storeIds.length > 0 ? query.storeIds : null,
       p_from: query.from,
       p_to: query.to,
-    });
-    const rows = bulk
-      ? (bulk as ProductCostDayRow[]).map(mapProductCostDay)
-      : await (async () => {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          let q: any = (client.from("sales_product_cost_day_agg") as any)
-            .select("tenant_id, store_id, day, product_code, item_count, revenue_cents, cmv_cents")
-            .eq("tenant_id", query.tenantId)
-            .gte("day", query.from)
-            .lte("day", query.to);
-          if (query.storeIds.length > 0) q = q.in("store_id", query.storeIds);
-          const ordered = q.order("day", { ascending: true }).order("store_id").order("product_code");
-          return (await fetchAllPages<ProductCostDayRow>(ordered, "fetchSalesProductCostDayAggs")).map(mapProductCostDay);
-        })();
+    };
+    let rows: SalesProductCostDayAgg[] | null = null;
+    if (rangeIsCompleteMonths(query.from, query.to)) {
+      const monthly = await readAggJsonb(client, "read_sales_product_cost_month_aggs", args);
+      if (monthly && monthly.length > 0) rows = (monthly as ProductCostDayRow[]).map(mapProductCostDay);
+    }
+    if (!rows) {
+      const bulk = await readAggJsonb(client, "read_sales_product_cost_day_aggs", args);
+      rows = bulk
+        ? (bulk as ProductCostDayRow[]).map(mapProductCostDay)
+        : await (async () => {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            let q: any = (client.from("sales_product_cost_day_agg") as any)
+              .select("tenant_id, store_id, day, product_code, item_count, revenue_cents, cmv_cents")
+              .eq("tenant_id", query.tenantId)
+              .gte("day", query.from)
+              .lte("day", query.to);
+            if (query.storeIds.length > 0) q = q.in("store_id", query.storeIds);
+            const ordered = q.order("day", { ascending: true }).order("store_id").order("product_code");
+            return (await fetchAllPages<ProductCostDayRow>(ordered, "fetchSalesProductCostDayAggs")).map(mapProductCostDay);
+          })();
+    }
     return applyFillToProductCosts(rows, await loadTableCostFill(client, rows, query));
   } catch (e) {
     console.warn("fetchSalesProductCostDayAggs:", e);

@@ -7,10 +7,20 @@ import {
   fetchSyncWatermark,
   forceQueueTimedOut,
   monthFillProgress,
+  rangeIsCompleteMonths,
   seedCoverageWindow,
   type SalesQueryClient,
 } from "./salesRepo";
 import type { SalesDayAgg, SalesHourAgg, SalesSellerDayAgg } from "./salesTypes";
+
+describe("rangeIsCompleteMonths", () => {
+  it("aceita mês civil fechado e rejeita período aberto", () => {
+    expect(rangeIsCompleteMonths("2026-09-01", "2026-09-30")).toBe(true);
+    expect(rangeIsCompleteMonths("2026-07-01", "2026-09-30")).toBe(true);
+    expect(rangeIsCompleteMonths("2026-10-01", "2026-10-27")).toBe(false);
+    expect(rangeIsCompleteMonths("2026-09-15", "2026-09-30")).toBe(false);
+  });
+});
 
 function mockClient(opts: {
   days?: SalesDayAgg[];
