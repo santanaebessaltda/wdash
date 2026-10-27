@@ -851,18 +851,20 @@ export function GoalDetailSkeleton() {
   );
 }
 
-/** Escala: card com titulo, selos, botoes e grade pessoa × dia. */
+/** Escala: título + legenda à direita, cards com selos, botões e grade pessoa × dia. */
 export function ScheduleCardsSkeleton({ count = 1, people = 5, days = 7 }: { count?: number; people?: number; days?: number }) {
   return (
     <Busy className="flex flex-col gap-4">
-      {/* Mesma legenda da tela: 5 itens, coluna no celular. */}
-      <div className="flex flex-col gap-y-1.5 sm:flex-row sm:flex-wrap sm:gap-x-4">
-        {Array.from({ length: 5 }, (_, i) => (
-          <div key={i} className="flex items-center gap-1.5">
-            <Skeleton className="h-2.5 w-3.5 shrink-0 rounded-[4px]" />
-            <Skeleton className={cn("h-3", i % 2 === 0 ? "w-36" : "w-44")} />
-          </div>
-        ))}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <Skeleton className="h-7 w-48" />
+        <ul className="flex flex-col gap-y-1.5 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-3.5">
+          {Array.from({ length: 5 }, (_, i) => (
+            <li key={i} className="inline-flex items-center gap-1.5">
+              <Skeleton className="h-2.5 w-2.5 rounded-[3px]" />
+              <Skeleton className={cn("h-3", i % 2 === 0 ? "w-20" : "w-28")} />
+            </li>
+          ))}
+        </ul>
       </div>
       {Array.from({ length: count }, (_, c) => (
         <Card key={c} className="min-w-0 overflow-hidden">

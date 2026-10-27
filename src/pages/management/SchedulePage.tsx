@@ -31,11 +31,11 @@ const VIEW_OPTIONS = [
 ] as const;
 type ScheduleViewMode = (typeof VIEW_OPTIONS)[number]["id"];
 const SCHEDULE_LEGEND: LegendItem[] = [
-  { key: "work", color: "bg-ok", label: "T · Trabalha", hint: "Na filial" },
-  { key: "off", color: "bg-chip-gray", label: "F · Folga", hint: "Descanso" },
-  { key: "holiday", color: "bg-warn", label: "FE · Feriado trabalhado", hint: "Trabalha no feriado" },
-  { key: "double", color: "bg-acc", label: "FE 2× · Pagamento em dobro", hint: "Trabalha com pagamento em dobro" },
-  { key: "comp", color: "bg-info", label: "FC · Folga compensatória", hint: "Folga pelo feriado trabalhado" },
+  { key: "work", color: "bg-ok", label: "T · Trabalha" },
+  { key: "off", color: "bg-chip-gray", label: "F · Folga" },
+  { key: "holiday", color: "bg-warn", label: "FE · Feriado trabalhado" },
+  { key: "double", color: "bg-acc", label: "FE 2× · Pagamento em dobro" },
+  { key: "comp", color: "bg-info", label: "FC · Folga compensatória" },
 ];
 const PATTERN_LABEL: Record<SchedulePattern, string> = {
   "6x1": "6×1",
@@ -562,14 +562,17 @@ export function SchedulePage() {
   }
 
   const registered = views.filter((view) => view.months.some((item) => item.monthStart === monthStart));
-  const creatable = views.filter((view) => !view.months.some((item) => item.monthStart === monthStart) && view.people.length > 0);
+  const withTeam = views.filter((view) => view.people.length > 0);
+  const creatable = withTeam.filter((view) => !view.months.some((item) => item.monthStart === monthStart));
   const scheduleCards = registered
     .flatMap((view) => view.months.filter((item) => item.monthStart === monthStart).map((item) => ({ view, item })))
     .sort((a, b) => (a.view.store.tradeName || a.view.store.name).localeCompare(b.view.store.tradeName || b.view.store.name, "pt-BR"));
 
   function openCreate() {
+    const target = creatable[0] ?? withTeam[0];
+    if (!target) return;
     setWizardMonth(null);
-    setWizardStoreId(creatable[0].store.id);
+    setWizardStoreId(target.store.id);
   }
 
   function registeredActions(view: BranchSchedule, monthStart: string) {
@@ -605,7 +608,7 @@ export function SchedulePage() {
     };
   }
 
-  const wizardBranches = (wizardView && wizardView.months.length > 0 ? [wizardView] : creatable).map((view) => toBranch(view));
+  const wizardBranches = (wizardMonth != null && wizardView ? [wizardView] : withTeam).map((view) => toBranch(view));
 
   return (
     <div>
@@ -648,8 +651,8 @@ export function SchedulePage() {
             >
               <MonthStep dir="proximo" />
             </button>
-            {creatable.length > 0 ? (
-              <Button icon={<Icon d={icons.plus} size={16} />} disabled={showSkeleton} onClick={openCreate}>
+            {storeRows.length > 0 ? (
+              <Button icon={<Icon d={icons.plus} size={16} />} disabled={showSkeleton || withTeam.length === 0} onClick={openCreate}>
                 Nova escala
               </Button>
             ) : null}
@@ -670,13 +673,15 @@ export function SchedulePage() {
               icon="📅"
               title="Sem escala cadastrada"
               description="Nenhuma filial deste filtro tem escala neste mês."
-              action={creatable.length > 0 ? <Button size="sm" onClick={openCreate}>Criar escala</Button> : undefined}
+              action={withTeam.length > 0 ? <Button size="sm" onClick={openCreate}>Criar escala</Button> : undefined}
             />
           </Card>
         ) : (
           <>
-            <h2 className="text-[22px] font-bold tracking-tight text-t0 sm:text-[24px]">{rangeHeading}</h2>
-            <ColorLegend className="mb-4 mt-3" items={SCHEDULE_LEGEND} />
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+              <h2 className="text-[22px] font-bold tracking-tight text-t0 sm:text-[24px]">{rangeHeading}</h2>
+              <ColorLegend mark="square" items={SCHEDULE_LEGEND} />
+            </div>
             <div className="flex flex-col gap-4">
               {scheduleCards.map(({ view, item }) => {
                 const visible =
