@@ -88,7 +88,7 @@ export function ProductsWithoutCostNotice({
         )
       }
     >
-      Isso can deixar o CMV e a margin incorretos.
+      Isso pode deixar o CMV e a margem incorretos.
     </Alert>
   );
 }
