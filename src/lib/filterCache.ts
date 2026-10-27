@@ -11,9 +11,9 @@
  */
 const store = new Map<string, unknown>();
 const MAX = 32;
-/** v3: invalida caches antigos apos mudanca de forma (periodo cost / Date revive). */
-const STORAGE_PREFIX = "wdash.fc.v3:";
-const LEGACY_PREFIXES = ["wdash.fc.v1:", "wdash.fc.v2:"];
+/** v4: pacote completo (Equipe/Produtos) — v3 podia settle sem seller/SKU e zerar KPI. */
+const STORAGE_PREFIX = "wdash.fc.v4:";
+const LEGACY_PREFIXES = ["wdash.fc.v1:", "wdash.fc.v2:", "wdash.fc.v3:"];
 /** Evita estourar sessionStorage com payloads enormes. */
 const MAX_STORAGE_CHARS = 1_500_000;
 

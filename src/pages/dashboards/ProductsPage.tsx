@@ -143,8 +143,14 @@ export default function ProductsPage() {
     const scopeAtLoad = scope;
     type ProductsCache = { aggs: ProductsAggInput; covFrom: Date | null };
     const cached = filterCacheGet<ProductsCache>(key);
-    // Sem catalogo de lojas a view zera (filtra por storeId) — nao tira o skeleton.
-    if (cached?.aggs && Array.isArray(cached.aggs.dayAggs) && productStores().length > 0) {
+    // Pacote completo (KPI + SKU/CMV) + catalogo: senao skeleton ate a rede.
+    const cacheReady =
+      cached != null &&
+      Array.isArray(cached.aggs?.dayAggs) &&
+      Array.isArray(cached.aggs?.productDayAggs) &&
+      Array.isArray(cached.aggs?.productCostDayAggs) &&
+      productStores().length > 0;
+    if (cacheReady) {
       setAggs(cached.aggs);
       setCoverageFrom(filterCacheDate(cached.covFrom));
       setViewScope(scopeAtLoad);

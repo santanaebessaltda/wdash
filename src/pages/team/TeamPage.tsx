@@ -218,13 +218,21 @@ export function TeamPage() {
       challenges: ChallengesData;
     };
     const cached = filterCacheGet<TeamCache>(key);
-    // Sem catalogo de lojas, a view zera tudo (filtra por storeId) — nao tira o skeleton.
-    const catalogReady = productStores().length > 0;
-    if (cached?.aggs && Array.isArray(cached.aggs.dayAggs) && catalogReady) {
+    // Pacote completo + catalogo: senao skeleton ate a rede (KPI zero com grafico cheio = cache sem seller).
+    const cacheReady =
+      cached != null &&
+      Array.isArray(cached.aggs?.dayAggs) &&
+      Array.isArray(cached.aggs?.sellerDayAggs) &&
+      cached.goals != null &&
+      Array.isArray(cached.goals.goals) &&
+      cached.challenges != null &&
+      Array.isArray(cached.challenges.challenges) &&
+      productStores().length > 0;
+    if (cacheReady) {
       setAggs(cached.aggs);
       setCoverageFrom(filterCacheDate(cached.covFrom));
-      setGoalsData(cached.goals ?? GOALS_EMPTY);
-      setChallengesData(cached.challenges ?? CHALLENGES_EMPTY);
+      setGoalsData(cached.goals);
+      setChallengesData(cached.challenges);
       setViewScope(scopeAtLoad);
       settle(key);
     }

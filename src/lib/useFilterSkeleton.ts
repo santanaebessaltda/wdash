@@ -2,8 +2,9 @@ import { useCallback, useState } from "react";
 import { useMinSkeleton } from "./useMinSkeleton";
 
 /**
- * Skeleton enquanto o filtro atual ainda nao tem pacote aplicado (`settle`).
- * 1ª carga e troca de filial/periodo/marca: skeleton ate os dados chegarem.
+ * Skeleton nos cards/KPIs enquanto o filtro atual nao tem pacote completo (`settle`).
+ * Titulo, filtro e subtitulo ficam fora do skeleton (nas paginas).
+ * 1ª carga e troca de filial/periodo/marca: espera o pacote 100%.
  * Recarga da mesma chave (venda nova) nao liga skeleton.
  *
  * Na view, use um `viewScope` que so atualiza no settle (junto com os aggs),
