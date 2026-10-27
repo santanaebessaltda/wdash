@@ -777,11 +777,12 @@ export function GoalDetailSkeleton() {
 export function ScheduleCardsSkeleton({ count = 1, people = 5, days = 7 }: { count?: number; people?: number; days?: number }) {
   return (
     <Busy className="flex flex-col gap-4">
-      <div className="flex flex-wrap gap-3">
-        {Array.from({ length: 4 }, (_, i) => (
-          <div key={i} className="flex items-center gap-2">
-            <Skeleton className="h-3 w-3 rounded-sm" />
-            <Skeleton className="h-3 w-24" />
+      {/* Mesma legenda da tela: 5 itens, coluna no celular. */}
+      <div className="flex flex-col gap-y-1.5 sm:flex-row sm:flex-wrap sm:gap-x-4">
+        {Array.from({ length: 5 }, (_, i) => (
+          <div key={i} className="flex items-center gap-1.5">
+            <Skeleton className="h-2.5 w-3.5 shrink-0 rounded-[4px]" />
+            <Skeleton className={cn("h-3", i % 2 === 0 ? "w-36" : "w-44")} />
           </div>
         ))}
       </div>
