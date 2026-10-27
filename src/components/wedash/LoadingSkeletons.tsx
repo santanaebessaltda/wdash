@@ -851,21 +851,10 @@ export function GoalDetailSkeleton() {
   );
 }
 
-/** Escala: título + legenda à direita, cards com selos, botões e grade pessoa × dia. */
+/** Escala: cards com selos, botões e grade heatmap (a legenda fica no cabeçalho da página). */
 export function ScheduleCardsSkeleton({ count = 1, people = 5, days = 7 }: { count?: number; people?: number; days?: number }) {
   return (
     <Busy className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <Skeleton className="h-7 w-48" />
-        <ul className="flex flex-col gap-y-1.5 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-3.5">
-          {Array.from({ length: 4 }, (_, i) => (
-            <li key={i} className="inline-flex items-center gap-1.5">
-              <Skeleton className="h-2.5 w-2.5 rounded-[3px]" />
-              <Skeleton className={cn("h-3", i % 2 === 0 ? "w-20" : "w-28")} />
-            </li>
-          ))}
-        </ul>
-      </div>
       {Array.from({ length: count }, (_, c) => (
         <Card key={c} className="min-w-0 overflow-hidden">
           <div className="mb-4 flex flex-wrap items-start justify-between gap-3">

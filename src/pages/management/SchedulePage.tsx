@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Accordion, Alert, Button, Card, Modal, Select, useToast } from "@/components/ui";
+import { Accordion, Alert, Button, Card, Modal, PageHeader, Select, useToast } from "@/components/ui";
 import { ColorLegend, type LegendItem } from "@/components/wedash/ColorLegend";
 import { ScheduleCardsSkeleton } from "@/components/wedash/LoadingSkeletons";
 import { BranchBadge, PeriodBadge } from "@/components/wedash/RecordBadges";
@@ -7,7 +7,7 @@ import { PersonAvatar } from "@/components/wedash/PersonAvatar";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
 import { MonthStep, monthNavBtn } from "@/pages/cash-close/MonthYearPicker";
 import { HeaderFilters } from "@/pages/stock/shared";
-import { SectionHeader, useScopedStores } from "@/pages/operation/shared";
+import { useScopedStores } from "@/pages/operation/shared";
 import { Icon, icons } from "@/pages/users/Icons";
 import { cn } from "@/lib/cn";
 import { filterCacheGet, filterCacheSet } from "@/lib/filterCache";
@@ -611,10 +611,9 @@ export function SchedulePage() {
 
   return (
     <div>
-      <SectionHeader
-        section="Gestão"
-        title="Escala"
-        subtitle={many ? "Acompanhe a escala das filiais." : "Acompanhe e ajuste a escala da filial."}
+      <PageHeader
+        crumbs={[{ label: "Escala" }]}
+        title={monthLabel(monthStart)}
         actions={
           <HeaderFilters>
             <div className="flex gap-1 rounded-[11px] border border-line bg-bg-2 p-1">
@@ -658,7 +657,13 @@ export function SchedulePage() {
           </HeaderFilters>
         }
       />
-      <div className="mt-6 min-w-0 pb-8">
+      {(showSkeleton || registered.length > 0) && storeRows.length > 0 ? (
+        <ColorLegend className="mb-4" mark="square" items={SCHEDULE_LEGEND} />
+      ) : null}
+      {viewMode !== "month" && registered.length > 0 ? (
+        <p className="mb-4 text-[13px] font-semibold text-t1">{rangeHeading}</p>
+      ) : null}
+      <div className="min-w-0 pb-8">
         {error ? <Alert className="mb-4" variant="danger" title="Não foi possível carregar a escala. Tente novamente." /> : null}
         {storeRows.length === 0 ? (
           <Card className="flex min-h-[280px] flex-col">
@@ -677,10 +682,6 @@ export function SchedulePage() {
           </Card>
         ) : (
           <>
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-              <h2 className="text-[22px] font-bold tracking-tight text-t0 sm:text-[24px]">{rangeHeading}</h2>
-              <ColorLegend mark="square" items={SCHEDULE_LEGEND} />
-            </div>
             <div className="flex flex-col gap-4">
               {scheduleCards.map(({ view, item }) => {
                 const visible =

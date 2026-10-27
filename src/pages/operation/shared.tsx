@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { Button, Card, CardHeader, CardTitle, FormField, Input, PageHeader, Select, TabNav, Tooltip } from "@/components/ui";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
 import { StoreDivisionTitle } from "@/components/wedash/StoreDivisionTitle";
-import { applyShoppingMenu, financeTabs, integrationTabs, navForRole, performanceTabs, scheduleTabs, settingsTabs } from "@/layout/nav-wedash";
+import { applyShoppingMenu, financeTabs, integrationTabs, navForRole, performanceTabs, settingsTabs } from "@/layout/nav-wedash";
 import { isNavGroup } from "@/layout/nav-config";
 import { useActiveSession } from "@/session/SessionProvider";
 import { useShoppingMenu } from "@/layout/useShoppingMenu";
@@ -58,16 +58,18 @@ export function useScopedStores() {
 export type SectionName =
   | "Estoque"
   | "Equipe"
+  | "Escala"
+  | "Pedido de compra"
   | "Performance"
   | "Financeiro"
-  | "Gestão"
   | "Integrações"
   | "Configurações";
 
 const SECTION_TABS: Record<SectionName, Array<{ label: string; to: string; end?: boolean }>> = {
   Estoque: [],
   Equipe: [],
-  Gestão: scheduleTabs,
+  Escala: [],
+  "Pedido de compra": [],
   Performance: performanceTabs,
   Financeiro: financeTabs,
   Integrações: integrationTabs,
@@ -78,7 +80,8 @@ const SECTION_TABS: Record<SectionName, Array<{ label: string; to: string; end?:
 const SECTION_PAGES: Record<SectionName, Array<() => Promise<unknown>>> = {
   Estoque: [() => import("@/pages/stock/InventoryPage")],
   Equipe: [() => import("@/pages/management/StaffPage")],
-  Gestão: [() => import("@/pages/management/SchedulePage"), () => import("@/pages/stock/PurchaseOrderPage")],
+  Escala: [() => import("@/pages/management/SchedulePage")],
+  "Pedido de compra": [() => import("@/pages/stock/PurchaseOrderPage")],
   Performance: [() => import("@/pages/goals/GoalsPage"), () => import("@/pages/management/ChallengesPage")],
   Financeiro: [
     () => import("@/pages/cash-close/CashClosePage"),

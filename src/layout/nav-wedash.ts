@@ -23,16 +23,11 @@ const ICON = {
   gear: "M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2zM15 12a3 3 0 1 0-6 0 3 3 0 0 0 6 0",
   /** Caixa  -  estoque. */
   stock: "M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16zM3.27 6.96 12 12.01l8.73-5.05M12 22.08V12",
-  /** Lucide BriefcaseBusiness — Gestão. */
-  briefcase: "M12 12h.01M16 6V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2M22 13a18.15 18.15 0 0 1-20 0M4 6h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z",
+  /** Lucide CalendarDays — Escala. */
+  calendar: "M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z",
+  /** Lucide ClipboardList — Pedido de compra. */
+  clipboard: "M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2M9 2h6a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1zM8 12h8M8 16h8M8 8h2",
   help: "M12 7v14M16 12h2M16 8h2M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3zM6 12h2M6 8h2",
-};
-
-/** Saldo por local. Página direta, sem submenu. */
-const stock: NavSingle = {
-  label: "Estoque",
-  icon: ICON.stock,
-  to: paths.stock.inventory,
 };
 
 /** Pessoas da filial. Página direta, sem submenu. */
@@ -42,22 +37,25 @@ const team: NavSingle = {
   to: paths.management.team,
 };
 
-const scheduleItem = { label: "Escala", to: paths.management.schedule };
-const purchaseOrderItem = { label: "Pedido de compra", to: paths.management.purchaseOrder };
-
-/** Escala da equipe. O gestor também vê o pedido de compra neste grupo. */
-const schedule: NavGroup = {
-  label: "Gestão",
-  description: "Monte a escala da equipe.",
-  icon: ICON.briefcase,
-  items: [scheduleItem],
+/** Escala da equipe. Página direta, sem submenu. */
+const schedule: NavSingle = {
+  label: "Escala",
+  icon: ICON.calendar,
+  to: paths.management.schedule,
 };
 
-const scheduleOwner: NavGroup = {
-  label: "Gestão",
-  description: "Monte a escala da equipe e o pedido de compra.",
-  icon: ICON.briefcase,
-  items: [scheduleItem, purchaseOrderItem],
+/** Saldo por local. Página direta, sem submenu. */
+const stock: NavSingle = {
+  label: "Estoque",
+  icon: ICON.stock,
+  to: paths.stock.inventory,
+};
+
+/** Pedido de compra (só Gestor). Página direta, sem submenu. */
+const purchaseOrder: NavSingle = {
+  label: "Pedido de compra",
+  icon: ICON.clipboard,
+  to: paths.management.purchaseOrder,
 };
 
 /** Metas e desafios. */
@@ -133,7 +131,6 @@ export function applyShoppingMenu(entries: NavEntry[], menu: { settings: boolean
 
 /** Abas das telas de cada grupo = os mesmos itens do menu. */
 export const performanceTabs = performance.items.map(({ label, to }) => ({ label, to }));
-export const scheduleTabs = scheduleOwner.items.map(({ label, to }) => ({ label, to }));
 export const financeTabs = finance.items.map(({ label, to }) => ({ label, to }));
 export const integrationTabs = integrations.items.map(({ label, to }) => ({ label, to }));
 export const settingsTabs = settings.items.map(({ label, to }) => ({ label, to }));
@@ -149,9 +146,10 @@ const navOwner: NavEntry[] = [
       { label: "Equipe", to: paths.team },
     ],
   },
-  stock,
   team,
-  scheduleOwner,
+  schedule,
+  stock,
+  purchaseOrder,
   performance,
   finance,
   tutorials,
@@ -179,9 +177,9 @@ const navManager: NavEntry[] = [
       { label: "Equipe", to: paths.team },
     ],
   },
-  stock,
   team,
   schedule,
+  stock,
   performance,
   finance,
   settingsHours,

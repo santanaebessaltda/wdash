@@ -448,7 +448,7 @@ export function PurchaseOrderPage() {
   return (
     <div className="flex flex-col p-4 sm:p-6">
       <SectionHeader
-        section="Gestão"
+        section="Pedido de compra"
         title="Pedido de compra"
         subtitle="Prepare o pedido de compra de cada filial."
         actions={
