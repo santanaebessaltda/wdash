@@ -152,31 +152,20 @@ export default function ProductsPage() {
     }
     try {
       const storeIds = queryStoreIds(session.role, scopeAtLoad.storeIds, session.stores);
-      // Onda 1: KPIs e cobertura — libera a tela sem esperar dezenas de milhares de SKUs.
-      const [kpi, cov] = await Promise.all([
+      // KPI + catalogo juntos (totais de periodo). Antes a onda 1 liberava KPI e a
+      // onda 2 (dia a dia) falhava/estourava — cards de baixo ficavam vazios.
+      const [kpi, cov, catalog] = await Promise.all([
         fetchProductsKpiAggs(session.tenantId, scopeAtLoad, storeIds),
         fetchSalesCoverage(session.tenantId, storeIds),
+        fetchProductsCatalogAggs(session.tenantId, scopeAtLoad, storeIds),
       ]);
       if (gen !== reloadGen.current) return;
       const covFrom = cov.from ? isoToDate(cov.from) : null;
-      const early: ProductsAggInput = {
-        ...kpi,
-        productDayAggs: cached?.aggs.productDayAggs,
-        productCostDayAggs: cached?.aggs.productCostDayAggs,
-        categoryDayAggs: cached?.aggs.categoryDayAggs,
-        catalogDescriptions: cached?.aggs.catalogDescriptions,
-        catalogTypes: cached?.aggs.catalogTypes,
-      };
-      setAggs(early);
-      setCoverageFrom(covFrom);
-      setViewScope(scopeAtLoad);
-      settle(key);
-
-      const catalog = await fetchProductsCatalogAggs(session.tenantId, scopeAtLoad, storeIds);
-      if (gen !== reloadGen.current) return;
-      const full: ProductsAggInput = { ...early, ...catalog };
+      const full: ProductsAggInput = { ...kpi, ...catalog };
       filterCacheSet(key, { aggs: full, covFrom });
       setAggs(full);
+      setCoverageFrom(covFrom);
+      setViewScope(scopeAtLoad);
       settle(key);
     } catch (e) {
       if (gen !== reloadGen.current) return;

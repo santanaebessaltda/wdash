@@ -11,7 +11,7 @@ import {
   buildProductLineDetail,
   buildProductsView,
   financeFetchRange,
-  productsFetchRange,
+  previousPeriod,
   resolvePeriod,
   type AbcClass,
   type ProductDetail,
@@ -28,8 +28,8 @@ import {
   fetchProductTypeNames,
   fetchSalesDayAggs,
   fetchSalesHourAggs,
-  fetchSalesProductCostDayAggs,
-  fetchSalesProductDayAggs,
+  fetchSalesProductCostPeriodAggs,
+  fetchSalesProductPeriodAggs,
 } from "@/data/wedash/salesRepo";
 import type { SalesHourAgg } from "@/data/wedash/salesTypes";
 import { calendarTodayIso } from "@/data/wedash/clock";
@@ -88,7 +88,11 @@ export async function fetchProductsKpiAggs(
   return { dayAggs, hourAggs, prevHourAggs };
 }
 
-/** Onda 2: SKU, CMV, categorias e catalogo. */
+/**
+ * SKU, CMV, categorias e catalogo.
+ * Totais do periodo no Postgres (igual Visao geral) — dia a dia em rede/mes
+ * estoura e deixava os cards de baixo vazios com KPI ja preenchido.
+ */
 export async function fetchProductsCatalogAggs(
   tenantId: string,
   scope: Scope,
@@ -99,14 +103,28 @@ export async function fetchProductsCatalogAggs(
     "productDayAggs" | "productCostDayAggs" | "categoryDayAggs" | "catalogDescriptions" | "catalogTypes"
   >
 > {
-  const prodRange = productsFetchRange(scope);
-  const [productDayAggs, productCostDayAggs, catalogDescriptions, catalogTypes, typeNames] = await Promise.all([
-    fetchSalesProductDayAggs({ tenantId, storeIds, from: prodRange.from, to: prodRange.to }),
-    fetchSalesProductCostDayAggs({ tenantId, storeIds, from: prodRange.from, to: prodRange.to }),
+  const period = resolvePeriod(scope.period, calendarTodayIso());
+  const prev = previousPeriod(period);
+  const q = (from: string, to: string) => ({ tenantId, storeIds, from, to });
+  const [
+    productsCurrent,
+    productsPrev,
+    costsCurrent,
+    costsPrev,
+    catalogDescriptions,
+    catalogTypes,
+    typeNames,
+  ] = await Promise.all([
+    fetchSalesProductPeriodAggs(q(period.start, period.end)),
+    fetchSalesProductPeriodAggs(q(prev.start, prev.end)),
+    fetchSalesProductCostPeriodAggs(q(period.start, period.end)),
+    fetchSalesProductCostPeriodAggs(q(prev.start, prev.end)),
     fetchProductCatalogDescriptions(),
     fetchProductCatalogTypes(),
     fetchProductTypeNames(),
   ]);
+  const productDayAggs = [...productsCurrent, ...productsPrev];
+  const productCostDayAggs = [...costsCurrent, ...costsPrev];
   const categoryDayAggs = rollupCategoryDays({
     products: productDayAggs,
     costs: productCostDayAggs,
