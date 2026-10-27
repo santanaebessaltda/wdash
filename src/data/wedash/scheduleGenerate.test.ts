@@ -127,6 +127,37 @@ describe("geração da escala", () => {
     expect(generated.compDue).toEqual([{ personId: "a", holiday: "2026-10-12", until: "2026-11-30" }]);
   });
 
+  it("não trava o revezamento de domingo quando a compensatória vai para o mês seguinte", () => {
+    const generated = generateMonth({
+      year: 2026,
+      month: 11,
+      pattern: "6x1",
+      offMode: "rotating",
+      sundayMin: 0,
+      womenSunday: "every_2",
+      menSunday: "every_3",
+      people: ["a", "b", "c", "d", "e", "f"].map((id) => ({ id, sex: "woman" as const })),
+      holidayDates: [],
+      dayNeeds: [
+        { dow: 0, open: true, min: 3 },
+        { dow: 1, open: true, min: 4 },
+        { dow: 2, open: true, min: 4 },
+        { dow: 3, open: true, min: 4 },
+        { dow: 4, open: true, min: 5 },
+        { dow: 5, open: true, min: 6 },
+        { dow: 6, open: true, min: 6 },
+      ],
+      holidayRules: [
+        { date: "2026-11-02", name: "Finados", open: false, workers: 0, pay: "extra_off", window: "month_end" },
+        { date: "2026-11-15", name: "Proclamação da República", open: true, workers: 3, pay: "double", window: "month_end" },
+        { date: "2026-11-20", name: "Consciência Negra", open: true, workers: 3, pay: "extra_off", window: "next_month" },
+      ],
+    });
+    expect(generated.days.some((row) => row.date.startsWith("2026-11"))).toBe(true);
+    expect(generated.compDue.length).toBe(3);
+    expect(generated.compDue.every((due) => due.holiday === "2026-11-20" && due.until === "2026-12-31")).toBe(true);
+  });
+
   it("respeita a folga fixa dentro do período pedido", () => {
     const rows = generateMonth({
       year: 2026,

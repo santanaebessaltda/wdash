@@ -235,14 +235,33 @@ export function generateMonth(input: {
     }
   }
   const compDue: CompDue[] = [];
+  const dueKey = (personId: string, holiday: string) => `${personId}|${holiday}`;
+  const seenDue = new Set<string>();
+  const pushDue = (due: CompDue) => {
+    const key = dueKey(due.personId, due.holiday);
+    if (seenDue.has(key)) return;
+    seenDue.add(key);
+    compDue.push(due);
+  };
   for (const link of result.compensation ?? []) {
     if (link.day >= from && link.day <= to) continue;
     const person = input.people[link.employee];
     if (!person) continue;
-    compDue.push({ personId: person.id, holiday: link.holiday, until: link.deadline || monthEnd });
+    pushDue({ personId: person.id, holiday: link.holiday, until: link.deadline || monthEnd });
+  }
+  // "No mês seguinte": o motor não estende a grade; quem trabalhou o feriado fica pendente.
+  for (const rule of rules) {
+    if (rule.pay !== "extra_off" || rule.window !== "next_month" || !rule.open) continue;
+    const until = holidayDeadline(rule, monthEnd);
+    for (const person of input.people) {
+      if (!days.some((row) => row.personId === person.id && row.date === rule.date && row.status === "holiday_work")) {
+        continue;
+      }
+      pushDue({ personId: person.id, holiday: rule.date, until });
+    }
   }
   for (const due of input.incomingComp ?? []) {
-    if (!placeIncoming(days, input.dayNeeds, rules, due)) compDue.push(due);
+    if (!placeIncoming(days, input.dayNeeds, rules, due)) pushDue(due);
   }
   return { days, compDue };
 }

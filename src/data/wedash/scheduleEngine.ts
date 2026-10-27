@@ -34,6 +34,12 @@
     const h = c.holidays.find(h => h.date === day);
     if (h) return { min: h.workers, max: h.workers, holiday: h, closed: h.workers === 0 };
     const wd = dow(date(day));
+    // Prazo "no mês seguinte" estende a grade só para encaixar FC. Sem piso de equipe
+    // nesses dias: senão o revezamento de domingo herda o mínimo deste mês e trava a criação.
+    const monthLast = iso(new Date(Date.UTC(Number(c.month.slice(0, 4)), Number(c.month.slice(5)), 0, 12)));
+    if (day > monthLast) {
+      return c.open[wd] ? { min: 0, max: c.employees.length, closed: false } : { min: 0, max: 0, closed: true };
+    }
     return c.open[wd] ? { min: c.minimum[wd], max: c.employees.length, closed: false } : { min: 0, max: 0, closed: true };
   }
   const holidayTreatment = (c, h) => c.model === '12x36' ? 'exempt' : h.treatment === undefined ? 'comp' : h.treatment;
@@ -80,6 +86,9 @@
     let extraEnd = last;
     for (const h of c.holidays) {
       if (!(h.workers > 0 && holidayTreatment(c, h) === 'comp')) continue;
+      // Folga só no mês seguinte (notBefore após o fim deste mês): não estende a grade.
+      // Estender montava o mês seguinte com mínimo/domingo/EC 141 daqui e travava a criação.
+      if (h.notBefore && date(h.notBefore) > last) continue;
       const deadline = date(h.deadline || (c.compDeadline === 'seven' ? iso(add(date(h.date), 7)) : iso(last)));
       if (deadline > extraEnd) extraEnd = deadline;
     }
@@ -451,6 +460,7 @@
         c.employees.forEach((e, i) => {
           if (j < 0 || !['T','FE'].includes(r.matrix[i][j])) return;
           if (holidayTreatment(c,h) === 'pay') payroll.push({employee:i, holiday:h.date, name:h.name});
+          else if (h.notBefore && h.notBefore > r.last) return; // pendente para o mês seguinte
           else if (!r.compensation.some(link => link.employee === i && link.holiday === h.date)) fail(e.name + ': feriado trabalhado em ' + h.date + ' sem compensatória vinculada.', 'compensacao');
         });
       });
