@@ -754,6 +754,45 @@ export async function fetchSalesProductDayAggs(
   return (await fetchAllPagesParallel<ProductDayRow>(build, "fetchSalesProductDayAggs")).map(mapProductDay);
 }
 
+/** Soma produto×dia no periodo no Postgres (1 linha por loja/SKU). `day` = p_from para filtros do client. */
+export async function fetchSalesProductPeriodAggs(
+  query: SalesProductDayQuery,
+  clientOverride?: SalesQueryClient,
+): Promise<SalesProductDayAgg[]> {
+  const client = clientOrNull(clientOverride);
+  if (!client) return [];
+
+  const args = {
+    p_tenant_id: query.tenantId,
+    p_store_ids: query.storeIds.length > 0 ? query.storeIds : null,
+    p_from: query.from,
+    p_to: query.to,
+  };
+  const bulk = await readAggJsonb(client, "read_sales_product_period_aggs", args);
+  if (bulk) return (bulk as ProductDayRow[]).map(mapProductDay);
+
+  // Fallback: pagina o dia a dia e agrega no client (ate a migration aplicar).
+  const days = await fetchSalesProductDayAggs(query, client);
+  return rollupProductDaysToPeriod(days, query.from);
+}
+
+function rollupProductDaysToPeriod(rows: SalesProductDayAgg[], stampDay: string): SalesProductDayAgg[] {
+  const map = new Map<string, SalesProductDayAgg>();
+  for (const r of rows) {
+    const k = `${r.storeId}|${r.productId}|${r.brand}`;
+    const acc = map.get(k);
+    if (!acc) {
+      map.set(k, { ...r, day: stampDay });
+      continue;
+    }
+    acc.revenueCents += r.revenueCents;
+    acc.itemCount += r.itemCount;
+    if (r.productName) acc.productName = r.productName;
+    if (r.productCode) acc.productCode = r.productCode;
+  }
+  return [...map.values()];
+}
+
 let catalogDescriptions: Promise<string[]> | null = null;
 
 /** Descricoes do catalogo de produtos (global, ~600 linhas)  -  base das linhas de produto. 1x por sessao. */
@@ -924,6 +963,49 @@ export async function fetchSalesProductCostDayAggs(
     console.warn("fetchSalesProductCostDayAggs:", e);
     return [];
   }
+}
+
+/** Soma CMV×dia no periodo (1 linha por loja/COD_PRODUTO). `day` = p_from. */
+export async function fetchSalesProductCostPeriodAggs(
+  query: SalesProductDayQuery,
+  clientOverride?: SalesQueryClient,
+): Promise<SalesProductCostDayAgg[]> {
+  const client = clientOrNull(clientOverride);
+  if (!client) return [];
+
+  try {
+    const args = {
+      p_tenant_id: query.tenantId,
+      p_store_ids: query.storeIds.length > 0 ? query.storeIds : null,
+      p_from: query.from,
+      p_to: query.to,
+    };
+    const bulk = await readAggJsonb(client, "read_sales_product_cost_period_aggs", args);
+    if (bulk) {
+      return (bulk as ProductCostDayRow[]).map(mapProductCostDay);
+    }
+    const days = await fetchSalesProductCostDayAggs(query, client);
+    return rollupProductCostsToPeriod(days, query.from);
+  } catch (e) {
+    console.warn("fetchSalesProductCostPeriodAggs:", e);
+    return [];
+  }
+}
+
+function rollupProductCostsToPeriod(rows: SalesProductCostDayAgg[], stampDay: string): SalesProductCostDayAgg[] {
+  const map = new Map<string, SalesProductCostDayAgg>();
+  for (const r of rows) {
+    const k = `${r.storeId}|${r.productCode}`;
+    const acc = map.get(k);
+    if (!acc) {
+      map.set(k, { ...r, day: stampDay });
+      continue;
+    }
+    acc.itemCount += r.itemCount;
+    acc.revenueCents += r.revenueCents;
+    acc.cmvCents += r.cmvCents;
+  }
+  return [...map.values()];
 }
 
 /** Tenant watermark of last successful light sync. */

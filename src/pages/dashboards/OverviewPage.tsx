@@ -12,13 +12,13 @@ import { buildOverviewView, resolvePeriod, previousPeriod, OVERVIEW_PRODUCTS_TOP
 import {
   fetchSalesDayAggs,
   fetchSalesHourAggs,
-  fetchProductCatalogTypes,
-  fetchProductTypeNames,
+  fetchSalesCategoryCatalog,
+  fetchSalesCategoryDayAggs,
   fetchSalesPaymentDayAggs,
   fetchNamedSellerDayAggs,
   fetchSalesSellerDayAggs,
-  fetchSalesProductDayAggs,
-  fetchSalesProductCostDayAggs,
+  fetchSalesProductPeriodAggs,
+  fetchSalesProductCostPeriodAggs,
   fetchSalesCoverage,
   fetchSellerAvatars,
   fetchSellerShifts,
@@ -36,7 +36,6 @@ import type {
   SellerAvatarRef,
   SellerShiftRef,
 } from "@/data/wedash/salesTypes";
-import { categoryCatalogFromTypes, rollupCategoryDays } from "@/data/wedash/categoryRollup";
 import { brlCent, isoToDate, labelUpper, num, deltaTip, titleName, profitBrl } from "@/lib/format";
 import type { DateRange, DateRangeChangeMeta } from "@/components/ui/DateRangePicker";
 import { useActiveSession } from "@/session/SessionProvider";
@@ -200,8 +199,9 @@ export default function OverviewPage() {
     setSellerAvatars(snap.avatars);
     setProductDayAggs(snap.products);
     setProductCostDayAggs(snap.productCosts);
-    setWatermark(snap.wm);
-    setCoverageFrom(snap.covFrom);
+    // sessionStorage devolve ISO string; Date local permanece Date.
+    setWatermark(snap.wm ? new Date(snap.wm) : null);
+    setCoverageFrom(snap.covFrom ? new Date(snap.covFrom) : null);
   }, []);
   const [watermark, setWatermark] = useState<Date | null>(null);
   const [coverageFrom, setCoverageFrom] = useState<Date | null>(null);
@@ -267,66 +267,89 @@ export default function OverviewPage() {
       return { days, sellers, named, team };
     });
     const categoryFrom = prev.start < period.start ? prev.start : period.start;
-    // Produtos / CMV / catalogo sobem JA com a onda 1 (antes esperavam ela terminar).
-    const productsP = fetchSalesProductDayAggs({
+    const productQuery = (from: string, to: string) => ({
       tenantId: session.tenantId,
       storeIds: asked,
-      from: categoryFrom,
-      to: period.end,
+      from,
+      to,
     });
-    const productCostsP = fetchSalesProductCostDayAggs({
-      tenantId: session.tenantId,
-      storeIds: asked,
-      from: categoryFrom,
-      to: period.end,
-    });
-    const catalogTypesP = fetchProductCatalogTypes();
-    const catalogTypeNamesP = fetchProductTypeNames();
     try {
-      // Onda 1: KPIs, formas, equipe, comparativo — libera a tela cedo.
-      const [days, hours, payments, sellers, wm, cov, goalHistDays, goalHistHours, prevDays, prevHours, shifts, avatars, goalsLoaded] =
-        await Promise.all([
-          fetchSalesDayAggs({
-            tenantId: session.tenantId,
-            storeIds: rankingIds,
-            from: period.start,
-            to: period.end,
-            brand: null,
-          }),
-          singleDay
-            ? fetchSalesHourAggs({ tenantId: session.tenantId, storeIds: asked, day: period.start, brand: null })
-            : Promise.resolve([] as SalesHourAgg[]),
-          fetchSalesPaymentDayAggs({ tenantId: session.tenantId, storeIds: asked, from: period.start, to: period.end }),
-          fetchSalesSellerDayAggs({ tenantId: session.tenantId, storeIds: asked, from: period.start, to: period.end }),
-          fetchSyncWatermark(session.tenantId).catch(() => null),
-          fetchSalesCoverage(session.tenantId, asked),
-          fetchSalesDayAggs({ tenantId: session.tenantId, storeIds: asked, from: goalDays.from, to: goalDays.to, brand: "ALL" }),
-          singleDay
-            ? fetchSalesHourAggs({
-                tenantId: session.tenantId,
-                storeIds: asked,
-                day: goalHistorySameWeekdays(period.start),
-                brand: "ALL",
-              })
-            : Promise.resolve([] as SalesHourAgg[]),
-          fetchSalesDayAggs({ tenantId: session.tenantId, storeIds: asked, from: prev.start, to: prev.end, brand: null }),
-          period.endsToday
-            ? fetchSalesHourAggs({ tenantId: session.tenantId, storeIds: asked, day: prev.end, brand: null })
-            : Promise.resolve([] as SalesHourAgg[]),
-          fetchSellerShifts(session.tenantId),
-          fetchSellerAvatars(session.tenantId),
-          goalsP,
-        ]);
-      if (gen !== reloadGen.current) return;
-      const early: OverviewCache = {
+      // Tudo junto: totais de produto/CMV no Postgres (~centenas de linhas) + categoria da view.
+      const [
         days,
         hours,
         payments,
         sellers,
-        products: cached?.products ?? [],
-        productCosts: cached?.productCosts ?? [],
-        cats: cached?.cats ?? [],
-        catalog: cached?.catalog ?? [],
+        wm,
+        cov,
+        goalHistDays,
+        goalHistHours,
+        prevDays,
+        prevHours,
+        shifts,
+        avatars,
+        goalsLoaded,
+        cats,
+        catalog,
+        productsCurrent,
+        productsPrev,
+        costsCurrent,
+        costsPrev,
+        goalAggs,
+      ] = await Promise.all([
+        fetchSalesDayAggs({
+          tenantId: session.tenantId,
+          storeIds: rankingIds,
+          from: period.start,
+          to: period.end,
+          brand: null,
+        }),
+        singleDay
+          ? fetchSalesHourAggs({ tenantId: session.tenantId, storeIds: asked, day: period.start, brand: null })
+          : Promise.resolve([] as SalesHourAgg[]),
+        fetchSalesPaymentDayAggs({ tenantId: session.tenantId, storeIds: asked, from: period.start, to: period.end }),
+        fetchSalesSellerDayAggs({ tenantId: session.tenantId, storeIds: asked, from: period.start, to: period.end }),
+        fetchSyncWatermark(session.tenantId).catch(() => null),
+        fetchSalesCoverage(session.tenantId, asked),
+        fetchSalesDayAggs({ tenantId: session.tenantId, storeIds: asked, from: goalDays.from, to: goalDays.to, brand: "ALL" }),
+        singleDay
+          ? fetchSalesHourAggs({
+              tenantId: session.tenantId,
+              storeIds: asked,
+              day: goalHistorySameWeekdays(period.start),
+              brand: "ALL",
+            })
+          : Promise.resolve([] as SalesHourAgg[]),
+        fetchSalesDayAggs({ tenantId: session.tenantId, storeIds: asked, from: prev.start, to: prev.end, brand: null }),
+        period.endsToday
+          ? fetchSalesHourAggs({ tenantId: session.tenantId, storeIds: asked, day: prev.end, brand: null })
+          : Promise.resolve([] as SalesHourAgg[]),
+        fetchSellerShifts(session.tenantId),
+        fetchSellerAvatars(session.tenantId),
+        goalsP,
+        fetchSalesCategoryDayAggs({
+          tenantId: session.tenantId,
+          storeIds: asked,
+          from: categoryFrom,
+          to: period.end,
+        }),
+        fetchSalesCategoryCatalog({ tenantId: session.tenantId, storeIds: asked }),
+        fetchSalesProductPeriodAggs(productQuery(period.start, period.end)),
+        fetchSalesProductPeriodAggs(productQuery(prev.start, prev.end)),
+        fetchSalesProductCostPeriodAggs(productQuery(period.start, period.end)),
+        fetchSalesProductCostPeriodAggs(productQuery(prev.start, prev.end)),
+        goalDataP,
+      ]);
+      if (gen !== reloadGen.current) return;
+      const full: OverviewCache = {
+        days,
+        hours,
+        payments,
+        sellers,
+        products: [...productsCurrent, ...productsPrev],
+        productCosts: [...costsCurrent, ...costsPrev],
+        cats,
+        catalog,
         shifts,
         avatars,
         wm,
@@ -336,31 +359,6 @@ export default function OverviewPage() {
         prevDays,
         prevHours,
         goalsLoaded,
-        goalDays: cached?.goalDays ?? [],
-        goalSellers: cached?.goalSellers ?? [],
-        goalNamed: cached?.goalNamed ?? [],
-        goalTeam: cached?.goalTeam ?? [],
-      };
-      applyOverview(early);
-      settle(key);
-
-      // Onda 2: ja estava em voo — so espera o que faltava (meta + SKUs).
-      const [products, productCosts, typeByProductId, typeNameById, goalAggs] = await Promise.all([
-        productsP,
-        productCostsP,
-        catalogTypesP,
-        catalogTypeNamesP,
-        goalDataP,
-      ]);
-      if (gen !== reloadGen.current) return;
-      const cats = rollupCategoryDays({ products, costs: productCosts, typeByProductId, typeNameById });
-      const catalog = categoryCatalogFromTypes(typeByProductId, typeNameById);
-      const full: OverviewCache = {
-        ...early,
-        products,
-        productCosts,
-        cats,
-        catalog,
         goalDays: goalAggs.days,
         goalSellers: goalAggs.sellers,
         goalNamed: goalAggs.named,
