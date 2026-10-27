@@ -145,7 +145,8 @@ export default function ProductsPage() {
     const cached = filterCacheGet<ProductsCache>(key);
     if (cached) {
       setAggs(cached.aggs);
-      setCoverageFrom(cached.covFrom);
+      // sessionStorage devolve ISO string; Date local permanece Date.
+      setCoverageFrom(cached.covFrom ? new Date(cached.covFrom) : null);
       setViewScope(scopeAtLoad);
       settle(key);
     }

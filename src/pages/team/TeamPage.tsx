@@ -220,7 +220,8 @@ export function TeamPage() {
     const cached = filterCacheGet<TeamCache>(key);
     if (cached) {
       setAggs(cached.aggs);
-      setCoverageFrom(cached.covFrom);
+      // sessionStorage devolve ISO string; Date local permanece Date.
+      setCoverageFrom(cached.covFrom ? new Date(cached.covFrom) : null);
       setGoalsData(cached.goals);
       setChallengesData(cached.challenges);
       setViewScope(scopeAtLoad);
