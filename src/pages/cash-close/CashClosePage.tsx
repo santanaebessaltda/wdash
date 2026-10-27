@@ -660,7 +660,7 @@ export function CashClosePage() {
       <div className="mt-6 pb-6">
         {error ? <Alert className="mb-4" variant="danger" title="Não foi possível carregar o fechamento. Tente novamente." /> : null}
         {showSkeleton ? (
-          <FinanceMonthSkeleton cells={cells} today={today} />
+          <FinanceMonthSkeleton cells={cells} today={today} legends={CLOSE_LEGEND_ONE.length} />
         ) : storeRows.length === 0 ? (
           <Card className="flex min-h-[280px] flex-col">
             <EmptyBlock icon="📒" title="Nenhuma filial disponível" description="Não há filiais disponíveis para este acesso." />
@@ -668,11 +668,13 @@ export function CashClosePage() {
         ) : analysis ? (
           <>
             <MonthSummary summary={analysis.summary} many={manyStores} diffDays={analysis.diffDays} closedRealCents={analysis.closedRealCents} />
-            <ColorLegend className="mb-3" items={CLOSE_LEGEND_ONE} />
+            <div className="mb-3 flex justify-end">
+              <ColorLegend mark="square" items={CLOSE_LEGEND_ONE} />
+            </div>
             <Month today={today} cells={cells} dayFace={dayFace} onOpen={openDay} many={manyStores} />
           </>
         ) : (
-          <FinanceMonthSkeleton cells={cells} today={today} />
+          <FinanceMonthSkeleton cells={cells} today={today} legends={CLOSE_LEGEND_ONE.length} />
         )}
       </div>
       <DayModal
@@ -931,12 +933,12 @@ export function DayChip({ color, children }: { color: string; children: string }
 }
 
 const CLOSE_LEGEND_ONE: LegendItem[] = [
-  { key: "surplus", color: "bg-ok", label: "Sobra", hint: "total real acima do Millennium" },
-  { key: "shortage", color: "bg-bad", label: "Quebra", hint: "total real abaixo do Millennium" },
-  { key: "even", color: "bg-chip-gray", label: "Sem diferença", hint: "os dois totais iguais" },
-  { key: "pending", color: "bg-warn", label: "Pendente", hint: "ainda sem total real" },
-  { key: "today", color: "bg-acc", label: "Em aberto", hint: "o dia de hoje" },
-  { key: "withdrawal", color: "bg-info", label: "Retirada", hint: "valor retirado no dia" },
+  { key: "surplus", color: "bg-ok", label: "Sobra" },
+  { key: "shortage", color: "bg-bad", label: "Quebra" },
+  { key: "even", color: "bg-chip-gray", label: "Sem diferença" },
+  { key: "pending", color: "bg-warn", label: "Pendente" },
+  { key: "today", color: "bg-acc", label: "Em aberto" },
+  { key: "withdrawal", color: "bg-info", label: "Retirada" },
 ];
 
 function groupedClose(count: number, status: string, detail: string): string {

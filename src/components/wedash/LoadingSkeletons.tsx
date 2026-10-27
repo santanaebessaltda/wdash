@@ -1172,7 +1172,7 @@ export function FinanceKpiSkeleton({
   );
 }
 
-/** KPIs + calendário do mês, na mesma grade da tela carregada. */
+/** KPIs + legenda à direita + calendário do mês, na mesma grade da tela carregada. */
 export function FinanceMonthSkeleton({
   cells,
   today,
@@ -1180,6 +1180,7 @@ export function FinanceMonthSkeleton({
   columns = "sm:grid-cols-3",
   hint = false,
   marked = false,
+  legends = 0,
 }: {
   cells: Array<string | null>;
   today?: string;
@@ -1187,10 +1188,24 @@ export function FinanceMonthSkeleton({
   columns?: string;
   hint?: boolean;
   marked?: boolean;
+  /** Quantidade de itens da legenda (quadrado + rótulo), à direita acima do calendário. */
+  legends?: number;
 }) {
   return (
     <Busy>
       <FinanceKpiSkeleton count={kpis} columns={columns} hint={hint} className="mb-4" />
+      {legends > 0 ? (
+        <div className="mb-3 flex justify-end">
+          <ul className="flex flex-col gap-y-1.5 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-3.5">
+            {Array.from({ length: legends }, (_, i) => (
+              <li key={i} className="inline-flex items-center gap-1.5">
+                <Skeleton className="h-2.5 w-2.5 rounded-[3px]" />
+                <Skeleton className={cn("h-3", i % 2 === 0 ? "w-16" : "w-20")} />
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
       <MonthCalendarSkeleton cells={cells} today={today} marked={marked} />
     </Busy>
   );

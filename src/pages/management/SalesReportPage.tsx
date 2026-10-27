@@ -72,10 +72,10 @@ function dayAmount(
 }
 
 const REPORT_LEGEND: LegendItem[] = [
-  { key: "today", color: "bg-acc", label: "Em aberto", hint: "o dia de hoje" },
-  { key: "missing", color: "bg-warn", label: "Não informado", hint: "ainda não foi ao shopping" },
-  { key: "match", color: "bg-ok", label: "Informado", hint: "bate com o vendido" },
-  { key: "diff", color: "bg-bad", label: "Informado", hint: "diferente do vendido" },
+  { key: "today", color: "bg-acc", label: "Em aberto" },
+  { key: "missing", color: "bg-warn", label: "Não informado" },
+  { key: "match", color: "bg-ok", label: "Informado" },
+  { key: "diff", color: "bg-bad", label: "Informado diferente" },
 ];
 
 function dayStatus(soldCents: number, informedCents: number | null): { text: string; color: string } {
@@ -403,7 +403,7 @@ export function SalesReportPage() {
         {error ? <Alert className="mb-4" variant="danger" title="Não foi possível carregar o informe de vendas. Tente novamente." /> : null}
         {!manyStores && shoppingSendsSales(account?.administrator) && account?.lastError ? <Alert className="mb-4" variant="danger" title={account.lastError} /> : null}
         {showSkeleton || (storeRows.length > 0 && (manyStores ? groupLoaded !== band : store != null && !pronto)) ? (
-          <FinanceMonthSkeleton cells={cells} today={today} marked={storeRows.length === 1} />
+          <FinanceMonthSkeleton cells={cells} today={today} marked={storeRows.length === 1} legends={REPORT_LEGEND.length} />
         ) : storeRows.length === 0 ? (
           <Card className="flex min-h-[280px] flex-col">
             <EmptyBlock icon="🧾" title="Nenhuma filial disponível" description="Não há filiais disponíveis para este acesso." />
@@ -453,7 +453,9 @@ export function SalesReportPage() {
                 tooltip="Informado − vendido. Valor a mais pode aumentar o aluguel percentual; valor a menos pode gerar divergência na auditoria."
               />
             </div>
-            <ColorLegend className="mb-3" items={REPORT_LEGEND} />
+            <div className="mb-3 flex justify-end">
+              <ColorLegend mark="square" items={REPORT_LEGEND} />
+            </div>
             <MonthCalendar>
               {cells.map((day, i) => {
                 if (!day) return <div key={`vazio-${i}`} className={blankDayClass(i)} />;
@@ -550,7 +552,9 @@ function GroupCalendar({
           tooltip="Informado − vendido, somando as filiais. Dia sem informe entra como zero."
         />
       </div>
-      <ColorLegend className="mb-3" items={REPORT_LEGEND} />
+      <div className="mb-3 flex justify-end">
+        <ColorLegend mark="square" items={REPORT_LEGEND} />
+      </div>
       <MonthCalendar>
         {cells.map((day, i) => {
           if (!day) return <div key={`vazio-${i}`} className={blankDayClass(i)} />;

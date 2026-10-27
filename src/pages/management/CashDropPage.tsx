@@ -507,7 +507,7 @@ export function CashDropPage() {
       <div className="mt-6 pb-8">
         {error ? <Alert className="mb-4" variant="danger" title="Não foi possível carregar as sangrias. Tente novamente." /> : null}
         {showSkeleton || (storeRows.length > 0 && !pronto) ? (
-          <FinanceMonthSkeleton cells={cells} today={today} kpis={4} columns="sm:grid-cols-2 lg:grid-cols-4" hint marked={storeRows.length === 1} />
+          <FinanceMonthSkeleton cells={cells} today={today} kpis={4} columns="sm:grid-cols-2 lg:grid-cols-4" hint marked={storeRows.length === 1} legends={DROP_LEGEND.length} />
         ) : storeRows.length === 0 || !store ? (
           <Card className="flex min-h-[280px] flex-col">
             <EmptyBlock icon="💵" title="Nenhuma filial disponível" description="Não há filiais disponíveis para este acesso." />
@@ -515,7 +515,9 @@ export function CashDropPage() {
         ) : (
           <>
             <MonthSummary aCobrar={open} recebido={depositado} excluded={monthCards.excluded} gap={monthCards.gap} />
-            <ColorLegend className="mb-3" items={DROP_LEGEND} />
+            <div className="mb-3 flex justify-end">
+              <ColorLegend mark="square" items={DROP_LEGEND} />
+            </div>
             <MonthCalendar>
               {cells.map((day, i) => {
                 const across = day && manyStores && day <= today ? dayAcrossStores(day, today, storeRows, lines, deposits, shortages) : null;
@@ -642,11 +644,11 @@ export function CashDropPage() {
 }
 
 const DROP_LEGEND: LegendItem[] = [
-  { key: "today", color: "bg-acc", label: "Em aberto", hint: "o dia de hoje" },
-  { key: "due", color: "bg-warn", label: "A receber", hint: "ainda entra no boleto" },
-  { key: "paid", color: "bg-ok", label: "Recebido", hint: "já entrou no boleto" },
-  { key: "out", color: "bg-info", label: "Fora", hint: "não entra no boleto" },
-  { key: "gap", color: "bg-bad", label: "Falta", hint: "valor que não foi encontrado" },
+  { key: "today", color: "bg-acc", label: "Em aberto" },
+  { key: "due", color: "bg-warn", label: "A receber" },
+  { key: "paid", color: "bg-ok", label: "Recebido" },
+  { key: "out", color: "bg-info", label: "Fora" },
+  { key: "gap", color: "bg-bad", label: "Falta" },
 ];
 
 function dayChips(total: CashDropAmounts, recebido: boolean, open: boolean): Array<{ color: string; text: string }> {
