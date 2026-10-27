@@ -61,11 +61,11 @@ function SellerChallengeCard({
     status === "upcoming" || c.unavailable
       ? null
       : c.mode === "CONTEST" && c.position != null
-        ? <ProgressStanding ok={c.won}>{`${c.position}º lugar`}</ProgressStanding>
+        ? <ProgressStanding ok={c.won} tone="acc">{`${c.position}º lugar`}</ProgressStanding>
         : c.mode === "COLLECTIVE" && (c.won || ended)
-          ? <ProgressStanding ok={c.won}>{c.won ? "Equipe ganhou" : "Equipe não ganhou"}</ProgressStanding>
+          ? <ProgressStanding ok={c.won} tone="acc">{c.won ? "Equipe ganhou" : "Equipe não ganhou"}</ProgressStanding>
         : c.mode === "MINIMUM" && (c.won || ended)
-          ? <ProgressStanding ok={c.won}>{c.won ? "Ganhou" : "Não ganhou"}</ProgressStanding>
+          ? <ProgressStanding ok={c.won} tone="acc">{c.won ? "Ganhou" : "Não ganhou"}</ProgressStanding>
           : null;
   return (
     <div className={cn("flex items-start gap-3.5 rounded-xl border border-line p-4", ended ? "bg-bg-inset" : "bg-bg-2")}>

@@ -12,7 +12,7 @@ export function progressTextClass(value: number): string {
   return "text-acc";
 }
 
-/** "Atingiu" em verde, ou o lugar / "Não atingiu" na cor do texto. No detalhe do desafio, quem ganhou usa a cor primária. Não é badge. */
+/** "Atingiu" em verde (`tone=ok`), ou o lugar / "Não atingiu" na cor do texto. Quem ganhou no desafio usa `tone=acc` (primária). Não é badge. */
 export function ProgressStanding({ ok, tone = "ok", children }: { ok: boolean; tone?: "ok" | "acc"; children: string }) {
   return <span className={`shrink-0 text-[12px] font-semibold ${ok ? (tone === "acc" ? "text-acc" : "text-ok") : "text-t1"}`}>{children}</span>;
 }

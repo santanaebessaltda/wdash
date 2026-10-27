@@ -410,7 +410,7 @@ export function ChallengeSummary({
       {standings.length > 0 ? (
         <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5">
           {standings.map((item) => (
-            <ProgressStanding key={item.label} ok={item.ok}>
+            <ProgressStanding key={item.label} ok={item.ok} tone="acc">
               {item.label}
             </ProgressStanding>
           ))}
@@ -548,9 +548,9 @@ function ChallengePersonStatus({
 }) {
   if (person.result == null) return <span className="shrink-0 text-[11px] font-semibold text-t3">Sem resultado</span>;
   const won = announcePrize && person.winner && (!disputa || ended) ? "Ganhou" : null;
-  if (won) return <span className="max-w-[11rem] text-right text-[12px] font-semibold leading-tight text-ok">{won}</span>;
-  if (disputa && person.position != null) return <ProgressStanding ok={person.winner}>{`${person.position}º lugar`}</ProgressStanding>;
-  if (person.winner) return <ProgressStanding ok>Ganhou</ProgressStanding>;
+  if (won) return <span className="max-w-[11rem] text-right text-[12px] font-semibold leading-tight text-acc">{won}</span>;
+  if (disputa && person.position != null) return <ProgressStanding ok={person.winner} tone="acc">{`${person.position}º lugar`}</ProgressStanding>;
+  if (person.winner) return <ProgressStanding ok tone="acc">Ganhou</ProgressStanding>;
   if (!disputa && ended) return <ProgressStanding ok={false}>Não ganhou</ProgressStanding>;
   if (late) return null;
   return <span className={`shrink-0 font-mono text-[12px] font-bold tabular-nums ${progressTextClass(pct)}`}>{num(pct, 0)}%</span>;
