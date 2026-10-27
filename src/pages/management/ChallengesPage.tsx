@@ -25,7 +25,8 @@ import { storesForSession, type Store } from "@/data/wedash/stores";
 import { BranchBadge, PeriodBadge, PrizeBadge, RecordStatusBadge } from "@/components/wedash/RecordBadges";
 import { cn } from "@/lib/cn";
 import { fullDate, isoToDate, endOfMonth, dateToIso } from "@/lib/format";
-import { useMinSkeleton } from "@/lib/useMinSkeleton";
+import { filterCacheGet, filterCacheSet } from "@/lib/filterCache";
+import { useFilterSkeleton } from "@/lib/useFilterSkeleton";
 import { ChallengeSummary } from "@/pages/challenges/ChallengeMiniCard";
 import { CHALLENGE_STATUS_ORDER, mainPrizeLabel } from "@/pages/challenges/shared";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
@@ -47,6 +48,57 @@ import { paths } from "@/router/paths";
 
 type Loaded = { challenges: ChallengeRecord[]; aggs: ChallengeAggInput };
 
+/** Formato JSON do filterCache (Map/Set nao serializa). */
+type ChallengesCache = {
+  challenges: ChallengeRecord[];
+  aggs: {
+    sellerProducts: ChallengeAggInput["sellerProducts"];
+    sellerDays: ChallengeAggInput["sellerDays"];
+    storeSaleDays: string[];
+    storeDays: ChallengeAggInput["storeDays"];
+    storeProducts: ChallengeAggInput["storeProducts"];
+    team: ChallengeAggInput["team"];
+    typeByCode: Array<[string, number]>;
+    nameByCode: Array<[string, string]>;
+  };
+};
+
+function toCache(loaded: Loaded): ChallengesCache {
+  return {
+    challenges: loaded.challenges,
+    aggs: {
+      sellerProducts: loaded.aggs.sellerProducts,
+      sellerDays: loaded.aggs.sellerDays,
+      storeSaleDays: [...loaded.aggs.storeSaleDays],
+      storeDays: loaded.aggs.storeDays,
+      storeProducts: loaded.aggs.storeProducts,
+      team: loaded.aggs.team,
+      typeByCode: [...loaded.aggs.typeByCode.entries()],
+      nameByCode: [...loaded.aggs.nameByCode.entries()],
+    },
+  };
+}
+
+function fromCache(c: ChallengesCache): Loaded {
+  return {
+    challenges: c.challenges,
+    aggs: {
+      sellerProducts: c.aggs.sellerProducts,
+      sellerDays: c.aggs.sellerDays,
+      storeSaleDays: new Set(c.aggs.storeSaleDays),
+      storeDays: c.aggs.storeDays,
+      storeProducts: c.aggs.storeProducts,
+      team: c.aggs.team,
+      typeByCode: new Map(c.aggs.typeByCode),
+      nameByCode: new Map(c.aggs.nameByCode),
+    },
+  };
+}
+
+function cacheReady(c: ChallengesCache | null): c is ChallengesCache {
+  return c != null && Array.isArray(c.challenges) && c.aggs != null && Array.isArray(c.aggs.storeSaleDays);
+}
+
 /** Desafios podem ser cadastrados para frente: o calendario vai ate o fim do mes daqui a 12 meses. */
 function maxPickerDate(today: string): Date {
   const d = isoToDate(today);
@@ -66,13 +118,15 @@ export function ChallengesPage() {
   const storeKey = storeIds.join(",");
 
   const [data, setData] = useState<Loaded | null>(null);
-  const [loading, setLoading] = useState(true);
   const [reload, setReload] = useState(0);
   const [confirm, setConfirm] = useState<ChallengeRecord | null>(null);
   const [excluindo, setExcluindo] = useState(false);
   const [duplicate, setDuplicate] = useState<ChallengeRecord | null>(null);
   const [publishing, setPublishing] = useState(false);
   const hasOtherStores = storesForSession(session.stores).length > 1;
+  const filterKey = `challenges:${session.tenantId}:${storeKey}:${janela.from}:${janela.to}`;
+  const { showSkeleton: filterSkeleton, settle } = useFilterSkeleton(filterKey);
+  const reloadGen = useRef(0);
 
   useEffect(() => {
     const onSync = () => setReload((n) => n + 1);
@@ -80,32 +134,43 @@ export function ChallengesPage() {
     return () => window.removeEventListener(SALES_SYNCED_EVENT, onSync);
   }, []);
 
-  const filterKey = `${session.tenantId}|${storeKey}|${janela.from}|${janela.to}`;
-  const loadedKey = useRef<string | null>(null);
-
   useEffect(() => {
     if (storesLoading) return;
+    const gen = ++reloadGen.current;
+    const key = filterKey;
+    const cached = filterCacheGet<ChallengesCache>(key);
+    if (cacheReady(cached)) {
+      setData(fromCache(cached));
+      settle(key);
+    }
     let cancelled = false;
-    (async () => {
-      // Venda nova (SALES_SYNCED_EVENT) recarrega sem skeleton; so filtro novo mostra o skeleton.
-      if (loadedKey.current !== filterKey) setLoading(true);
-      const challenges = await fetchChallenges({ tenantId: session.tenantId, storeIds, from: janela.from, to: janela.to, includeDrafts: true });
-      const aggs =
-        challenges.length > 0
-          ? await fetchChallengeInput({ tenantId: session.tenantId, challenges, today })
-          : emptyChallengeAggInput();
-      if (!cancelled) {
-        setData({ challenges, aggs });
-        loadedKey.current = filterKey;
-        setLoading(false);
+    void (async () => {
+      try {
+        const challenges = await fetchChallenges({ tenantId: session.tenantId, storeIds, from: janela.from, to: janela.to, includeDrafts: true });
+        const aggs =
+          challenges.length > 0
+            ? await fetchChallengeInput({ tenantId: session.tenantId, challenges, today })
+            : emptyChallengeAggInput();
+        if (cancelled || gen !== reloadGen.current) return;
+        const loaded = { challenges, aggs };
+        filterCacheSet(key, toCache(loaded));
+        setData(loaded);
+        settle(key);
+      } catch (e) {
+        if (cancelled || gen !== reloadGen.current) return;
+        console.warn("ChallengesPage:", e);
+        if (!cacheReady(cached)) {
+          setData({ challenges: [], aggs: emptyChallengeAggInput() });
+          settle(key);
+        }
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [session.tenantId, storeKey, janela.from, janela.to, storesLoading, reload]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [session.tenantId, storeKey, janela.from, janela.to, storesLoading, reload, filterKey, settle, storeIds, today]);
 
-  const showSkeleton = useMinSkeleton(loading || storesLoading);
+  const showSkeleton = storesLoading || filterSkeleton;
 
   const cards = useMemo(() => {
     if (!data) return [];

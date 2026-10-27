@@ -28,7 +28,8 @@ import { dayAmounts, depositBoleto, sumAmounts, type CashDropAmounts } from "@/d
 import { statusBadgeVariant } from "@/lib/status";
 import { brlCent, longDate, isoToDate, endOfMonth, startOfMonth, dateToIso, addDays } from "@/lib/format";
 import { cn } from "@/lib/cn";
-import { useMinSkeleton } from "@/lib/useMinSkeleton";
+import { filterCacheGet, filterCacheSet } from "@/lib/filterCache";
+import { useFilterSkeleton } from "@/lib/useFilterSkeleton";
 import { refreshMomentTitle, useScreenRefresh } from "@/pages/dashboard/screenRefresh";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
 import { NumberInput, SectionHeader, parseNum, useScopedStores } from "@/pages/operation/shared";
@@ -43,6 +44,12 @@ type ActionBatch = "recebido" | "aCobrar" | "fora" | "falta" | "desfazer";
 type DropLine = CashDropLineRow & { storeId: string };
 type DropDeposit = CashDropDepositDay & { storeId: string };
 type DropShortage = CashDropShortageRow & { storeId: string };
+
+type CashDropMonthCache = { lines: DropLine[]; deposits: DropDeposit[]; shortages: DropShortage[] };
+
+function cashDropCacheReady(c: CashDropMonthCache | null): c is CashDropMonthCache {
+  return c != null && Array.isArray(c.lines) && Array.isArray(c.deposits) && Array.isArray(c.shortages);
+}
 
 function storeTotals(
   storeIds: string[],
@@ -123,7 +130,6 @@ export function CashDropPage() {
   const { session, storeRows, loading: storesLoading } = useScopedStores();
   const gestor = isOwner(session.role);
   const manyStores = storeRows.length > 1;
-  const showStores = useMinSkeleton(storesLoading);
   const today = calendarTodayIso();
   const [rangeFrom, setRangeFrom] = useState(() => startOfMonth(today));
   const [rangeTo, setRangeTo] = useState(() => endOfMonth(today));
@@ -157,7 +163,11 @@ export function CashDropPage() {
   const from = rangeFrom;
   const to = rangeTo;
   const cells = useMemo(() => rangeCells(from, to), [from, to]);
-  const band = storeKey ? `${storeKey}|${from}|${to}|${reloadKey}` : "";
+  const filterKey = `cashdrop:${session.tenantId}:${storeKey}:${from}:${to}`;
+  const { showSkeleton: filterSkeleton, settle } = useFilterSkeleton(filterKey);
+  const showSkeleton = storesLoading || filterSkeleton;
+  const band = filterKey;
+  const reloadGen = useRef(0);
 
   const [storeView, setStoreView] = useState(storeKey);
   if (storeView !== storeKey) {
@@ -262,7 +272,25 @@ export function CashDropPage() {
   }, []);
 
   useEffect(() => {
-    if (storesLoading || storeRows.length === 0) return;
+    if (storesLoading) return;
+    const gen = ++reloadGen.current;
+    const key = filterKey;
+    if (storeRows.length === 0) {
+      setLines([]);
+      setDeposits([]);
+      setShortages([]);
+      setLoaded(key);
+      settle(key);
+      return;
+    }
+    const cached = filterCacheGet<CashDropMonthCache>(key);
+    if (cashDropCacheReady(cached)) {
+      setLines(cached.lines);
+      setDeposits(cached.deposits);
+      setShortages(cached.shortages);
+      setLoaded(key);
+      settle(key);
+    }
     let cancel = false;
     setError(false);
     void Promise.all(
@@ -276,21 +304,27 @@ export function CashDropPage() {
       }),
     )
       .then((parts) => {
-        if (cancel) return;
+        if (cancel || gen !== reloadGen.current) return;
         const nextDeposits = parts.flatMap((part) => part.deposits);
-        setLines(parts.flatMap((part) => part.lines));
+        const nextLines = parts.flatMap((part) => part.lines);
+        const nextShortages = parts.flatMap((part) => part.shortages);
+        filterCacheSet(key, { lines: nextLines, deposits: nextDeposits, shortages: nextShortages } satisfies CashDropMonthCache);
+        setLines(nextLines);
         setDeposits(nextDeposits);
-        setShortages(parts.flatMap((part) => part.shortages));
-        setLoaded(band);
+        setShortages(nextShortages);
+        setLoaded(key);
+        settle(key);
         setMarcados((current) => current.filter((day) => !nextDeposits.some((row) => row.day === day)));
       })
       .catch(() => {
-        if (!cancel) setError(true);
+        if (cancel || gen !== reloadGen.current) return;
+        setError(true);
+        if (!cashDropCacheReady(cached)) settle(key);
       });
     return () => {
       cancel = true;
     };
-  }, [storesLoading, storeRows, session.tenantId, from, to, band]);
+  }, [storesLoading, storeRows, session.tenantId, from, to, filterKey, reloadKey, settle]);
 
   const taken = useMemo(() => new Set(deposits.map((d) => d.day)), [deposits]);
   const gapByDay = useMemo(() => new Map(shortages.map((s) => [s.day, s.amountCents])), [shortages]);
@@ -331,7 +365,7 @@ export function CashDropPage() {
     }
     return [...ids];
   }, [marcados, deposits]);
-  const pronto = loaded === band;
+  const pronto = loaded === band && !showSkeleton;
   const markLabel = marcados.length === 0 ? "Marcar como" : marcados.length === 1 ? "Marcar como · 1 dia" : `Marcar como · ${marcados.length} dias`;
 
   function toggleDay(day: string) {
@@ -472,7 +506,7 @@ export function CashDropPage() {
       />
       <div className="mt-6 pb-8">
         {error ? <Alert className="mb-4" variant="danger" title="Não foi possível carregar as sangrias. Tente novamente." /> : null}
-        {showStores || (storeRows.length > 0 && !pronto) ? (
+        {showSkeleton || (storeRows.length > 0 && !pronto) ? (
           <FinanceMonthSkeleton cells={cells} today={today} kpis={4} columns="sm:grid-cols-2 lg:grid-cols-4" hint marked={storeRows.length === 1} />
         ) : storeRows.length === 0 || !store ? (
           <Card className="flex min-h-[280px] flex-col">

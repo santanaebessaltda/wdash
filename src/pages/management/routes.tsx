@@ -7,15 +7,15 @@ import { RequireRole } from "@/session/RequireSession";
 import { StaffPage } from "./StaffPage";
 import { SchedulePage } from "./SchedulePage";
 import { PurchaseOrderPage } from "../stock/PurchaseOrderPage";
-/* Gestão > Equipe / Escala / Pedido de compra sync — cabeçalho na hora; só o conteúdo em skeleton. */
+import { ChallengesPage } from "./ChallengesPage";
+import { CashClosePage } from "../cash-close/CashClosePage";
+import WalletPage from "../wallet/WalletPage";
+import { CashDropPage } from "./CashDropPage";
+import { SalesReportPage } from "./SalesReportPage";
+/* Gestão sync (Equipe, Escala, Pedido, Performance, Financeiro) — cabeçalho na hora; só o conteúdo em skeleton. */
 
-const ChallengesPage = lazyPage(() => import("./ChallengesPage"), "ChallengesPage");
 const ChallengeDetailPage = lazyPage(() => import("../challenges/ChallengeDetailPage"), "default");
 const ChallengeEditorPage = lazyPage(() => import("../challenges/ChallengeEditorPage"), "default");
-const CashClosePage = lazyPage(() => import("../cash-close/CashClosePage"), "CashClosePage");
-const WalletPage = lazyPage(() => import("../wallet/WalletPage"), "default");
-const CashDropPage = lazyPage(() => import("./CashDropPage"), "CashDropPage");
-const SalesReportPage = lazyPage(() => import("./SalesReportPage"), "SalesReportPage");
 
 function LegacyChallengeRedirect({ edit = false }: { edit?: boolean }) {
   const { id = "" } = useParams();

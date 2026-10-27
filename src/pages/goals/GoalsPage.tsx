@@ -17,7 +17,8 @@ import { fetchSalesDayAggs } from "@/data/wedash/salesRepo";
 import type { SalesDayAgg } from "@/data/wedash/salesTypes";
 import { storesForSession, type Store } from "@/data/wedash/stores";
 import { brlCent, fullDate, endOfMonth, num, dateToIso, isoToDate } from "@/lib/format";
-import { useMinSkeleton } from "@/lib/useMinSkeleton";
+import { filterCacheGet, filterCacheSet } from "@/lib/filterCache";
+import { useFilterSkeleton } from "@/lib/useFilterSkeleton";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
 import {
   applyPeriodDateChange,
@@ -58,13 +59,15 @@ export default function GoalsPage() {
   const storeKey = storeIds.join(",");
 
   const [data, setData] = useState<Loaded | null>(null);
-  const [loading, setLoading] = useState(true);
   const [reload, setReload] = useState(0);
   const [confirm, setConfirm] = useState<GoalRecord | null>(null);
   const [excluindo, setExcluindo] = useState(false);
   const [duplicate, setDuplicate] = useState<GoalRecord | null>(null);
   const [publishing, setPublishing] = useState(false);
   const hasOtherStores = storesForSession(session.stores).length > 1;
+  const filterKey = `goals:${session.tenantId}:${storeKey}:${janela.from}:${janela.to}`;
+  const { showSkeleton: filterSkeleton, settle } = useFilterSkeleton(filterKey);
+  const reloadGen = useRef(0);
 
   useEffect(() => {
     const onSync = () => setReload((n) => n + 1);
@@ -72,43 +75,54 @@ export default function GoalsPage() {
     return () => window.removeEventListener(SALES_SYNCED_EVENT, onSync);
   }, []);
 
-  const filterKey = `${session.tenantId}|${storeKey}|${janela.from}|${janela.to}`;
-  const loadedKey = useRef<string | null>(null);
-
   useEffect(() => {
     if (storesLoading) return;
+    const gen = ++reloadGen.current;
+    const key = filterKey;
+    const cached = filterCacheGet<Loaded>(key);
+    if (cached && Array.isArray(cached.goals) && Array.isArray(cached.dayAggs) && Array.isArray(cached.team)) {
+      setData(cached);
+      settle(key);
+    }
     let cancelled = false;
-    (async () => {
-      // Venda nova (SALES_SYNCED_EVENT) recarrega sem skeleton; so filtro novo mostra o skeleton.
-      if (loadedKey.current !== filterKey) setLoading(true);
-      const goals = await fetchGoals({ tenantId: session.tenantId, storeIds, from: janela.from, to: janela.to, includeDrafts: true });
-      let dayAggs: SalesDayAgg[] = [];
-      let team: GoalTeamMember[] = [];
-      if (goals.length > 0) {
-        const goalStores = [...new Set(goals.map((g) => g.storeId))];
-        const from = goals.reduce((m, g) => (g.startsOn < m ? g.startsOn : m), goals[0].startsOn);
-        const lastEnd = goals.reduce((m, g) => (g.endsOn > m ? g.endsOn : m), goals[0].endsOn);
-        const to = lastEnd < today ? lastEnd : today;
-        const historyFrom = goalWeightFrom(from);
-        [dayAggs, team] = await Promise.all([
-          historyFrom <= to
-            ? fetchSalesDayAggs({ tenantId: session.tenantId, storeIds: goalStores, from: historyFrom, to, brand: "ALL" })
-            : Promise.resolve([]),
-          fetchGoalTeam(session.tenantId, goalStores),
-        ]);
-      }
-      if (!cancelled) {
-        setData({ goals, dayAggs, team });
-        loadedKey.current = filterKey;
-        setLoading(false);
+    void (async () => {
+      try {
+        const goals = await fetchGoals({ tenantId: session.tenantId, storeIds, from: janela.from, to: janela.to, includeDrafts: true });
+        let dayAggs: SalesDayAgg[] = [];
+        let team: GoalTeamMember[] = [];
+        if (goals.length > 0) {
+          const goalStores = [...new Set(goals.map((g) => g.storeId))];
+          const from = goals.reduce((m, g) => (g.startsOn < m ? g.startsOn : m), goals[0].startsOn);
+          const lastEnd = goals.reduce((m, g) => (g.endsOn > m ? g.endsOn : m), goals[0].endsOn);
+          const to = lastEnd < today ? lastEnd : today;
+          const historyFrom = goalWeightFrom(from);
+          [dayAggs, team] = await Promise.all([
+            historyFrom <= to
+              ? fetchSalesDayAggs({ tenantId: session.tenantId, storeIds: goalStores, from: historyFrom, to, brand: "ALL" })
+              : Promise.resolve([]),
+            fetchGoalTeam(session.tenantId, goalStores),
+          ]);
+        }
+        if (cancelled || gen !== reloadGen.current) return;
+        const loaded = { goals, dayAggs, team };
+        filterCacheSet(key, loaded);
+        setData(loaded);
+        settle(key);
+      } catch (e) {
+        if (cancelled || gen !== reloadGen.current) return;
+        console.warn("GoalsPage:", e);
+        if (!(cached && Array.isArray(cached.goals))) {
+          setData({ goals: [], dayAggs: [], team: [] });
+          settle(key);
+        }
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [session.tenantId, storeKey, janela.from, janela.to, storesLoading, reload]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [session.tenantId, storeKey, janela.from, janela.to, storesLoading, reload, filterKey, settle, storeIds, today]);
 
-  const showSkeleton = useMinSkeleton(loading || storesLoading);
+  const showSkeleton = storesLoading || filterSkeleton;
 
   const cards = useMemo(() => {
     if (!data) return [];

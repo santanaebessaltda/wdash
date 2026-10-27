@@ -14,7 +14,8 @@ import { ALREADY_LAUNCHED, canResendDay, forceLaunchAllowed, groupedDay, grouped
 import { brlCent, longDate, isoToDate, endOfMonth, startOfMonth, eachDay, dateToIso, addDays } from "@/lib/format";
 import { statusBadgeVariant } from "@/lib/status";
 import { SALES_SYNCED_EVENT } from "@/pages/dashboard/useForceRefresh";
-import { useMinSkeleton } from "@/lib/useMinSkeleton";
+import { filterCacheGet, filterCacheSet } from "@/lib/filterCache";
+import { useFilterSkeleton } from "@/lib/useFilterSkeleton";
 import { refreshMomentTitle, useScreenRefresh } from "@/pages/dashboard/screenRefresh";
 import { isOwner } from "@/layout/nav-wedash";
 import { paths } from "@/router/paths";
@@ -23,6 +24,22 @@ import { SectionHeader, useScopedStores } from "@/pages/operation/shared";
 import { HeaderFilters } from "@/pages/stock/shared";
 
 const money = (cents: number) => brlCent(cents / 100);
+
+type GroupStore = { id: string; name: string };
+
+type SalesReportCache = {
+  many: boolean;
+  sold: Record<string, number>;
+  launched: Record<string, number>;
+  account: ShoppingAccount | null;
+  groupStores: GroupStore[];
+  groupSold: Record<string, number>;
+  groupInformed: Record<string, number>;
+};
+
+function salesReportCacheReady(c: SalesReportCache | null, many: boolean): c is SalesReportCache {
+  return c != null && c.many === many && typeof c.sold === "object" && typeof c.launched === "object";
+}
 
 function differenceAmount(cents: number): string {
   const abs = brlCent(Math.abs(cents) / 100);
@@ -69,8 +86,6 @@ function dayStatus(soldCents: number, informedCents: number | null): { text: str
   return { text, color: "bg-bad" };
 }
 
-type GroupStore = { id: string; name: string };
-
 function soldByStoreDay(aggs: Array<{ storeId: string; day: string; revenueCents: number; brand?: string | null }>): Record<string, number> {
   const byStore = new Map<string, typeof aggs>();
   for (const row of aggs) {
@@ -102,7 +117,6 @@ export function SalesReportPage() {
   const { show } = useToast();
   const { session, storeRows, loading: storesLoading } = useScopedStores();
   const manyStores = storeRows.length > 1;
-  const showStores = useMinSkeleton(storesLoading);
   const today = calendarTodayIso();
   const [rangeFrom, setRangeFrom] = useState(() => startOfMonth(today));
   const [rangeTo, setRangeTo] = useState(() => endOfMonth(today));
@@ -139,7 +153,11 @@ export function SalesReportPage() {
   const markedRef = useRef(marcados);
   markedRef.current = marcados;
   const storeKey = storeRows.map((item) => item.id).join(",");
-  const band = storeKey ? `${storeKey}|${from}|${to}|${reloadKey}` : "";
+  const filterKey = `salesreport:${session.tenantId}:${storeKey}:${from}:${to}`;
+  const { showSkeleton: filterSkeleton, settle } = useFilterSkeleton(filterKey);
+  const showSkeleton = storesLoading || filterSkeleton;
+  const band = filterKey;
+  const reloadGen = useRef(0);
   const kiosk = store?.pointType === "SHOPPING";
 
   useEffect(() => {
@@ -161,64 +179,111 @@ export function SalesReportPage() {
   }, [storesLoading, storeRows, session.tenantId, reloadKey]);
 
   useEffect(() => {
-    if (storesLoading || manyStores || !store) return;
+    if (storesLoading) return;
+    const gen = ++reloadGen.current;
+    const key = filterKey;
+    if (storeRows.length === 0) {
+      setSold({});
+      setLaunched({});
+      setAccount(null);
+      setGroupStores([]);
+      setGroupSold({});
+      setGroupInformed({});
+      setLoaded(key);
+      setGroupLoaded(key);
+      settle(key);
+      return;
+    }
+    const cached = filterCacheGet<SalesReportCache>(key);
+    if (salesReportCacheReady(cached, manyStores)) {
+      setSold(cached.sold);
+      setLaunched(cached.launched);
+      setAccount(cached.account);
+      setGroupStores(cached.groupStores);
+      setGroupSold(cached.groupSold);
+      setGroupInformed(cached.groupInformed);
+      setLoaded(key);
+      setGroupLoaded(key);
+      settle(key);
+    }
     let cancel = false;
     setError(false);
-    void Promise.all([
-      fetchSalesDayAggs({ tenantId: session.tenantId, storeIds: [store.id], from, to }),
-      fetchLaunchedDays(session.tenantId, store.id, from, to),
-      fetchShoppingAccount(session.tenantId, store.id),
-    ])
-      .then(([days, launches, access]) => {
-        if (cancel) return;
-        setSold(sumSoldByDay(days));
+    void (async () => {
+      try {
+        if (manyStores) {
+          const kiosks = storeRows.filter((item) => item.pointType === "SHOPPING");
+          const accounts = await Promise.all(kiosks.map(async (item) => ({ item, account: await fetchShoppingAccount(session.tenantId, item.id) })));
+          if (cancel || gen !== reloadGen.current) return;
+          const sending = accounts.filter((row) => shoppingSendsSales(row.account?.administrator));
+          const ids = sending.map((row) => row.item.id);
+          let nextStores: GroupStore[] = [];
+          let nextSold: Record<string, number> = {};
+          let nextInformed: Record<string, number> = {};
+          if (ids.length > 0) {
+            const [aggs, informed] = await Promise.all([
+              fetchSalesDayAggs({ tenantId: session.tenantId, storeIds: ids, from, to }),
+              fetchInformedCents(session.tenantId, ids, from, to),
+            ]);
+            if (cancel || gen !== reloadGen.current) return;
+            nextStores = sending.map(({ item }) => ({ id: item.id, name: item.tradeName })).sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+            nextSold = soldByStoreDay(aggs);
+            nextInformed = informed;
+          }
+          const packed: SalesReportCache = {
+            many: true,
+            sold: {},
+            launched: {},
+            account: null,
+            groupStores: nextStores,
+            groupSold: nextSold,
+            groupInformed: nextInformed,
+          };
+          filterCacheSet(key, packed);
+          setGroupStores(nextStores);
+          setGroupSold(nextSold);
+          setGroupInformed(nextInformed);
+          setGroupLoaded(key);
+          settle(key);
+          return;
+        }
+        if (!store) {
+          settle(key);
+          return;
+        }
+        const [days, launches, access] = await Promise.all([
+          fetchSalesDayAggs({ tenantId: session.tenantId, storeIds: [store.id], from, to }),
+          fetchLaunchedDays(session.tenantId, store.id, from, to),
+          fetchShoppingAccount(session.tenantId, store.id),
+        ]);
+        if (cancel || gen !== reloadGen.current) return;
+        const nextSold = sumSoldByDay(days);
+        const packed: SalesReportCache = {
+          many: false,
+          sold: nextSold,
+          launched: launches,
+          account: access,
+          groupStores: [],
+          groupSold: {},
+          groupInformed: {},
+        };
+        filterCacheSet(key, packed);
+        setSold(nextSold);
         setLaunched(launches);
         setAccount(access);
-        setLoaded(band);
-      })
-      .catch(() => {
-        if (!cancel) setError(true);
-      });
-    return () => {
-      cancel = true;
-    };
-  }, [storesLoading, manyStores, store, session.tenantId, from, to, band]);
-
-  useEffect(() => {
-    if (storesLoading || !manyStores) return;
-    let cancel = false;
-    setError(false);
-    const kiosks = storeRows.filter((item) => item.pointType === "SHOPPING");
-    void (async () => {
-      const accounts = await Promise.all(kiosks.map(async (item) => ({ item, account: await fetchShoppingAccount(session.tenantId, item.id) })));
-      if (cancel) return;
-      const sending = accounts.filter((row) => shoppingSendsSales(row.account?.administrator));
-      const ids = sending.map((row) => row.item.id);
-      if (ids.length === 0) {
-        setGroupStores([]);
-        setGroupSold({});
-        setGroupInformed({});
-        setGroupLoaded(band);
-        return;
+        setLoaded(key);
+        settle(key);
+      } catch {
+        if (cancel || gen !== reloadGen.current) return;
+        setError(true);
+        if (!salesReportCacheReady(cached, manyStores)) settle(key);
       }
-      const [aggs, informed] = await Promise.all([
-        fetchSalesDayAggs({ tenantId: session.tenantId, storeIds: ids, from, to }),
-        fetchInformedCents(session.tenantId, ids, from, to),
-      ]);
-      if (cancel) return;
-      setGroupStores(sending.map(({ item }) => ({ id: item.id, name: item.tradeName })).sort((a, b) => a.name.localeCompare(b.name, "pt-BR")));
-      setGroupSold(soldByStoreDay(aggs));
-      setGroupInformed(informed);
-      setGroupLoaded(band);
-    })().catch(() => {
-      if (!cancel) setError(true);
-    });
+    })();
     return () => {
       cancel = true;
     };
-  }, [storesLoading, manyStores, storeRows, session.tenantId, from, to, band]);
+  }, [storesLoading, manyStores, store, storeRows, session.tenantId, from, to, filterKey, reloadKey, settle]);
 
-  const pronto = loaded === band;
+  const pronto = loaded === band && !showSkeleton;
 
   const puxar = useCallback(async () => {
     const current = storeRef.current;
@@ -337,7 +402,7 @@ export function SalesReportPage() {
       <div className="mt-6 pb-8">
         {error ? <Alert className="mb-4" variant="danger" title="Não foi possível carregar o informe de vendas. Tente novamente." /> : null}
         {!manyStores && shoppingSendsSales(account?.administrator) && account?.lastError ? <Alert className="mb-4" variant="danger" title={account.lastError} /> : null}
-        {showStores || (storeRows.length > 0 && (manyStores ? groupLoaded !== band : store != null && !pronto)) ? (
+        {showSkeleton || (storeRows.length > 0 && (manyStores ? groupLoaded !== band : store != null && !pronto)) ? (
           <FinanceMonthSkeleton cells={cells} today={today} marked={storeRows.length === 1} />
         ) : storeRows.length === 0 ? (
           <Card className="flex min-h-[280px] flex-col">

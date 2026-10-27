@@ -63,10 +63,17 @@ import { cn } from "@/lib/cn";
 import { brlCent, longDate, isoToDate, endOfMonth, startOfMonth, dateToIso, addDays, labelUpper } from "@/lib/format";
 import { refreshMomentTitle, useScreenRefresh } from "@/pages/dashboard/screenRefresh";
 import { SALES_SYNCED_EVENT } from "@/pages/dashboard/useForceRefresh";
-import { useMinSkeleton } from "@/lib/useMinSkeleton";
+import { filterCacheGet, filterCacheSet } from "@/lib/filterCache";
+import { useFilterSkeleton } from "@/lib/useFilterSkeleton";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
 import { parseNum, SectionHeader, useScopedStores } from "@/pages/operation/shared";
 import { HeaderFilters } from "@/pages/stock/shared";
+
+type CashCloseMonthCache = { marks: CashCloseDayMark[]; reviews: CashCloseReview[] };
+
+function cashCloseCacheReady(c: CashCloseMonthCache | null): c is CashCloseMonthCache {
+  return c != null && Array.isArray(c.marks) && Array.isArray(c.reviews);
+}
 
 
 const money = (cents: number | null) => (cents == null ? "—" : brlCent(cents / 100));
@@ -270,7 +277,6 @@ export function CashClosePage() {
   const { show } = useToast();
   const { session, storeRows, loading: storesLoading } = useScopedStores();
   const manyStores = storeRows.length > 1;
-  const showStores = useMinSkeleton(storesLoading);
   const today = calendarTodayIso();
   const [rangeFrom, setRangeFrom] = useState(() => startOfMonth(today));
   const [rangeTo, setRangeTo] = useState(() => endOfMonth(today));
@@ -301,7 +307,11 @@ export function CashClosePage() {
   const from = rangeFrom;
   const toGross = rangeTo;
   const to = toGross < today ? toGross : today;
-  const bandKey = `${storeKey}|${from}|${to}|${reloadKey}`;
+  const filterKey = `cashclose:${session.tenantId}:${storeKey}:${from}:${to}`;
+  const { showSkeleton: filterSkeleton, settle } = useFilterSkeleton(filterKey);
+  const showSkeleton = storesLoading || filterSkeleton;
+  const bandKey = filterKey;
+  const reloadGen = useRef(0);
 
   const sessionStores = useMemo(() => storesForSession(session.stores), [session.stores]);
   const sellerStoresKey = useMemo(() => sessionStores.map((store) => store.id).join(","), [sessionStores]);
@@ -426,7 +436,23 @@ export function CashClosePage() {
   }, []);
 
   useEffect(() => {
-    if (storesLoading || storeRows.length === 0 || from > to) return;
+    if (storesLoading) return;
+    const gen = ++reloadGen.current;
+    const key = filterKey;
+    if (storeRows.length === 0 || from > to) {
+      setMarks([]);
+      setReviews([]);
+      setMarksKey(key);
+      settle(key);
+      return;
+    }
+    const cached = filterCacheGet<CashCloseMonthCache>(key);
+    if (cashCloseCacheReady(cached)) {
+      setMarks(cached.marks);
+      setReviews(cached.reviews);
+      setMarksKey(key);
+      settle(key);
+    }
     let cancelled = false;
     setError(false);
     const ids = storeRows.map((l) => l.id);
@@ -435,18 +461,22 @@ export function CashClosePage() {
       fetchCashCloseReviews(session.tenantId, ids, from, to),
     ])
       .then(([rows, ajustes]) => {
-        if (cancelled) return;
+        if (cancelled || gen !== reloadGen.current) return;
+        filterCacheSet(key, { marks: rows, reviews: ajustes } satisfies CashCloseMonthCache);
         setMarks(rows);
         setReviews(ajustes);
-        setMarksKey(bandKey);
+        setMarksKey(key);
+        settle(key);
       })
       .catch(() => {
-        if (!cancelled) setError(true);
+        if (cancelled || gen !== reloadGen.current) return;
+        setError(true);
+        if (!cashCloseCacheReady(cached)) settle(key);
       });
     return () => {
       cancelled = true;
     };
-  }, [storesLoading, session.tenantId, storeRows, from, to, bandKey]);
+  }, [storesLoading, session.tenantId, storeRows, from, to, filterKey, reloadKey, settle]);
 
   useEffect(() => {
     if (storesLoading || storeRows.length === 0 || to < today) {
@@ -631,7 +661,7 @@ export function CashClosePage() {
       />
       <div className="mt-6 pb-6">
         {error ? <Alert className="mb-4" variant="danger" title="Não foi possível carregar o fechamento. Tente novamente." /> : null}
-        {showStores ? (
+        {showSkeleton ? (
           <FinanceMonthSkeleton cells={cells} today={today} />
         ) : storeRows.length === 0 ? (
           <Card className="flex min-h-[280px] flex-col">

@@ -15,6 +15,8 @@ import { effectiveWeekHours } from "@/data/wedash/storeHours";
 import { cn } from "@/lib/cn";
 import { brlCent, dateToIso, endOfMonth, fullDate, isoToDate, num } from "@/lib/format";
 import { exportPdf, usePrintMode } from "@/lib/printMode";
+import { filterCacheGet, filterCacheSet } from "@/lib/filterCache";
+import { useFilterSkeleton } from "@/lib/useFilterSkeleton";
 import { useMinSkeleton } from "@/lib/useMinSkeleton";
 import { usePagedRows } from "@/lib/usePagedRows";
 import { SALES_SYNCED_EVENT } from "@/pages/dashboard/useForceRefresh";
@@ -25,6 +27,12 @@ import { fetchStoreSellers, type Store } from "@/data/wedash/stores";
 import { matchesCodeOrName } from "@/lib/personSearch";
 import { buildXlsx, type XlsxCell } from "@/lib/xlsx";
 import { HeaderFilters } from "@/pages/stock/shared";
+
+type WalletBranchCache = Array<{ store: Store; wallet: WalletMonth }>;
+
+function walletCacheReady(c: WalletBranchCache | null): c is WalletBranchCache {
+  return Array.isArray(c) && c.every((row) => row != null && row.store != null && row.wallet != null);
+}
 
 const money = (cents: number) => brlCent(cents / 100);
 
@@ -1038,22 +1046,36 @@ export function BranchWalletPage() {
   const [codes, setCodes] = useState<Map<string, string>>(() => new Map());
   const [pdfQueued, setPdfQueued] = useState(false);
   const printing = usePrintMode();
-  const showSkeleton = useMinSkeleton(storesLoading || loading);
-  const request = useRef(0);
-  const loadedKey = useRef("");
-  const pdfOnce = useRef(false);
   const storeKey = storeRows.map((store) => store.id).join(",");
+  const filterKey = `wallet:${session.tenantId}:${storeKey}:${from}:${to}`;
+  const { showSkeleton: filterSkeleton, settle } = useFilterSkeleton(filterKey);
+  const showSkeleton = storesLoading || filterSkeleton;
+  const request = useRef(0);
+  const pdfOnce = useRef(false);
+  const storesRef = useRef(storeRows);
+  storesRef.current = storeRows;
+  const settleRef = useRef(settle);
+  settleRef.current = settle;
 
   const load = useCallback(() => {
-    if (storeRows.length === 0) return;
     const id = ++request.current;
-    const key = `${storeRows.map((store) => store.id).join(",")}|${from}|${to}`;
-    if (loadedKey.current !== key) setBranches(null);
+    const key = filterKey;
+    const storesAtLoad = storesRef.current;
+    if (storesAtLoad.length === 0) {
+      setBranches([]);
+      settleRef.current(key);
+      return;
+    }
+    const cached = filterCacheGet<WalletBranchCache>(key);
+    if (walletCacheReady(cached)) {
+      setBranches(cached);
+      settleRef.current(key);
+    }
     setFailed(false);
     setLoading(true);
     const months = monthsTouched(from, to);
     void Promise.all(
-      storeRows.map(async (store) => {
+      storesAtLoad.map(async (store) => {
         const parts = await Promise.all(
           months.map((month) =>
             loadBranchWallet({
@@ -1072,23 +1094,28 @@ export function BranchWalletPage() {
     )
       .then((loaded) => {
         if (id !== request.current) return;
-        loadedKey.current = key;
+        filterCacheSet(key, loaded);
         setBranches(loaded);
         setFailed(false);
+        settleRef.current(key);
       })
       .catch(() => {
         if (id !== request.current) return;
         setFailed(true);
+        if (!walletCacheReady(cached)) {
+          setBranches([]);
+          settleRef.current(key);
+        }
       })
       .finally(() => {
         if (id === request.current) setLoading(false);
       });
-  }, [from, to, session.tenantId, storeRows, today]);
+  }, [filterKey, from, to, session.tenantId, today]);
 
   useEffect(() => {
-    if (!storeKey) return;
+    if (storesLoading) return;
     load();
-  }, [load, storeKey]);
+  }, [load, storesLoading, storeKey]);
 
   useEffect(() => {
     const ids = storeKey ? storeKey.split(",") : [];
@@ -1190,7 +1217,7 @@ export function BranchWalletPage() {
             </Button>
           </div>
         ) : null}
-        {showSkeleton && !branches ? (
+        {showSkeleton ? (
           <WalletSkeleton showStore={storeRows.length > 1} />
         ) : storeRows.length === 0 ? (
           <Card className="flex min-h-[280px] flex-col">

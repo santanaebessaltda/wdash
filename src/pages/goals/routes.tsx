@@ -5,8 +5,9 @@ import { paths } from "@/router/paths";
 import { RedirectTo } from "@/router/RedirectTo";
 import { OWNER_ROLES } from "@/layout/nav-wedash";
 import { RequireRole } from "@/session/RequireSession";
+import GoalsPage from "./GoalsPage";
+/* Performance > Metas sync — cabeçalho na hora; só os cards em skeleton. */
 
-const GoalsPage = lazyPage(() => import("./GoalsPage"), "default");
 const GoalDetailPage = lazyPage(() => import("./GoalDetailPage"), "default");
 const GoalEditorPage = lazyPage(() => import("./GoalEditorPage"), "default");
 
