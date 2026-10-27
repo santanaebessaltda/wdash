@@ -59,6 +59,7 @@ import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
 import { PRODUCT_AVATAR_TONES, colorsByAmount, kpiTone, nextSeriesColor, paymentColor } from "@/pages/dashboard/palette";
 import { OverviewSkeleton } from "@/components/wedash/LoadingSkeletons";
 import { useFilterSkeleton } from "@/lib/useFilterSkeleton";
+import { filterCacheGet, filterCacheSet } from "@/lib/filterCache";
 import { calendarTodayIso } from "@/data/wedash/clock";
 import { goalHistoryDayRange, goalHistorySameWeekdays } from "@/data/wedash/goalCurve";
 import { goalWeightFrom } from "@/data/wedash/engine/goalProjection";
@@ -153,7 +154,55 @@ export default function OverviewPage() {
   const [productDayAggs, setProductDayAggs] = useState<SalesProductDayAgg[]>([]);
   const [productCostDayAggs, setProductCostDayAggs] = useState<SalesProductCostDayAgg[]>([]);
   const filterKey = scopeFilterKey(scope);
-  const { showSkeleton, settle } = useFilterSkeleton(filterKey);
+  const { showSkeleton, refreshing, settle } = useFilterSkeleton(filterKey);
+
+  type OverviewCache = {
+    days: SalesDayAgg[];
+    hours: SalesHourAgg[];
+    payments: SalesPaymentDayAgg[];
+    sellers: SalesSellerDayAgg[];
+    products: SalesProductDayAgg[];
+    productCosts: SalesProductCostDayAgg[];
+    cats: SalesCategoryDayAgg[];
+    catalog: SalesCategoryRef[];
+    shifts: SellerShiftRef[];
+    avatars: SellerAvatarRef[];
+    wm: Date | null;
+    covFrom: Date | null;
+    goalHistDays: SalesDayAgg[];
+    goalHistHours: SalesHourAgg[];
+    prevDays: SalesDayAgg[];
+    prevHours: SalesHourAgg[];
+    goalsLoaded: GoalRecord[];
+    goalDays: SalesDayAgg[];
+    goalSellers: SalesSellerDayAgg[];
+    goalNamed: SalesSellerDayAgg[];
+    goalTeam: GoalTeamMember[];
+  };
+
+  const applyOverview = useCallback((snap: OverviewCache) => {
+    setGoals(snap.goalsLoaded);
+    setGoalDayAggs(snap.goalDays);
+    setGoalSellerDayAggs(snap.goalSellers);
+    setGoalNamedSellerDayAggs(snap.goalNamed);
+    setGoalTeam(snap.goalTeam);
+    setDayAggs(snap.days);
+    setHourAggs(snap.hours);
+    setGoalHistoryDayAggs(snap.goalHistDays);
+    setGoalHistoryHourAggs(snap.goalHistHours);
+    setPrevDayAggs(snap.prevDays);
+    setPrevHourAggs(snap.prevHours);
+    setCategoryDayAggs(snap.cats);
+    setCategoryCatalog(snap.catalog);
+    setPaymentDayAggs(snap.payments);
+    setSellerDayAggs(snap.sellers);
+    setSellerShifts(snap.shifts);
+    setSellerAvatars(snap.avatars);
+    setProductDayAggs(snap.products);
+    setProductCostDayAggs(snap.productCosts);
+    setWatermark(snap.wm);
+    setCoverageFrom(snap.covFrom);
+  }, []);
   const [watermark, setWatermark] = useState<Date | null>(null);
   const [coverageFrom, setCoverageFrom] = useState<Date | null>(null);
   const [goalHistoryDayAggs, setGoalHistoryDayAggs] = useState<SalesDayAgg[]>([]);
@@ -182,6 +231,11 @@ export default function OverviewPage() {
   const reloadAggs = useCallback(async () => {
     const gen = ++reloadGen.current;
     const key = filterKey;
+    const cached = filterCacheGet<OverviewCache>(key);
+    if (cached) {
+      applyOverview(cached);
+      settle(key);
+    }
     const period = resolvePeriod(scope.period, calendarTodayIso());
     const prev = previousPeriod(period);
     const singleDay = period.start === period.end;
@@ -194,14 +248,12 @@ export default function OverviewPage() {
       scope.storeIds.length > 0 ? scope.storeIds : storesForSession(session.stores).map((s) => s.id);
     const goalsP = fetchGoals({ tenantId: session.tenantId, storeIds: goalStoreIds, from: period.start, to: period.end });
     // Atingimento da meta = do inicio de cada meta ate hoje (pode sair do periodo da tela).
-    // Secao Meta do detalhe da pessoa = mesma janela, por pessoa.
     const empty = { days: [] as SalesDayAgg[], sellers: [] as SalesSellerDayAgg[], named: [] as SalesSellerDayAgg[], team: [] as GoalTeamMember[] };
     const goalDataP = goalsP.then(async (gs) => {
       if (gs.length === 0) return empty;
       const from = gs.reduce((m, g) => (g.startsOn < m ? g.startsOn : m), gs[0]!.startsOn);
       const end = gs.reduce((m, g) => (g.endsOn > m ? g.endsOn : m), gs[0]!.endsOn);
       const to = end < today ? end : today;
-      // 6 semanas antes do inicio: peso de cada dia da semana na projecao (a mesma do detalhe da meta).
       const historyFrom = goalWeightFrom(from);
       if (historyFrom > to) return empty;
       const storeIds = [...new Set(gs.map((g) => g.storeId))];
@@ -216,117 +268,98 @@ export default function OverviewPage() {
     });
     const categoryFrom = prev.start < period.start ? prev.start : period.start;
     try {
-      const [days, hours, payments, sellers, products, productCosts, typeByProductId, typeNameById, wm, cov, goalHistDays, goalHistHours, prevDays, prevHours, shifts, avatars, goalsLoaded, goalAggs] = await Promise.all([
-        fetchSalesDayAggs({
-          tenantId: session.tenantId,
-          // Gestor: a rede, para a fatia "Demais filiais". Gerente: só as filiais do vínculo.
-          storeIds: rankingIds,
-          from: period.start,
-          to: period.end,
-          brand: null,
-        }),
-        singleDay
-          ? fetchSalesHourAggs({
-              tenantId: session.tenantId,
-              storeIds: asked,
-              day: period.start,
-              brand: null,
-            })
-          : Promise.resolve([] as SalesHourAgg[]),
-        fetchSalesPaymentDayAggs({
-          tenantId: session.tenantId,
-          storeIds: asked,
-          from: period.start,
-          to: period.end,
-        }),
-        fetchSalesSellerDayAggs({
-          tenantId: session.tenantId,
-          storeIds: asked,
-          from: period.start,
-          to: period.end,
-        }),
-        fetchSalesProductDayAggs({
-          tenantId: session.tenantId,
-          storeIds: asked,
-          from: categoryFrom,
-          to: period.end,
-        }),
-        fetchSalesProductCostDayAggs({
-          tenantId: session.tenantId,
-          storeIds: asked,
-          from: categoryFrom,
-          to: period.end,
-        }),
+      // Onda 1: KPIs, formas, equipe, comparativo — libera a tela cedo.
+      const [days, hours, payments, sellers, wm, cov, goalHistDays, goalHistHours, prevDays, prevHours, shifts, avatars, goalsLoaded] =
+        await Promise.all([
+          fetchSalesDayAggs({
+            tenantId: session.tenantId,
+            storeIds: rankingIds,
+            from: period.start,
+            to: period.end,
+            brand: null,
+          }),
+          singleDay
+            ? fetchSalesHourAggs({ tenantId: session.tenantId, storeIds: asked, day: period.start, brand: null })
+            : Promise.resolve([] as SalesHourAgg[]),
+          fetchSalesPaymentDayAggs({ tenantId: session.tenantId, storeIds: asked, from: period.start, to: period.end }),
+          fetchSalesSellerDayAggs({ tenantId: session.tenantId, storeIds: asked, from: period.start, to: period.end }),
+          fetchSyncWatermark(session.tenantId).catch(() => null),
+          fetchSalesCoverage(session.tenantId, asked),
+          fetchSalesDayAggs({ tenantId: session.tenantId, storeIds: asked, from: goalDays.from, to: goalDays.to, brand: "ALL" }),
+          singleDay
+            ? fetchSalesHourAggs({
+                tenantId: session.tenantId,
+                storeIds: asked,
+                day: goalHistorySameWeekdays(period.start),
+                brand: "ALL",
+              })
+            : Promise.resolve([] as SalesHourAgg[]),
+          fetchSalesDayAggs({ tenantId: session.tenantId, storeIds: asked, from: prev.start, to: prev.end, brand: null }),
+          period.endsToday
+            ? fetchSalesHourAggs({ tenantId: session.tenantId, storeIds: asked, day: prev.end, brand: null })
+            : Promise.resolve([] as SalesHourAgg[]),
+          fetchSellerShifts(session.tenantId),
+          fetchSellerAvatars(session.tenantId),
+          goalsP,
+        ]);
+      if (gen !== reloadGen.current) return;
+      const early: OverviewCache = {
+        days,
+        hours,
+        payments,
+        sellers,
+        products: cached?.products ?? [],
+        productCosts: cached?.productCosts ?? [],
+        cats: cached?.cats ?? [],
+        catalog: cached?.catalog ?? [],
+        shifts,
+        avatars,
+        wm,
+        covFrom: cov.from ? isoToDate(cov.from) : null,
+        goalHistDays,
+        goalHistHours,
+        prevDays,
+        prevHours,
+        goalsLoaded,
+        goalDays: cached?.goalDays ?? [],
+        goalSellers: cached?.goalSellers ?? [],
+        goalNamed: cached?.goalNamed ?? [],
+        goalTeam: cached?.goalTeam ?? [],
+      };
+      applyOverview(early);
+      settle(key);
+
+      // Onda 2: produtos, custos e metas (o que mais pesa em periodo longo).
+      const [products, productCosts, typeByProductId, typeNameById, goalAggs] = await Promise.all([
+        fetchSalesProductDayAggs({ tenantId: session.tenantId, storeIds: asked, from: categoryFrom, to: period.end }),
+        fetchSalesProductCostDayAggs({ tenantId: session.tenantId, storeIds: asked, from: categoryFrom, to: period.end }),
         fetchProductCatalogTypes(),
         fetchProductTypeNames(),
-        fetchSyncWatermark(session.tenantId).catch(() => null),
-        fetchSalesCoverage(session.tenantId, asked),
-        fetchSalesDayAggs({
-          tenantId: session.tenantId,
-          storeIds: asked,
-          from: goalDays.from,
-          to: goalDays.to,
-          brand: "ALL",
-        }),
-        singleDay
-          ? fetchSalesHourAggs({
-              tenantId: session.tenantId,
-              storeIds: asked,
-              day: goalHistorySameWeekdays(period.start),
-              brand: "ALL",
-            })
-          : Promise.resolve([] as SalesHourAgg[]),
-        fetchSalesDayAggs({
-          tenantId: session.tenantId,
-          storeIds: asked,
-          from: prev.start,
-          to: prev.end,
-          brand: null,
-        }),
-        period.endsToday
-          ? fetchSalesHourAggs({
-              tenantId: session.tenantId,
-              storeIds: asked,
-              day: prev.end,
-              brand: null,
-            })
-          : Promise.resolve([] as SalesHourAgg[]),
-        fetchSellerShifts(session.tenantId),
-        fetchSellerAvatars(session.tenantId),
-        goalsP,
         goalDataP,
       ]);
       if (gen !== reloadGen.current) return;
       const cats = rollupCategoryDays({ products, costs: productCosts, typeByProductId, typeNameById });
       const catalog = categoryCatalogFromTypes(typeByProductId, typeNameById);
-      setGoals(goalsLoaded);
-      setGoalDayAggs(goalAggs.days);
-      setGoalSellerDayAggs(goalAggs.sellers);
-      setGoalNamedSellerDayAggs(goalAggs.named);
-      setGoalTeam(goalAggs.team);
-      setDayAggs(days);
-      setHourAggs(hours);
-      setGoalHistoryDayAggs(goalHistDays);
-      setGoalHistoryHourAggs(goalHistHours);
-      setPrevDayAggs(prevDays);
-      setPrevHourAggs(prevHours);
-      setCategoryDayAggs(cats);
-      setCategoryCatalog(catalog);
-      setPaymentDayAggs(payments);
-      setSellerDayAggs(sellers);
-      setSellerShifts(shifts);
-      setSellerAvatars(avatars);
-      setProductDayAggs(products);
-      setProductCostDayAggs(productCosts);
-      setWatermark(wm);
-      setCoverageFrom(cov.from ? isoToDate(cov.from) : null);
+      const full: OverviewCache = {
+        ...early,
+        products,
+        productCosts,
+        cats,
+        catalog,
+        goalDays: goalAggs.days,
+        goalSellers: goalAggs.sellers,
+        goalNamed: goalAggs.named,
+        goalTeam: goalAggs.team,
+      };
+      filterCacheSet(key, full);
+      applyOverview(full);
       settle(key);
     } catch (e) {
       if (gen !== reloadGen.current) return;
       console.error("Overview reloadAggs:", e);
       settle(key);
     }
-  }, [scope, session.role, session.stores, session.tenantId, filterKey, settle]);
+  }, [scope, session.role, session.stores, session.tenantId, filterKey, settle, applyOverview]);
 
   useEffect(() => {
     const onSynced = () => void reloadAggs();
@@ -528,7 +561,7 @@ export default function OverviewPage() {
       {showSkeleton ? (
         <OverviewSkeleton weekdays={currentPeriod.start !== currentPeriod.end} />
       ) : (
-      <>
+      <div className={cn(refreshing && "pointer-events-none opacity-60 transition-opacity")}>
 
       {/* KPI row  -  4 cards */}
       <div className="mt-4 grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -1193,7 +1226,7 @@ export default function OverviewPage() {
           )}
         </Card>
       </div>
-      </>
+      </div>
       )}
 
       {detailModal}

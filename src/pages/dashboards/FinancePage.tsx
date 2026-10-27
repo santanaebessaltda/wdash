@@ -42,6 +42,7 @@ import { ReportHeader, useExportPdf } from "@/pages/dashboard/ReportHeader";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
 import { FinanceSkeleton } from "@/components/wedash/LoadingSkeletons";
 import { useFilterSkeleton } from "@/lib/useFilterSkeleton";
+import { filterCacheGet, filterCacheSet } from "@/lib/filterCache";
 import { brlCent, isoToDate, labelUpper, deltaTip, num, profitBrl } from "@/lib/format";
 import { usePagedRows } from "@/lib/usePagedRows";
 import { cn } from "@/lib/cn";
@@ -140,7 +141,7 @@ export default function FinancePage() {
   const [aggs, setAggs] = useState<FinanceAggInput>({ dayAggs: [] });
   const [coverageFrom, setCoverageFrom] = useState<Date | null>(null);
   const filterKey = scopeFilterKey(scope);
-  const { pending, showSkeleton, settle } = useFilterSkeleton(filterKey);
+  const { pending, showSkeleton, refreshing, settle } = useFilterSkeleton(filterKey);
   // Catalogo de lojas (horario/custos) hidratado depois do 1 render  ->  recalcula.
   const [storesTick, setStoresTick] = useState(0);
   const [evoSort, setEvoSort] = useState<EvoSort>("month");
@@ -156,12 +157,20 @@ export default function FinancePage() {
   const reload = useCallback(async () => {
     const gen = ++reloadGen.current;
     const key = filterKey;
+    type FinanceCache = { aggs: FinanceAggInput; covFrom: Date | null };
+    const cached = filterCacheGet<FinanceCache>(key);
+    if (cached) {
+      setAggs(cached.aggs);
+      setCoverageFrom(cached.covFrom);
+      settle(key);
+    }
     const period = resolvePeriod(scope.period, calendarTodayIso());
     const range = financeFetchRange(scope);
     const costRange = productsFetchRange(scope);
     const storeIds = queryStoreIds(session.role, scope.storeIds, session.stores);
     try {
-      const [dayAggs, hourAggs, prevHourAggs, paymentDayAggs, productCostDayAggs, cov, informedCents] = await Promise.all([
+      // Onda 1: faturamento e formas — libera KPIs.
+      const [dayAggs, hourAggs, prevHourAggs, paymentDayAggs, cov, informedCents] = await Promise.all([
         fetchSalesDayAggs({ tenantId: session.tenantId, storeIds, from: range.from, to: range.to, brand: null }),
         period.start === period.end
           ? fetchSalesHourAggs({ tenantId: session.tenantId, storeIds, day: period.start, brand: null })
@@ -170,18 +179,41 @@ export default function FinancePage() {
           ? fetchSalesHourAggs({ tenantId: session.tenantId, storeIds, day: range.prevHourDay, brand: null })
           : Promise.resolve([] as SalesHourAgg[]),
         fetchSalesPaymentDayAggs({ tenantId: session.tenantId, storeIds, from: period.start, to: period.end }),
-        fetchSalesProductCostDayAggs({ tenantId: session.tenantId, storeIds, from: costRange.from, to: costRange.to }),
         fetchSalesCoverage(session.tenantId, storeIds),
         fetchInformedCents(session.tenantId, storeIds, range.from, range.to).catch(() => ({})),
       ]);
+      if (gen !== reloadGen.current) return;
+      const early: FinanceAggInput = {
+        dayAggs,
+        hourAggs,
+        prevHourAggs,
+        paymentDayAggs,
+        productCostDayAggs: cached?.aggs.productCostDayAggs,
+        productNames: cached?.aggs.productNames,
+        informedCents,
+      };
+      setAggs(early);
+      setCoverageFrom(cov.from ? isoToDate(cov.from) : null);
+      settle(key);
+
+      // Onda 2: CMV por produto (pesado em periodo longo).
+      const productCostDayAggs = await fetchSalesProductCostDayAggs({
+        tenantId: session.tenantId,
+        storeIds,
+        from: costRange.from,
+        to: costRange.to,
+      });
       const productNames = await fetchProductNames(
         productCostDayAggs
           .filter((r) => r.day >= period.start && r.day <= period.end && r.revenueCents > 0 && r.cmvCents === 0)
           .map((r) => r.productCode),
       );
       if (gen !== reloadGen.current) return;
-      setAggs({ dayAggs, hourAggs, prevHourAggs, paymentDayAggs, productCostDayAggs, productNames, informedCents });
-      setCoverageFrom(cov.from ? isoToDate(cov.from) : null);
+      const full: FinanceAggInput = { ...early, productCostDayAggs, productNames };
+      const covFrom = cov.from ? isoToDate(cov.from) : null;
+      filterCacheSet(key, { aggs: full, covFrom });
+      setAggs(full);
+      setCoverageFrom(covFrom);
       settle(key);
     } catch (e) {
       if (gen !== reloadGen.current) return;
@@ -308,7 +340,7 @@ export default function FinancePage() {
       {showSkeleton ? (
         <FinanceSkeleton />
       ) : (
-      <>
+      <div className={cn(refreshing && "pointer-events-none opacity-60 transition-opacity")}>
 
       {/* KPI row  -  4 cards. Gerente fica sem CMV, lucro e margem. */}
       <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -695,7 +727,7 @@ export default function FinancePage() {
         )}
       </Card>
       )}
-      </>
+      </div>
       )}
     </div>
   );

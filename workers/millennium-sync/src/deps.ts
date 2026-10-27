@@ -95,6 +95,40 @@ function chunk<T>(items: T[], size: number): T[][] {
   return out;
 }
 
+/** Meses civis tocados por [from, to] (YYYY-MM-DD). */
+function monthStartsBetween(from: string, to: string): string[] {
+  const out: string[] = [];
+  let cursor = `${from.slice(0, 7)}-01`;
+  const last = `${to.slice(0, 7)}-01`;
+  while (cursor <= last && out.length < 36) {
+    out.push(cursor);
+    const [y, m] = cursor.split("-").map(Number);
+    const next = m === 12 ? `${y + 1}-01-01` : `${y}-${String(m + 1).padStart(2, "0")}-01`;
+    cursor = next;
+  }
+  return out;
+}
+
+/** Atualiza sales_product(_cost)_month_agg apos gravar dias. Sem a RPC, so avisa. */
+async function rebuildProductMonths(
+  sb: SupabaseClient,
+  tenantId: string,
+  storeId: string,
+  from: string,
+  to: string,
+): Promise<void> {
+  for (const monthStart of monthStartsBetween(from, to)) {
+    const { error } = await sb.rpc("rebuild_sales_product_month", {
+      p_tenant_id: tenantId,
+      p_store_id: storeId,
+      p_month_start: monthStart,
+    });
+    if (error && !/function|schema cache|does not exist|404/i.test(error.message ?? "")) {
+      console.warn("rebuild_sales_product_month:", error.message);
+    }
+  }
+}
+
 export function buildCatalogDeps(sb: SupabaseClient): CatalogDeps {
   return {
     async countCatalog() {
@@ -1055,22 +1089,24 @@ export function buildDeps(sb: SupabaseClient, erpSecret: string): SyncJobDeps {
         .gte("day", args.from)
         .lte("day", args.to);
       if (delErr) throw delErr;
-      if (args.rows.length === 0) return;
-      const payload = args.rows.map((r) => ({
-        tenant_id: r.tenantId,
-        store_id: r.storeId,
-        day: r.day,
-        product_id: r.productId,
-        product_code: r.productCode,
-        product_name: r.productName,
-        brand: r.brand,
-        revenue_cents: r.revenueCents,
-        item_count: r.itemCount,
-      }));
-      const { error } = await sb.from("sales_product_day_agg").upsert(payload, {
-        onConflict: "tenant_id,store_id,day,product_id",
-      });
-      if (error) throw error;
+      if (args.rows.length > 0) {
+        const payload = args.rows.map((r) => ({
+          tenant_id: r.tenantId,
+          store_id: r.storeId,
+          day: r.day,
+          product_id: r.productId,
+          product_code: r.productCode,
+          product_name: r.productName,
+          brand: r.brand,
+          revenue_cents: r.revenueCents,
+          item_count: r.itemCount,
+        }));
+        const { error } = await sb.from("sales_product_day_agg").upsert(payload, {
+          onConflict: "tenant_id,store_id,day,product_id",
+        });
+        if (error) throw error;
+      }
+      await rebuildProductMonths(sb, args.tenantId, args.storeId, args.from, args.to);
     },
 
     async replaceSellerProductDayAggs(args) {
@@ -1141,20 +1177,23 @@ export function buildDeps(sb: SupabaseClient, erpSecret: string): SyncJobDeps {
         .eq("store_id", args.storeId)
         .in("day", args.days);
       if (delErr) throw delErr;
-      if (args.rows.length === 0) return;
-      const payload = args.rows.map((r) => ({
-        tenant_id: r.tenantId,
-        store_id: r.storeId,
-        day: r.day,
-        product_code: r.productCode,
-        item_count: r.itemCount,
-        revenue_cents: r.revenueCents,
-        cmv_cents: r.cmvCents,
-      }));
-      const { error } = await sb.from("sales_product_cost_day_agg").upsert(payload, {
-        onConflict: "tenant_id,store_id,day,product_code",
-      });
-      if (error) throw error;
+      if (args.rows.length > 0) {
+        const payload = args.rows.map((r) => ({
+          tenant_id: r.tenantId,
+          store_id: r.storeId,
+          day: r.day,
+          product_code: r.productCode,
+          item_count: r.itemCount,
+          revenue_cents: r.revenueCents,
+          cmv_cents: r.cmvCents,
+        }));
+        const { error } = await sb.from("sales_product_cost_day_agg").upsert(payload, {
+          onConflict: "tenant_id,store_id,day,product_code",
+        });
+        if (error) throw error;
+      }
+      const sorted = [...args.days].sort();
+      await rebuildProductMonths(sb, args.tenantId, args.storeId, sorted[0]!, sorted[sorted.length - 1]!);
     },
 
     async replacePaymentDayAggs(args: {

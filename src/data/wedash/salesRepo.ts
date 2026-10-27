@@ -291,11 +291,14 @@ async function loadTableCostFill(
 }
 
 const PAGE_SIZE = 1000;
+/** Quantas paginas de 1000 linhas buscar em paralelo depois da 1ª. */
+const PAGE_PARALLEL = 4;
 
 /**
  * PostgREST corta em 1000 linhas por request (`.limit` maior nao adianta): pagina
- * com `range` quando o client suporta (Supabase). A query precisa de ordem total
- * (inclua a chave da linha no `order`) para as paginas nao repetirem/pularem linhas.
+ * com `range` quando o client suporta (Supabase). Depois da 1ª pagina, as seguintes
+ * sobem em lotes paralelos para periodo longo nao ficar serial.
+ * A query precisa de ordem total (inclua a chave da linha no `order`).
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function fetchAllPages<Row>(ordered: any, label: string): Promise<Row[]> {
@@ -307,17 +310,54 @@ export async function fetchAllPages<Row>(ordered: any, label: string): Promise<R
     }
     return (data as Row[] | null) ?? [];
   }
-  const out: Row[] = [];
-  for (let offset = 0; ; offset += PAGE_SIZE) {
-    const { data, error } = await ordered.range(offset, offset + PAGE_SIZE - 1);
-    if (error) {
-      console.warn(`${label}:`, error.message ?? error);
-      return out;
-    }
-    const rows = (data as Row[] | null) ?? [];
-    out.push(...rows);
-    if (rows.length < PAGE_SIZE) return out;
+
+  const first = await ordered.range(0, PAGE_SIZE - 1);
+  if (first.error) {
+    console.warn(`${label}:`, first.error.message ?? first.error);
+    return [];
   }
+  const out: Row[] = [...((first.data as Row[] | null) ?? [])];
+  if (out.length < PAGE_SIZE) return out;
+
+  let offset = PAGE_SIZE;
+  for (;;) {
+    const starts = Array.from({ length: PAGE_PARALLEL }, (_, i) => offset + i * PAGE_SIZE);
+    const pages = await Promise.all(starts.map((start) => ordered.range(start, start + PAGE_SIZE - 1)));
+    let short = false;
+    for (const page of pages) {
+      if (page.error) {
+        console.warn(`${label}:`, page.error.message ?? page.error);
+        return out;
+      }
+      const rows = (page.data as Row[] | null) ?? [];
+      out.push(...rows);
+      if (rows.length < PAGE_SIZE) {
+        short = true;
+        break;
+      }
+    }
+    if (short) return out;
+    offset += PAGE_PARALLEL * PAGE_SIZE;
+  }
+}
+
+/** Leitura em 1 round-trip via RPC jsonb. null = funcao ausente / falha  ->  caller usa paginas. */
+async function readAggJsonb(
+  client: SalesQueryClient,
+  fn: string,
+  args: Record<string, unknown>,
+): Promise<unknown[] | null> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (client as any).rpc(fn, args);
+  if (error) {
+    // Funcao ainda nao aplicada no projeto  ->  cai no caminho antigo.
+    if (/function|schema cache|does not exist|404/i.test(error.message ?? "")) return null;
+    console.warn(`${fn}:`, error.message ?? error);
+    return null;
+  }
+  if (data == null) return [];
+  if (Array.isArray(data)) return data;
+  return null;
 }
 
 /** Fetch hourly aggregates for one local day. */
@@ -606,6 +646,14 @@ export async function fetchSellerAvatars(
 }
 
 async function querySellerDayRows(client: SalesQueryClient, query: SalesSellerDayQuery): Promise<SellerDayRow[]> {
+  const bulk = await readAggJsonb(client, "read_sales_seller_day_aggs", {
+    p_tenant_id: query.tenantId,
+    p_store_ids: query.storeIds.length > 0 ? query.storeIds : null,
+    p_from: query.from,
+    p_to: query.to,
+  });
+  if (bulk) return bulk as SellerDayRow[];
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let q: any = (client.from("sales_seller_day_agg") as any)
     .select(
@@ -642,6 +690,14 @@ export async function fetchSalesProductDayAggs(
 ): Promise<SalesProductDayAgg[]> {
   const client = clientOrNull(clientOverride);
   if (!client) return [];
+
+  const bulk = await readAggJsonb(client, "read_sales_product_day_aggs", {
+    p_tenant_id: query.tenantId,
+    p_store_ids: query.storeIds.length > 0 ? query.storeIds : null,
+    p_from: query.from,
+    p_to: query.to,
+  });
+  if (bulk) return (bulk as ProductDayRow[]).map(mapProductDay);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let q: any = (client.from("sales_product_day_agg") as any)
@@ -780,6 +836,18 @@ type ProductCostDayRow = {
   cmv_cents: number;
 };
 
+function mapProductCostDay(r: ProductCostDayRow): SalesProductCostDayAgg {
+  return {
+    tenantId: r.tenant_id,
+    storeId: r.store_id,
+    day: r.day,
+    productCode: String(r.product_code ?? "").trim(),
+    itemCount: Number(r.item_count) || 0,
+    revenueCents: Number(r.revenue_cents) || 0,
+    cmvCents: Number(r.cmv_cents) || 0,
+  };
+}
+
 /** CMV diario por COD_PRODUTO (RELATORIOMARGEM). Falha de leitura  ->  [] (colunas de custo ficam " - "). */
 export async function fetchSalesProductCostDayAggs(
   query: SalesProductDayQuery,
@@ -788,26 +856,26 @@ export async function fetchSalesProductCostDayAggs(
   const client = clientOrNull(clientOverride);
   if (!client) return [];
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let q: any = (client.from("sales_product_cost_day_agg") as any)
-    .select("tenant_id, store_id, day, product_code, item_count, revenue_cents, cmv_cents")
-    .eq("tenant_id", query.tenantId)
-    .gte("day", query.from)
-    .lte("day", query.to);
-
-  if (query.storeIds.length > 0) q = q.in("store_id", query.storeIds);
-
-  const ordered = q.order("day", { ascending: true }).order("store_id").order("product_code");
   try {
-    const rows = (await fetchAllPages<ProductCostDayRow>(ordered, "fetchSalesProductCostDayAggs")).map((r) => ({
-      tenantId: r.tenant_id,
-      storeId: r.store_id,
-      day: r.day,
-      productCode: String(r.product_code ?? "").trim(),
-      itemCount: Number(r.item_count) || 0,
-      revenueCents: Number(r.revenue_cents) || 0,
-      cmvCents: Number(r.cmv_cents) || 0,
-    }));
+    const bulk = await readAggJsonb(client, "read_sales_product_cost_day_aggs", {
+      p_tenant_id: query.tenantId,
+      p_store_ids: query.storeIds.length > 0 ? query.storeIds : null,
+      p_from: query.from,
+      p_to: query.to,
+    });
+    const rows = bulk
+      ? (bulk as ProductCostDayRow[]).map(mapProductCostDay)
+      : await (async () => {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          let q: any = (client.from("sales_product_cost_day_agg") as any)
+            .select("tenant_id, store_id, day, product_code, item_count, revenue_cents, cmv_cents")
+            .eq("tenant_id", query.tenantId)
+            .gte("day", query.from)
+            .lte("day", query.to);
+          if (query.storeIds.length > 0) q = q.in("store_id", query.storeIds);
+          const ordered = q.order("day", { ascending: true }).order("store_id").order("product_code");
+          return (await fetchAllPages<ProductCostDayRow>(ordered, "fetchSalesProductCostDayAggs")).map(mapProductCostDay);
+        })();
     return applyFillToProductCosts(rows, await loadTableCostFill(client, rows, query));
   } catch (e) {
     console.warn("fetchSalesProductCostDayAggs:", e);

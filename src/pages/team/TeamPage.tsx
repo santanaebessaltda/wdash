@@ -51,6 +51,7 @@ import { usePrintMode } from "@/lib/printMode";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
 import { TeamSkeleton } from "@/components/wedash/LoadingSkeletons";
 import { useFilterSkeleton } from "@/lib/useFilterSkeleton";
+import { filterCacheGet, filterCacheSet } from "@/lib/filterCache";
 import { FlameIcon, TargetIcon, TrophyIcon } from "@/pages/dashboards/icons";
 import { RankingBlock } from "@/pages/live/blocks";
 import { PALETTE, colorsByAmount, kpiTone, variationColor } from "@/pages/dashboard/palette";
@@ -188,7 +189,7 @@ export function TeamPage() {
   const [aggs, setAggs] = useState<TeamAggInput>({ dayAggs: [] });
   const [coverageFrom, setCoverageFrom] = useState<Date | null>(null);
   const filterKey = scopeFilterKey(scope);
-  const { showSkeleton, settle } = useFilterSkeleton(filterKey);
+  const { showSkeleton, refreshing, settle } = useFilterSkeleton(filterKey);
   const [search, setSearch] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("revenue");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
@@ -208,10 +209,25 @@ export function TeamPage() {
   const reload = useCallback(async () => {
     const gen = ++reloadGen.current;
     const key = filterKey;
+    type TeamCache = {
+      aggs: TeamAggInput;
+      covFrom: Date | null;
+      goals: GoalsData;
+      challenges: ChallengesData;
+    };
+    const cached = filterCacheGet<TeamCache>(key);
+    if (cached) {
+      setAggs(cached.aggs);
+      setCoverageFrom(cached.covFrom);
+      setGoalsData(cached.goals);
+      setChallengesData(cached.challenges);
+      settle(key);
+    }
     try {
+      const storeIds = queryStoreIds(session.role, scope.storeIds, session.stores);
       const [next, cov, goals, challenges] = await Promise.all([
-        fetchTeamAggInput(session.tenantId, scope, queryStoreIds(session.role, scope.storeIds, session.stores)),
-        fetchSalesCoverage(session.tenantId, queryStoreIds(session.role, scope.storeIds, session.stores)),
+        fetchTeamAggInput(session.tenantId, scope, storeIds),
+        fetchSalesCoverage(session.tenantId, storeIds),
         fetchGoalsData(session.tenantId, scope, session.stores),
         fetchPeriodChallenges(session.tenantId, scope, session.stores).catch((e: unknown) => {
           console.error("Team challenges:", e);
@@ -219,8 +235,10 @@ export function TeamPage() {
         }),
       ]);
       if (gen !== reloadGen.current) return;
+      const covFrom = cov.from ? isoToDate(cov.from) : null;
+      filterCacheSet(key, { aggs: next, covFrom, goals, challenges });
       setAggs(next);
-      setCoverageFrom(cov.from ? isoToDate(cov.from) : null);
+      setCoverageFrom(covFrom);
       setGoalsData(goals);
       setChallengesData(challenges);
       settle(key);
@@ -447,7 +465,7 @@ export function TeamPage() {
       {showSkeleton ? (
         <TeamSkeleton />
       ) : (
-        <>
+        <div className={cn(refreshing && "pointer-events-none opacity-60 transition-opacity")}>
           <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {view.kpis.map((kpi, i) => {
               const Icon = KPI_ICONS[i] ?? IconRevenue;
@@ -656,7 +674,7 @@ export function TeamPage() {
             />
             )}
           </Card>
-        </>
+        </div>
       )}
 
       {personModal}

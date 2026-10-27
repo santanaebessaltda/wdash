@@ -40,6 +40,7 @@ import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
 import { ProductsWithoutCostNotice } from "@/pages/dashboard/ProductsWithoutCostNotice";
 import { ProductsSkeleton } from "@/components/wedash/LoadingSkeletons";
 import { useFilterSkeleton } from "@/lib/useFilterSkeleton";
+import { filterCacheGet, filterCacheSet } from "@/lib/filterCache";
 import { brlCent, isoToDate, num, comparedWithTip, profitBrl } from "@/lib/format";
 import { cn } from "@/lib/cn";
 import type { DateRange, DateRangeChangeMeta } from "@/components/ui/DateRangePicker";
@@ -114,7 +115,7 @@ export default function ProductsPage() {
   const [aggs, setAggs] = useState<ProductsAggInput>({ dayAggs: [] });
   const [coverageFrom, setCoverageFrom] = useState<Date | null>(null);
   const filterKey = scopeFilterKey(scope);
-  const { pending, showSkeleton, settle } = useFilterSkeleton(filterKey);
+  const { pending, showSkeleton, refreshing, settle } = useFilterSkeleton(filterKey);
   const [search, setSearch] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("revenue");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
@@ -137,14 +138,24 @@ export default function ProductsPage() {
   const reload = useCallback(async () => {
     const gen = ++reloadGen.current;
     const key = filterKey;
+    type ProductsCache = { aggs: ProductsAggInput; covFrom: Date | null };
+    const cached = filterCacheGet<ProductsCache>(key);
+    if (cached) {
+      setAggs(cached.aggs);
+      setCoverageFrom(cached.covFrom);
+      settle(key);
+    }
     try {
+      const storeIds = queryStoreIds(session.role, scope.storeIds, session.stores);
       const [next, cov] = await Promise.all([
-        fetchProductsAggInput(session.tenantId, scope, queryStoreIds(session.role, scope.storeIds, session.stores)),
-        fetchSalesCoverage(session.tenantId, queryStoreIds(session.role, scope.storeIds, session.stores)),
+        fetchProductsAggInput(session.tenantId, scope, storeIds),
+        fetchSalesCoverage(session.tenantId, storeIds),
       ]);
       if (gen !== reloadGen.current) return;
+      const covFrom = cov.from ? isoToDate(cov.from) : null;
+      filterCacheSet(key, { aggs: next, covFrom });
       setAggs(next);
-      setCoverageFrom(cov.from ? isoToDate(cov.from) : null);
+      setCoverageFrom(covFrom);
       settle(key);
     } catch (e) {
       if (gen !== reloadGen.current) return;
@@ -337,7 +348,7 @@ export default function ProductsPage() {
       {showSkeleton ? (
         <ProductsSkeleton />
       ) : (
-      <>
+      <div className={cn(refreshing && "pointer-events-none opacity-60 transition-opacity")}>
 
       <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {view.kpis.map((kpi, i) => (
@@ -685,7 +696,7 @@ export default function ProductsPage() {
         )}
         </Card>
       </div>
-      </>
+      </div>
       )}
 
       {detailModal}
