@@ -43,8 +43,16 @@ export interface QuickRange {
   resolve: (today: Date) => DateRange;
 }
 
-function startOfCalendarDay(d: Date): Date {
-  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+/** Aceita Date ou ISO string (sessionStorage / cache) — evita crash em getFullYear. */
+function asCalendarDate(value: Date | string | null | undefined): Date | null {
+  if (value == null || value === "") return null;
+  const d = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function startOfCalendarDay(d: Date | string): Date {
+  const date = asCalendarDate(d) ?? new Date(NaN);
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
 }
 
 function addCalendarDays(d: Date, n: number): Date {
@@ -145,10 +153,18 @@ export function DateRangePicker({
 }) {
   // Dia civil das lojas (Campo Grande)  -  alinhado a resolvePeriod/calendarTodayIso.
   const today = useMemo(() => isoToDate(calendarTodayIso()), []);
-  const min = useMemo(() => (minDate ? startOfCalendarDay(minDate) : null), [minDate]);
-  const max = useMemo(() => startOfCalendarDay(maxDate ?? today), [maxDate, today]);
+  const min = useMemo(() => {
+    const d = asCalendarDate(minDate);
+    return d ? startOfCalendarDay(d) : null;
+  }, [minDate]);
+  const max = useMemo(() => startOfCalendarDay(asCalendarDate(maxDate) ?? today), [maxDate, today]);
   const [open, setOpen] = useState(false);
-  const [viewMonth, setViewMonth] = useState<Date>(() => (value ? new Date(value[0].getFullYear(), value[0].getMonth(), 1) : new Date(today.getFullYear(), today.getMonth(), 1)));
+  const [viewMonth, setViewMonth] = useState<Date>(() => {
+    const start = value ? asCalendarDate(value[0]) : null;
+    return start
+      ? new Date(start.getFullYear(), start.getMonth(), 1)
+      : new Date(today.getFullYear(), today.getMonth(), 1);
+  });
   const [draftStart, setDraftStart] = useState<Date | null>(null);
   const [panelPos, setPanelPos] = useState<{ top: number; left: number; width: number; maxHeight: number } | null>(null);
   const triggerRef = useRef<HTMLDivElement>(null);
@@ -158,7 +174,8 @@ export function DateRangePicker({
   useEffect(() => {
     if (!open) return;
     setDraftStart(null);
-    if (value) setViewMonth(new Date(value[0].getFullYear(), value[0].getMonth(), 1));
+    const start = value ? asCalendarDate(value[0]) : null;
+    if (start) setViewMonth(new Date(start.getFullYear(), start.getMonth(), 1));
   }, [open]); // value lido so no momento do open
 
   function dayBlocked(day: Date): boolean {

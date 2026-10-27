@@ -143,7 +143,7 @@ export default function ProductsPage() {
     const scopeAtLoad = scope;
     type ProductsCache = { aggs: ProductsAggInput; covFrom: Date | null };
     const cached = filterCacheGet<ProductsCache>(key);
-    if (cached) {
+    if (cached?.aggs && Array.isArray(cached.aggs.dayAggs)) {
       setAggs(cached.aggs);
       setCoverageFrom(filterCacheDate(cached.covFrom));
       setViewScope(scopeAtLoad);

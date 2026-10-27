@@ -11,7 +11,9 @@
  */
 const store = new Map<string, unknown>();
 const MAX = 32;
-const STORAGE_PREFIX = "wdash.fc.v2:";
+/** v3: invalida caches antigos apos mudanca de forma (periodo cost / Date revive). */
+const STORAGE_PREFIX = "wdash.fc.v3:";
+const LEGACY_PREFIXES = ["wdash.fc.v1:", "wdash.fc.v2:"];
 /** Evita estourar sessionStorage com payloads enormes. */
 const MAX_STORAGE_CHARS = 1_500_000;
 
@@ -64,10 +66,23 @@ export function filterCacheClear(): void {
     const drop: string[] = [];
     for (let i = 0; i < sessionStorage.length; i++) {
       const k = sessionStorage.key(i);
-      if (k?.startsWith(STORAGE_PREFIX)) drop.push(k);
+      if (!k) continue;
+      if (k.startsWith(STORAGE_PREFIX) || LEGACY_PREFIXES.some((p) => k.startsWith(p))) drop.push(k);
     }
     for (const k of drop) sessionStorage.removeItem(k);
   } catch {
     /* ignore */
   }
+}
+
+/** Remove so as chaves legadas (uma vez por sessao ao carregar o modulo). */
+try {
+  const drop: string[] = [];
+  for (let i = 0; i < sessionStorage.length; i++) {
+    const k = sessionStorage.key(i);
+    if (k && LEGACY_PREFIXES.some((p) => k.startsWith(p))) drop.push(k);
+  }
+  for (const k of drop) sessionStorage.removeItem(k);
+} catch {
+  /* ignore */
 }

@@ -160,7 +160,7 @@ export default function FinancePage() {
     const scopeAtLoad = scope;
     type FinanceCache = { aggs: FinanceAggInput; covFrom: Date | null };
     const cached = filterCacheGet<FinanceCache>(key);
-    if (cached) {
+    if (cached?.aggs && Array.isArray(cached.aggs.dayAggs)) {
       setAggs(cached.aggs);
       setCoverageFrom(filterCacheDate(cached.covFrom));
       setViewScope(scopeAtLoad);
@@ -228,11 +228,15 @@ export default function FinancePage() {
     return () => window.removeEventListener(SALES_SYNCED_EVENT, onSynced);
   }, [reload]);
 
-  const view = useMemo(
-    () => buildFinanceView({ ...viewScope, division: null }, aggs),
+  const view = useMemo(() => {
+    try {
+      return buildFinanceView({ ...viewScope, division: null }, aggs);
+    } catch (e) {
+      console.error("Finance view:", e);
+      return buildFinanceView({ ...viewScope, division: null }, { dayAggs: [] });
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [viewScope, aggs, storesTick],
-  );
+  }, [viewScope, aggs, storesTick]);
 
   const evoRows = useMemo(() => {
     const rows = view.monthlyEvolution.map((r, order) => ({ ...r, order }));

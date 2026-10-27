@@ -218,11 +218,11 @@ export function TeamPage() {
       challenges: ChallengesData;
     };
     const cached = filterCacheGet<TeamCache>(key);
-    if (cached) {
+    if (cached?.aggs && Array.isArray(cached.aggs.dayAggs)) {
       setAggs(cached.aggs);
       setCoverageFrom(filterCacheDate(cached.covFrom));
-      setGoalsData(cached.goals);
-      setChallengesData(cached.challenges);
+      setGoalsData(cached.goals ?? GOALS_EMPTY);
+      setChallengesData(cached.challenges ?? CHALLENGES_EMPTY);
       setViewScope(scopeAtLoad);
       settle(key);
     }

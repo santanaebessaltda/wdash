@@ -2523,7 +2523,7 @@ export function buildFinanceViewFromAggs(scope: Scope, input: FinanceAggInput): 
     if (!storeById.has(r.storeId)) continue;
     costDays.add(`${r.storeId}|${r.day}`);
     if (r.day < period.start || r.day > period.end || r.revenueCents <= 0 || r.cmvCents !== 0) continue;
-    const code = r.productCode.trim();
+    const code = String(r.productCode ?? "").trim();
     if (!code) continue;
     const p = withoutCost.get(code) ?? { code: code, name: input.productNames?.[code] ?? "", items: 0, revenue: 0 };
     p.items += r.itemCount;

@@ -1,6 +1,7 @@
 import { Alert, RadialProgress } from "@/components/ui";
 import { calendarTodayIso } from "@/data/wedash/clock";
 import { monthFillProgress, type MonthFill } from "@/data/wedash/salesRepo";
+import { filterCacheDate } from "@/lib/filterCache";
 
 /** Periodo [inicio, fim] inclui dias que a carga do mes ainda nao trouxe. */
 export function monthFillTouches(fill: MonthFill | null, start: string, end: string): boolean {
@@ -8,11 +9,13 @@ export function monthFillTouches(fill: MonthFill | null, start: string, end: str
 }
 
 /** Durante a carga do historico o calendario libera desde o dia mais antigo da carga (o aviso explica o parcial). */
-export function pickerMinDate(coverageFrom: Date | null, fill: MonthFill | null): Date | null {
-  if (!fill) return coverageFrom;
+export function pickerMinDate(coverageFrom: Date | string | null | undefined, fill: MonthFill | null): Date | null {
+  const coverage = filterCacheDate(coverageFrom);
+  if (!fill?.fillUntil) return coverage;
   const [y, m, d] = fill.fillUntil.split("-").map(Number);
+  if (!y || !m || !d) return coverage;
   const fillStart = new Date(y, m - 1, d);
-  return coverageFrom && coverageFrom < fillStart ? coverageFrom : fillStart;
+  return coverage && coverage < fillStart ? coverage : fillStart;
 }
 
 /**
