@@ -18,7 +18,7 @@ import { fetchGoals } from "@/data/wedash/goalsRepo";
 import { goalMonthFloor, scheduleStartMonth, type GoalSpan } from "@/data/wedash/goalMonths";
 import { branchRoleLabel, fetchStoreSellers, fetchStoreShifts, isBranchTeamMember, type Store, type StoreSeller, type StoreShift } from "@/data/wedash/stores";
 import { DOW_LABELS } from "@/data/wedash/storeHours";
-import { applyDayChoices, dayEditOptions, defaultDayNeeds, generateMonth, inferCompLinks, PREVIOUS_MONTH_EDIT, weekday, type CellChoice, type DayNeed, type DayStatus, type HolidayRule, type SchedulePattern, type Sex } from "@/data/wedash/scheduleGenerate";
+import { applyDayChoices, dayEditOptions, defaultDayNeeds, generateMonth, inferCompLinks, issueFromUnknown, PREVIOUS_MONTH_EDIT, weekday, type CellChoice, type DayNeed, type DayStatus, type HolidayRule, type ScheduleGenerateIssue, type SchedulePattern, type Sex } from "@/data/wedash/scheduleGenerate";
 import { holidayLabel, holidaysForStore, loadHolidaySeed, loadNationalHolidays, storePlace, type Holiday } from "@/data/wedash/scheduleHolidays";
 import { deleteSchedule, fetchCompDue, fetchPreviousSnapshot, fetchSchedule, saveManualDay, saveSchedule, type StoredDay, type StoredSchedule } from "@/data/wedash/scheduleRepo";
 import { ScheduleWizard, type ScheduleWizardValue, type WizardBranch } from "./ScheduleWizard";
@@ -348,9 +348,16 @@ export function SchedulePage() {
     return { keptManualDays, monthStart, schedule, days };
   }
 
-  async function onGenerate(storeId: string, value: ScheduleWizardValue): Promise<string | void> {
+  async function onGenerate(storeId: string, value: ScheduleWizardValue): Promise<ScheduleGenerateIssue | void> {
     const view = views.find((item) => item.store.id === storeId);
-    if (!view) return "Não foi possível gerar a escala.";
+    if (!view) {
+      return {
+        title: "Não foi possível gerar a escala",
+        explanation: "A filial escolhida não está disponível neste momento.",
+        howToFix: ["Feche o assistente, atualize a página e tente de novo."],
+        fixes: [],
+      };
+    }
     setSaving(true);
     try {
       const selected = value.selectedIds.map((id) => ({
@@ -387,7 +394,7 @@ export function SchedulePage() {
       setWizardMonth(null);
       setReloadKey((value) => value + 1);
     } catch (caught) {
-      return caught instanceof Error && caught.message ? caught.message : "Não foi possível gerar a escala.";
+      return issueFromUnknown(caught);
     } finally {
       setSaving(false);
     }

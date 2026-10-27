@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { applyDayChoices, generateMonth, previousFromSnapshot, weekday, type EditableDay, type HolidayRule } from "./scheduleGenerate";
+import { applyDayChoices, generateMonth, previousFromSnapshot, scheduleIssueFromEngine, weekday, type EditableDay, type HolidayRule } from "./scheduleGenerate";
 import { easter, nationalHolidays, storePlace } from "./scheduleHolidays";
 
 describe("feriados nacionais", () => {
@@ -125,6 +125,26 @@ describe("geração da escala", () => {
       holidayRules: [{ date: "2026-10-12", name: "Aparecida", open: true, workers: 1, pay: "extra_off", window: "next_month" }],
     });
     expect(generated.compDue).toEqual([{ personId: "a", holiday: "2026-10-12", until: "2026-11-30" }]);
+  });
+
+  it("explica como destravar erro de domingo", () => {
+    const issue = scheduleIssueFromEngine(
+      [
+        {
+          title: "O revezamento dos domingos precisa de mais pessoas",
+          explanation: "A quantidade pedida nos domingos não deixa espaço para todas as folgas de domingo escolhidas para a equipe.",
+          details: ["Foram pedidas 15 presenças nos 5 domingos."],
+          actions: [
+            { label: "Rever pessoas por dia", target: "businessDays" },
+            { label: "Adicionar pessoas à equipe", target: "employeeName" },
+          ],
+        },
+      ],
+      "falhou",
+    );
+    expect(issue.title).toMatch(/domingos/i);
+    expect(issue.howToFix.some((line) => line.toLowerCase().includes("domingo"))).toBe(true);
+    expect(issue.fixes.map((fix) => fix.step).sort()).toEqual([2, 3]);
   });
 
   it("usa o mês anterior no revezamento de domingo", () => {

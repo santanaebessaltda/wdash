@@ -1,13 +1,26 @@
 import { Fragment, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Accordion, Alert, Button, DatePicker, FormField, Input, Modal, Select, WizardCardHeader, WizardNav, WizardSteps } from "@/components/ui";
+import { Accordion, Alert, AlertLink, Button, DatePicker, FormField, Input, Modal, Select, WizardCardHeader, WizardNav, WizardSteps } from "@/components/ui";
 import { PersonAvatar } from "@/components/wedash/PersonAvatar";
 import { Icon, icons } from "@/pages/users/Icons";
 import { cn } from "@/lib/cn";
 import { dateToIso, isoToDate } from "@/lib/format";
 import { endOfMonth, startOfMonth } from "@/data/wedash/engine/format";
 import { DOW_LABELS, type Dow } from "@/data/wedash/storeHours";
-import { defaultDayNeeds, patternFits, type CompWindow, type DayNeed, type GroupNeed, type HolidayRule, type OffMode, type SchedulePattern, type ScheduleScenario, type Sex, type SundayRule } from "@/data/wedash/scheduleGenerate";
+import {
+  defaultDayNeeds,
+  patternFits,
+  type CompWindow,
+  type DayNeed,
+  type GroupNeed,
+  type HolidayRule,
+  type OffMode,
+  type ScheduleGenerateIssue,
+  type SchedulePattern,
+  type ScheduleScenario,
+  type Sex,
+  type SundayRule,
+} from "@/data/wedash/scheduleGenerate";
 
 const STEPS = [
   { num: 1, label: "Escala" },
@@ -283,7 +296,7 @@ export function ScheduleWizard({
   stores: WizardBranch[];
   storeId: string;
   saving: boolean;
-  onSubmit: (storeId: string, value: ScheduleWizardValue) => Promise<string | void>;
+  onSubmit: (storeId: string, value: ScheduleWizardValue) => Promise<ScheduleGenerateIssue | string | void>;
 }) {
   const opening = (stores.find((item) => item.id === storeId) ?? stores[0]) as WizardBranch;
   const [branchId, setBranchId] = useState(opening.id);
@@ -297,7 +310,20 @@ export function ScheduleWizard({
   const [extraDate, setExtraDate] = useState("");
   const [extraName, setExtraName] = useState("");
   const [addingHoliday, setAddingHoliday] = useState(false);
-  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saveIssue, setSaveIssue] = useState<ScheduleGenerateIssue | null>(null);
+
+  function clearIssue() {
+    setSaveIssue(null);
+  }
+
+  function showIssue(result: ScheduleGenerateIssue | string | void) {
+    if (!result) return;
+    if (typeof result === "string") {
+      setSaveIssue({ title: result, explanation: "", howToFix: [], fixes: [] });
+      return;
+    }
+    setSaveIssue(result);
+  }
   const days = periodDays(value.periodStart, value.periodEnd);
   const periodOk = value.periodEnd >= value.periodStart && days > 0 && days <= 93;
   const types = TYPES.filter((item) => patternFits(value.scenario, item.id));
@@ -378,7 +404,7 @@ export function ScheduleWizard({
     setExtraDate("");
     setExtraName("");
     setAddingHoliday(false);
-    setSaveError(null);
+    clearIssue();
   }
 
   function patchRule(date: string, patch: Partial<HolidayRule>) {
@@ -398,7 +424,45 @@ export function ScheduleWizard({
       bodyClassName="overflow-x-hidden overflow-y-auto p-5"
       footer={
         <div className="flex w-full min-w-0 flex-col gap-3">
-          {saveError ? <Alert variant="danger" title={saveError} /> : null}
+          {saveIssue ? (
+            <Alert
+              variant="danger"
+              title={saveIssue.title}
+              footer={
+                saveIssue.fixes.length > 0 ? (
+                  <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 border-t border-black/5 pt-2 dark:border-white/10">
+                    {saveIssue.fixes.map((fix) => (
+                      <AlertLink
+                        key={`${fix.step}-${fix.label}`}
+                        onClick={() => {
+                          setStep(fix.step);
+                          clearIssue();
+                        }}
+                      >
+                        {fix.label}
+                      </AlertLink>
+                    ))}
+                  </div>
+                ) : undefined
+              }
+            >
+              {saveIssue.explanation || saveIssue.howToFix.length > 0 ? (
+                <div className="space-y-2">
+                  {saveIssue.explanation ? <p>{saveIssue.explanation}</p> : null}
+                  {saveIssue.howToFix.length > 0 ? (
+                    <div>
+                      <p className="font-semibold text-t0">Como resolver</p>
+                      <ul className="mt-1 list-disc space-y-0.5 pl-4">
+                        {saveIssue.howToFix.map((line) => (
+                          <li key={line}>{line}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+            </Alert>
+          ) : null}
           <WizardNav
             align="end"
             hidePrevious={step === 1}
@@ -408,18 +472,16 @@ export function ScheduleWizard({
             hidePreviousIcon
             hideNextIcon
             onPrevious={() => {
-              setSaveError(null);
+              clearIssue();
               setStep((current) => current - 1);
             }}
             onNext={() => {
               if (step < 4) {
-                setSaveError(null);
+                clearIssue();
                 setStep((current) => current + 1);
                 return;
               }
-              void onSubmit(branchId, forSubmit(value)).then((message) => {
-                if (message) setSaveError(message);
-              });
+              void onSubmit(branchId, forSubmit(value)).then(showIssue);
             }}
           />
         </div>

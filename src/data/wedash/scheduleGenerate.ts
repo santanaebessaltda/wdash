@@ -65,6 +65,128 @@ export type GeneratorSnapshot = {
 
 export type GeneratedMonth = { days: GeneratedDay[]; compDue: CompDue[]; snapshot: GeneratorSnapshot };
 
+/** Etapa do wizard onde a pessoa corrige o problema. */
+export type ScheduleFixStep = 2 | 3 | 4;
+
+export type ScheduleGenerateIssue = {
+  title: string;
+  explanation: string;
+  /** Passos concretos de como destravar. */
+  howToFix: string[];
+  /** Atalhos para a etapa do wizard. */
+  fixes: { label: string; step: ScheduleFixStep }[];
+};
+
+export class ScheduleGenerateError extends Error {
+  issue: ScheduleGenerateIssue;
+  constructor(issue: ScheduleGenerateIssue) {
+    super(issue.explanation);
+    this.name = "ScheduleGenerateError";
+    this.issue = issue;
+  }
+}
+
+type EngineDiagnostic = {
+  title?: string;
+  explanation?: string;
+  details?: string[];
+  actions?: { label?: string; target?: string }[];
+};
+
+const TARGET_STEP: Record<string, ScheduleFixStep> = {
+  businessDays: 3,
+  employeeList: 2,
+  employeeName: 2,
+  holidayList: 4,
+  compDeadline: 4,
+};
+
+function uniqueLines(lines: string[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const line of lines) {
+    const text = line.trim();
+    if (!text || seen.has(text)) continue;
+    seen.add(text);
+    out.push(text);
+  }
+  return out;
+}
+
+function tipsFor(text: string): string[] {
+  const t = text.toLowerCase();
+  if (t.includes("domingo")) {
+    return [
+      "Em Dias, baixe o mínimo de pessoas no domingo.",
+      "Em Feriados, se o feriado cair no domingo, use o mesmo mínimo dos outros domingos (não peça mais gente só nele).",
+      "Em Equipe → Folgas aos domingos, use “um a cada três” em vez de “um a cada dois”, ou inclua mais pessoas na escala.",
+    ];
+  }
+  if (t.includes("compensat") || (t.includes("folga") && t.includes("feriado"))) {
+    return [
+      "No feriado, mude o prazo da folga para “No mês seguinte” ou “7 dias”.",
+      "Ou troque a compensação para “Pagamento em dobro” (sem folga extra).",
+      "Ou em Dias, baixe um pouco o mínimo nos dias úteis para sobrar vaga de folga.",
+    ];
+  }
+  if (t.includes("semana") && (t.includes("cobrir") || t.includes("falta gente") || t.includes("não conseguiu fechar"))) {
+    return [
+      "Em Dias, reduza o mínimo nos dias mais cheios (sexta e sábado costumam apertar).",
+      "Em Equipe, inclua mais pessoas nesta escala.",
+      "Se alguém tem folga fixa, mude para Automático ou escolha outro dia.",
+    ];
+  }
+  if (t.includes("12×36") || t.includes("12x36") || t.includes("dia sim")) {
+    return [
+      "Em Dias e Feriados, as quantidades precisam caber em dois grupos alternados.",
+      "Baixe o mínimo nos dias pedindo quase a equipe inteira, ou inclua mais pessoas.",
+    ];
+  }
+  return [
+    "Revise a equipe, o mínimo por dia e os feriados — um desses três costuma travar a escala.",
+  ];
+}
+
+/** Monta o aviso amigável a partir do diagnóstico do motor (ou de um texto solto). */
+export function scheduleIssueFromEngine(
+  diagnostics: EngineDiagnostic[] | undefined,
+  fallback: string,
+): ScheduleGenerateIssue {
+  const diag = diagnostics?.[0];
+  const title = diag?.title?.trim() || "Não foi possível montar a escala";
+  const explanation = diag?.explanation?.trim() || fallback.trim() || "Revise equipe, dias e feriados e tente de novo.";
+  const blob = `${title} ${explanation} ${(diag?.details ?? []).join(" ")}`;
+  const howToFix = uniqueLines([...(diag?.details ?? []), ...tipsFor(blob)]);
+  const fixes = uniqueLines(
+    (diag?.actions ?? [])
+      .map((action) => {
+        const step = action.target ? TARGET_STEP[action.target] : undefined;
+        if (!step || !action.label) return "";
+        return `${step}|${action.label}`;
+      })
+      .filter(Boolean),
+  ).map((row) => {
+    const [step, ...rest] = row.split("|");
+    return { step: Number(step) as ScheduleFixStep, label: rest.join("|") };
+  });
+  if (fixes.length === 0) {
+    if (blob.toLowerCase().includes("domingo") || blob.toLowerCase().includes("equipe")) {
+      fixes.push({ step: 2, label: "Rever equipe e folgas de domingo" }, { step: 3, label: "Rever mínimo nos dias" });
+    } else if (blob.toLowerCase().includes("feriado") || blob.toLowerCase().includes("compensat")) {
+      fixes.push({ step: 4, label: "Rever feriados" }, { step: 3, label: "Rever mínimo nos dias" });
+    } else {
+      fixes.push({ step: 3, label: "Rever dias" }, { step: 2, label: "Rever equipe" }, { step: 4, label: "Rever feriados" });
+    }
+  }
+  return { title, explanation, howToFix, fixes };
+}
+
+export function issueFromUnknown(caught: unknown): ScheduleGenerateIssue {
+  if (caught instanceof ScheduleGenerateError) return caught.issue;
+  const message = caught instanceof Error && caught.message ? caught.message : "Não foi possível gerar a escala.";
+  return scheduleIssueFromEngine(undefined, message);
+}
+
 /** Encaixa o snapshot do mês anterior na equipe atual (mesmos ids). */
 export function previousFromSnapshot(
   snapshot: GeneratorSnapshot | null | undefined,
@@ -218,6 +340,7 @@ type EngineMonth = {
   compensation?: { employee: number; holiday: string; day: string; deadline?: string }[];
   assignment?: { base: number; phase: number; workPhase?: number }[];
   config?: Record<string, unknown>;
+  diagnostics?: EngineDiagnostic[];
 };
 
 export function generateMonth(input: {
@@ -296,7 +419,11 @@ export function generateMonth(input: {
       notBefore: rule.window === "next_month" ? addDays(monthEnd, 1) : addDays(rule.date, 1),
     })),
   }) as EngineMonth;
-  if (!result.ok) throw new Error(result.error || "Não foi possível gerar a escala.");
+  if (!result.ok) {
+    throw new ScheduleGenerateError(
+      scheduleIssueFromEngine(result.diagnostics, result.error || "Não foi possível gerar a escala."),
+    );
+  }
   const plain = new Set(input.holidayDates);
   const knownHoliday = new Set(rules.map((rule) => rule.date));
   const days: GeneratedDay[] = [];
