@@ -5,7 +5,7 @@
  */
 const store = new Map<string, unknown>();
 const MAX = 32;
-const STORAGE_PREFIX = "wdash.fc.v1:";
+const STORAGE_PREFIX = "wdash.fc.v2:";
 /** Evita estourar sessionStorage com payloads enormes. */
 const MAX_STORAGE_CHARS = 1_500_000;
 

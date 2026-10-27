@@ -12,8 +12,8 @@ import { buildOverviewView, resolvePeriod, previousPeriod, OVERVIEW_PRODUCTS_TOP
 import {
   fetchSalesDayAggs,
   fetchSalesHourAggs,
-  fetchSalesCategoryCatalog,
-  fetchSalesCategoryDayAggs,
+  fetchProductCatalogTypes,
+  fetchProductTypeNames,
   fetchSalesPaymentDayAggs,
   fetchNamedSellerDayAggs,
   fetchSalesSellerDayAggs,
@@ -36,6 +36,7 @@ import type {
   SellerAvatarRef,
   SellerShiftRef,
 } from "@/data/wedash/salesTypes";
+import { categoryCatalogFromTypes, rollupCategoryDays } from "@/data/wedash/categoryRollup";
 import { brlCent, isoToDate, labelUpper, num, deltaTip, titleName, profitBrl } from "@/lib/format";
 import type { DateRange, DateRangeChangeMeta } from "@/components/ui/DateRangePicker";
 import { useActiveSession } from "@/session/SessionProvider";
@@ -266,7 +267,6 @@ export default function OverviewPage() {
       ]);
       return { days, sellers, named, team };
     });
-    const categoryFrom = prev.start < period.start ? prev.start : period.start;
     const productQuery = (from: string, to: string) => ({
       tenantId: session.tenantId,
       storeIds: asked,
@@ -274,7 +274,8 @@ export default function OverviewPage() {
       to,
     });
     try {
-      // Tudo junto: totais de produto/CMV no Postgres (~centenas de linhas) + categoria da view.
+      // Tudo junto. Categoria = rollup dos totais de produto (a view dia a dia e lenta e
+      // deixava o card vazio quando a leitura falhava / estourava).
       const [
         days,
         hours,
@@ -289,12 +290,12 @@ export default function OverviewPage() {
         shifts,
         avatars,
         goalsLoaded,
-        cats,
-        catalog,
         productsCurrent,
         productsPrev,
         costsCurrent,
         costsPrev,
+        typeByProductId,
+        typeNameById,
         goalAggs,
       ] = await Promise.all([
         fetchSalesDayAggs({
@@ -327,27 +328,31 @@ export default function OverviewPage() {
         fetchSellerShifts(session.tenantId),
         fetchSellerAvatars(session.tenantId),
         goalsP,
-        fetchSalesCategoryDayAggs({
-          tenantId: session.tenantId,
-          storeIds: asked,
-          from: categoryFrom,
-          to: period.end,
-        }),
-        fetchSalesCategoryCatalog({ tenantId: session.tenantId, storeIds: asked }),
         fetchSalesProductPeriodAggs(productQuery(period.start, period.end)),
         fetchSalesProductPeriodAggs(productQuery(prev.start, prev.end)),
         fetchSalesProductCostPeriodAggs(productQuery(period.start, period.end)),
         fetchSalesProductCostPeriodAggs(productQuery(prev.start, prev.end)),
+        fetchProductCatalogTypes(),
+        fetchProductTypeNames(),
         goalDataP,
       ]);
       if (gen !== reloadGen.current) return;
+      const products = [...productsCurrent, ...productsPrev];
+      const productCosts = [...costsCurrent, ...costsPrev];
+      const cats = rollupCategoryDays({
+        products,
+        costs: productCosts,
+        typeByProductId,
+        typeNameById,
+      });
+      const catalog = categoryCatalogFromTypes(typeByProductId, typeNameById);
       const full: OverviewCache = {
         days,
         hours,
         payments,
         sellers,
-        products: [...productsCurrent, ...productsPrev],
-        productCosts: [...costsCurrent, ...costsPrev],
+        products,
+        productCosts,
         cats,
         catalog,
         shifts,
