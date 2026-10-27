@@ -13,6 +13,7 @@ import {
 } from "@/session/authApi";
 import { accessLabel, roleLabel, sessionFromUser, storesKey, type Session } from "@/session/session";
 import { clearAllPendingForce } from "@/data/wedash/syncUi";
+import { filterCacheClear } from "@/lib/filterCache";
 import { clearSavedPeriod } from "@/session/periodStorage";
 import { requestPermissionAfterLogin, watchSalesPush } from "@/push/salesPush";
 
@@ -284,6 +285,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     // Nao desconecta Millennium  -  so Configuracoes > Integracao ERP.
     clearSavedPeriod();
     clearAllPendingForce();
+    filterCacheClear();
     setSession(null);
     save(null);
     void logoutAuth();

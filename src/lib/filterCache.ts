@@ -2,12 +2,25 @@
  * Cache por chave de filtro (periodo + lojas + marca).
  * Memoria (LRU) + sessionStorage: voltar na mesma aba e no mesmo filtro fica instantaneo
  * sem ir de novo no banco; a tela ainda refresca em silencio.
+ *
+ * Padrao das telas do Dashboard:
+ * 1. cache hit → aplica + `setViewScope` + `settle` (tela instantanea)
+ * 2. rede: `Promise.all` do pacote completo → aplica + `setViewScope` + `settle` uma vez
+ * 3. `viewScope` so muda com os aggs (nunca no clique do filtro sozinho)
+ * 4. datas do cache: sempre `filterCacheDate(...)` — JSON vira ISO string
  */
 const store = new Map<string, unknown>();
 const MAX = 32;
 const STORAGE_PREFIX = "wdash.fc.v2:";
 /** Evita estourar sessionStorage com payloads enormes. */
 const MAX_STORAGE_CHARS = 1_500_000;
+
+/** Revive Date apos JSON.parse do sessionStorage (ISO string). */
+export function filterCacheDate(value: Date | string | null | undefined): Date | null {
+  if (value == null || value === "") return null;
+  const d = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
 
 export function filterCacheGet<T>(key: string): T | null {
   if (store.has(key)) {

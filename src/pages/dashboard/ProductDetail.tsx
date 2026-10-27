@@ -67,8 +67,7 @@ export const moneyOrDash = (v: number | null) => (v == null ? "—" : brlCent(v)
 
 /* ---------- Dados ---------- */
 
-/** Tudo o que a tela Produtos le  -  tambem usado pelo detalhe aberto de outras telas. */
-/** Onda 1: KPIs / evolucao (dia + hora). Produtos e CMV ficam na onda 2. */
+/** KPIs / evolucao (dia + hora). Junto com o catalogo no carregamento da tela. */
 export async function fetchProductsKpiAggs(
   tenantId: string,
   scope: Scope,

@@ -59,7 +59,7 @@ import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
 import { PRODUCT_AVATAR_TONES, colorsByAmount, kpiTone, nextSeriesColor, paymentColor } from "@/pages/dashboard/palette";
 import { OverviewSkeleton } from "@/components/wedash/LoadingSkeletons";
 import { useFilterSkeleton } from "@/lib/useFilterSkeleton";
-import { filterCacheGet, filterCacheSet } from "@/lib/filterCache";
+import { filterCacheDate, filterCacheGet, filterCacheSet } from "@/lib/filterCache";
 import { calendarTodayIso } from "@/data/wedash/clock";
 import { goalHistoryDayRange, goalHistorySameWeekdays } from "@/data/wedash/goalCurve";
 import { goalWeightFrom } from "@/data/wedash/engine/goalProjection";
@@ -153,6 +153,17 @@ export default function OverviewPage() {
   const [sellerAvatars, setSellerAvatars] = useState<SellerAvatarRef[]>([]);
   const [productDayAggs, setProductDayAggs] = useState<SalesProductDayAgg[]>([]);
   const [productCostDayAggs, setProductCostDayAggs] = useState<SalesProductCostDayAgg[]>([]);
+  const [watermark, setWatermark] = useState<Date | null>(null);
+  const [coverageFrom, setCoverageFrom] = useState<Date | null>(null);
+  const [goalHistoryDayAggs, setGoalHistoryDayAggs] = useState<SalesDayAgg[]>([]);
+  const [goalHistoryHourAggs, setGoalHistoryHourAggs] = useState<SalesHourAgg[]>([]);
+  const [prevDayAggs, setPrevDayAggs] = useState<SalesDayAgg[]>([]);
+  const [prevHourAggs, setPrevHourAggs] = useState<SalesHourAgg[]>([]);
+  const [goals, setGoals] = useState<GoalRecord[]>([]);
+  const [goalDayAggs, setGoalDayAggs] = useState<SalesDayAgg[]>([]);
+  const [goalSellerDayAggs, setGoalSellerDayAggs] = useState<SalesSellerDayAgg[]>([]);
+  const [goalNamedSellerDayAggs, setGoalNamedSellerDayAggs] = useState<SalesSellerDayAgg[]>([]);
+  const [goalTeam, setGoalTeam] = useState<GoalTeamMember[]>([]);
   const filterKey = scopeFilterKey(scope);
   const { showSkeleton, settle } = useFilterSkeleton(filterKey);
   /** Escopo da view: so muda com os dados, senao a filial nova zera os cards velhos. */
@@ -202,21 +213,9 @@ export default function OverviewPage() {
     setSellerAvatars(snap.avatars);
     setProductDayAggs(snap.products);
     setProductCostDayAggs(snap.productCosts);
-    // sessionStorage devolve ISO string; Date local permanece Date.
-    setWatermark(snap.wm ? new Date(snap.wm) : null);
-    setCoverageFrom(snap.covFrom ? new Date(snap.covFrom) : null);
+    setWatermark(filterCacheDate(snap.wm));
+    setCoverageFrom(filterCacheDate(snap.covFrom));
   }, []);
-  const [watermark, setWatermark] = useState<Date | null>(null);
-  const [coverageFrom, setCoverageFrom] = useState<Date | null>(null);
-  const [goalHistoryDayAggs, setGoalHistoryDayAggs] = useState<SalesDayAgg[]>([]);
-  const [goalHistoryHourAggs, setGoalHistoryHourAggs] = useState<SalesHourAgg[]>([]);
-  const [prevDayAggs, setPrevDayAggs] = useState<SalesDayAgg[]>([]);
-  const [prevHourAggs, setPrevHourAggs] = useState<SalesHourAgg[]>([]);
-  const [goals, setGoals] = useState<GoalRecord[]>([]);
-  const [goalDayAggs, setGoalDayAggs] = useState<SalesDayAgg[]>([]);
-  const [goalSellerDayAggs, setGoalSellerDayAggs] = useState<SalesSellerDayAgg[]>([]);
-  const [goalNamedSellerDayAggs, setGoalNamedSellerDayAggs] = useState<SalesSellerDayAgg[]>([]);
-  const [goalTeam, setGoalTeam] = useState<GoalTeamMember[]>([]);
   // Catalogo de lojas (horario/fuso) hidratado depois do 1 render  ->  recalcula eixos.
   const [storesTick, setStoresTick] = useState(0);
   useEffect(() => {
@@ -380,6 +379,7 @@ export default function OverviewPage() {
     } catch (e) {
       if (gen !== reloadGen.current) return;
       console.error("Overview reloadAggs:", e);
+      settle(key);
     }
   }, [scope, session.role, session.stores, session.tenantId, filterKey, settle, applyOverview]);
 

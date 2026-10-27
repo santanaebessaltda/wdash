@@ -51,7 +51,7 @@ import { usePrintMode } from "@/lib/printMode";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
 import { TeamSkeleton } from "@/components/wedash/LoadingSkeletons";
 import { useFilterSkeleton } from "@/lib/useFilterSkeleton";
-import { filterCacheGet, filterCacheSet } from "@/lib/filterCache";
+import { filterCacheDate, filterCacheGet, filterCacheSet } from "@/lib/filterCache";
 import { FlameIcon, TargetIcon, TrophyIcon } from "@/pages/dashboards/icons";
 import { RankingBlock } from "@/pages/live/blocks";
 import { PALETTE, colorsByAmount, kpiTone, variationColor } from "@/pages/dashboard/palette";
@@ -220,8 +220,7 @@ export function TeamPage() {
     const cached = filterCacheGet<TeamCache>(key);
     if (cached) {
       setAggs(cached.aggs);
-      // sessionStorage devolve ISO string; Date local permanece Date.
-      setCoverageFrom(cached.covFrom ? new Date(cached.covFrom) : null);
+      setCoverageFrom(filterCacheDate(cached.covFrom));
       setGoalsData(cached.goals);
       setChallengesData(cached.challenges);
       setViewScope(scopeAtLoad);
@@ -229,37 +228,32 @@ export function TeamPage() {
     }
     try {
       const storeIds = queryStoreIds(session.role, scopeAtLoad.storeIds, session.stores);
-      // Onda 1: ranking e cobertura — metas/desafios (mais pesados) vêm depois.
-      const [next, cov] = await Promise.all([
+      // Ranking + metas + desafios juntos — evita aba Metas/Desafios vazia apos o ranking.
+      const [next, cov, goals, challenges] = await Promise.all([
         fetchTeamAggInput(session.tenantId, scopeAtLoad, storeIds),
         fetchSalesCoverage(session.tenantId, storeIds),
-      ]);
-      if (gen !== reloadGen.current) return;
-      const covFrom = cov.from ? isoToDate(cov.from) : null;
-      setAggs(next);
-      setCoverageFrom(covFrom);
-      if (cached) {
-        setGoalsData(cached.goals);
-        setChallengesData(cached.challenges);
-      }
-      setViewScope(scopeAtLoad);
-      settle(key);
-
-      const [goals, challenges] = await Promise.all([
-        fetchGoalsData(session.tenantId, scopeAtLoad, session.stores),
+        fetchGoalsData(session.tenantId, scopeAtLoad, session.stores).catch((e: unknown) => {
+          console.error("Team goals:", e);
+          return GOALS_EMPTY;
+        }),
         fetchPeriodChallenges(session.tenantId, scopeAtLoad, session.stores).catch((e: unknown) => {
           console.error("Team challenges:", e);
           return CHALLENGES_EMPTY;
         }),
       ]);
       if (gen !== reloadGen.current) return;
+      const covFrom = cov.from ? isoToDate(cov.from) : null;
       filterCacheSet(key, { aggs: next, covFrom, goals, challenges });
+      setAggs(next);
+      setCoverageFrom(covFrom);
       setGoalsData(goals);
       setChallengesData(challenges);
+      setViewScope(scopeAtLoad);
       settle(key);
     } catch (e) {
       if (gen !== reloadGen.current) return;
       console.error("Team reload:", e);
+      settle(key);
     }
   }, [scope, session.role, session.stores, session.tenantId, filterKey, settle]);
 

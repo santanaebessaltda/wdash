@@ -8,7 +8,6 @@ import { scopeFilterKey, useScope } from "@/pages/dashboard/useScope";
 import {
   buildFinanceView,
   financeFetchRange,
-  productsFetchRange,
   resolvePeriod,
   type FinanceAggInput,
   type FinanceKpi,
@@ -19,7 +18,7 @@ import {
   fetchSalesDayAggs,
   fetchSalesHourAggs,
   fetchSalesPaymentDayAggs,
-  fetchSalesProductCostDayAggs,
+  fetchSalesProductCostPeriodAggs,
   fetchProductNames,
 } from "@/data/wedash/salesRepo";
 import { fetchInformedCents } from "@/data/wedash/shoppingRepo";
@@ -42,7 +41,7 @@ import { ReportHeader, useExportPdf } from "@/pages/dashboard/ReportHeader";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
 import { FinanceSkeleton } from "@/components/wedash/LoadingSkeletons";
 import { useFilterSkeleton } from "@/lib/useFilterSkeleton";
-import { filterCacheGet, filterCacheSet } from "@/lib/filterCache";
+import { filterCacheDate, filterCacheGet, filterCacheSet } from "@/lib/filterCache";
 import { brlCent, isoToDate, labelUpper, deltaTip, num, profitBrl } from "@/lib/format";
 import { usePagedRows } from "@/lib/usePagedRows";
 import { cn } from "@/lib/cn";
@@ -163,66 +162,59 @@ export default function FinancePage() {
     const cached = filterCacheGet<FinanceCache>(key);
     if (cached) {
       setAggs(cached.aggs);
-      // sessionStorage devolve ISO string; Date local permanece Date.
-      setCoverageFrom(cached.covFrom ? new Date(cached.covFrom) : null);
+      setCoverageFrom(filterCacheDate(cached.covFrom));
       setViewScope(scopeAtLoad);
       settle(key);
     }
     const period = resolvePeriod(scopeAtLoad.period, calendarTodayIso());
     const range = financeFetchRange(scopeAtLoad);
-    const costRange = productsFetchRange(scopeAtLoad);
     const storeIds = queryStoreIds(session.role, scopeAtLoad.storeIds, session.stores);
     try {
-      // Onda 1: faturamento e formas — libera KPIs.
-      const [dayAggs, hourAggs, prevHourAggs, paymentDayAggs, cov, informedCents] = await Promise.all([
-        fetchSalesDayAggs({ tenantId: session.tenantId, storeIds, from: range.from, to: range.to, brand: null }),
-        period.start === period.end
-          ? fetchSalesHourAggs({ tenantId: session.tenantId, storeIds, day: period.start, brand: null })
-          : Promise.resolve([] as SalesHourAgg[]),
-        range.prevHourDay
-          ? fetchSalesHourAggs({ tenantId: session.tenantId, storeIds, day: range.prevHourDay, brand: null })
-          : Promise.resolve([] as SalesHourAgg[]),
-        fetchSalesPaymentDayAggs({ tenantId: session.tenantId, storeIds, from: period.start, to: period.end }),
-        fetchSalesCoverage(session.tenantId, storeIds),
-        fetchInformedCents(session.tenantId, storeIds, range.from, range.to).catch(() => ({})),
-      ]);
+      // Pacote completo de uma vez (KPIs + formas + aviso sem custo).
+      const [dayAggs, hourAggs, prevHourAggs, paymentDayAggs, cov, informedCents, productCostDayAggs] =
+        await Promise.all([
+          fetchSalesDayAggs({ tenantId: session.tenantId, storeIds, from: range.from, to: range.to, brand: null }),
+          period.start === period.end
+            ? fetchSalesHourAggs({ tenantId: session.tenantId, storeIds, day: period.start, brand: null })
+            : Promise.resolve([] as SalesHourAgg[]),
+          range.prevHourDay
+            ? fetchSalesHourAggs({ tenantId: session.tenantId, storeIds, day: range.prevHourDay, brand: null })
+            : Promise.resolve([] as SalesHourAgg[]),
+          fetchSalesPaymentDayAggs({ tenantId: session.tenantId, storeIds, from: period.start, to: period.end }),
+          fetchSalesCoverage(session.tenantId, storeIds),
+          fetchInformedCents(session.tenantId, storeIds, range.from, range.to).catch(() => ({})),
+          fetchSalesProductCostPeriodAggs({
+            tenantId: session.tenantId,
+            storeIds,
+            from: period.start,
+            to: period.end,
+          }),
+        ]);
       if (gen !== reloadGen.current) return;
-      const early: FinanceAggInput = {
+      // Nomes so para o aviso "sem custo" (fetchProductNames ja devolve {} se falhar).
+      const productNames = await fetchProductNames(
+        productCostDayAggs.filter((r) => r.revenueCents > 0 && r.cmvCents === 0).map((r) => r.productCode),
+      );
+      if (gen !== reloadGen.current) return;
+      const covFrom = cov.from ? isoToDate(cov.from) : null;
+      const full: FinanceAggInput = {
         dayAggs,
         hourAggs,
         prevHourAggs,
         paymentDayAggs,
-        productCostDayAggs: cached?.aggs.productCostDayAggs,
-        productNames: cached?.aggs.productNames,
+        productCostDayAggs,
+        productNames,
         informedCents,
       };
-      setAggs(early);
-      setCoverageFrom(cov.from ? isoToDate(cov.from) : null);
-      setViewScope(scopeAtLoad);
-      settle(key);
-
-      // Onda 2: CMV por produto (pesado em periodo longo).
-      const productCostDayAggs = await fetchSalesProductCostDayAggs({
-        tenantId: session.tenantId,
-        storeIds,
-        from: costRange.from,
-        to: costRange.to,
-      });
-      const productNames = await fetchProductNames(
-        productCostDayAggs
-          .filter((r) => r.day >= period.start && r.day <= period.end && r.revenueCents > 0 && r.cmvCents === 0)
-          .map((r) => r.productCode),
-      );
-      if (gen !== reloadGen.current) return;
-      const full: FinanceAggInput = { ...early, productCostDayAggs, productNames };
-      const covFrom = cov.from ? isoToDate(cov.from) : null;
       filterCacheSet(key, { aggs: full, covFrom });
       setAggs(full);
       setCoverageFrom(covFrom);
+      setViewScope(scopeAtLoad);
       settle(key);
     } catch (e) {
       if (gen !== reloadGen.current) return;
       console.error("Finance reload:", e);
+      settle(key);
     }
   }, [scope, session.role, session.stores, session.tenantId, filterKey, settle]);
 

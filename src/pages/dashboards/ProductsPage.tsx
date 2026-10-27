@@ -41,7 +41,7 @@ import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
 import { ProductsWithoutCostNotice } from "@/pages/dashboard/ProductsWithoutCostNotice";
 import { ProductsSkeleton } from "@/components/wedash/LoadingSkeletons";
 import { useFilterSkeleton } from "@/lib/useFilterSkeleton";
-import { filterCacheGet, filterCacheSet } from "@/lib/filterCache";
+import { filterCacheDate, filterCacheGet, filterCacheSet } from "@/lib/filterCache";
 import { brlCent, isoToDate, num, comparedWithTip, profitBrl } from "@/lib/format";
 import { cn } from "@/lib/cn";
 import type { DateRange, DateRangeChangeMeta } from "@/components/ui/DateRangePicker";
@@ -145,15 +145,13 @@ export default function ProductsPage() {
     const cached = filterCacheGet<ProductsCache>(key);
     if (cached) {
       setAggs(cached.aggs);
-      // sessionStorage devolve ISO string; Date local permanece Date.
-      setCoverageFrom(cached.covFrom ? new Date(cached.covFrom) : null);
+      setCoverageFrom(filterCacheDate(cached.covFrom));
       setViewScope(scopeAtLoad);
       settle(key);
     }
     try {
       const storeIds = queryStoreIds(session.role, scopeAtLoad.storeIds, session.stores);
-      // KPI + catalogo juntos (totais de periodo). Antes a onda 1 liberava KPI e a
-      // onda 2 (dia a dia) falhava/estourava — cards de baixo ficavam vazios.
+      // KPI + catalogo juntos (totais de periodo no Postgres).
       const [kpi, cov, catalog] = await Promise.all([
         fetchProductsKpiAggs(session.tenantId, scopeAtLoad, storeIds),
         fetchSalesCoverage(session.tenantId, storeIds),
@@ -170,6 +168,7 @@ export default function ProductsPage() {
     } catch (e) {
       if (gen !== reloadGen.current) return;
       console.error("Products reload:", e);
+      settle(key);
     }
   }, [scope, session.role, session.stores, session.tenantId, filterKey, settle]);
 
