@@ -423,7 +423,9 @@ export default function GoalEditorPage() {
       : null;
   /** Erros so aparecem depois da 1 tentativa de salvar; dai somem conforme o campo e corrigido. */
   const [tried, setTried] = useState(false);
-  const [saving, setSaving] = useState(false);
+  /** Qual botão está salvando — evita os dois virarem "Salvando…" ao mesmo tempo. */
+  const [savingAs, setSavingAs] = useState<"draft" | "publish" | null>(null);
+  const saving = savingAs != null;
   const [overlap, setOverlap] = useState(false);
   useEffect(() => setOverlap(false), [startsOn, endsOn, storeId]);
   const fields = {
@@ -458,7 +460,7 @@ export default function GoalEditorPage() {
         ? { managerPct: positive(t.mgrCommission)!, managerBonus: positive(t.mgrBonus) ?? 0 }
         : {}),
     }));
-    setSaving(true);
+    setSavingAs(publish ? "publish" : "draft");
     const res = await saveGoal(session.tenantId, id ?? null, {
       storeId,
       name,
@@ -478,7 +480,7 @@ export default function GoalEditorPage() {
           : [],
       ...(wasPublished ? {} : { published: publish }),
     });
-    setSaving(false);
+    setSavingAs(null);
     if (!res.ok) {
       if (res.reason === "overlap") {
         setOverlap(true);
@@ -517,7 +519,10 @@ export default function GoalEditorPage() {
         }),
       );
     }
-    toast.show(wasPublished ? "Alterações salvas." : publish ? "Meta publicada." : "Rascunho salvo.", "success");
+    toast.show(
+      wasPublished ? "Alterações salvas." : !publish ? "Rascunho salvo." : id ? "Meta publicada." : "Meta criada.",
+      "success",
+    );
     navigate(paths.goalDetail(res.id), { state: location.state });
   };
 
@@ -733,10 +738,10 @@ export default function GoalEditorPage() {
         ) : (
           <>
             <Button variant="outline" onClick={() => void submit(false)} disabled={saving || !sourceReady}>
-              {saving ? "Salvando…" : "Salvar rascunho"}
+              {savingAs === "draft" ? "Salvando…" : "Salvar rascunho"}
             </Button>
             <Button onClick={() => void submit(true)} disabled={saving || !sourceReady}>
-              {saving ? "Salvando…" : "Publicar"}
+              {savingAs === "publish" ? "Salvando…" : id ? "Publicar" : "Criar meta"}
             </Button>
           </>
         )}

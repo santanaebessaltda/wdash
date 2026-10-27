@@ -198,7 +198,9 @@ export default function ChallengeEditorPage() {
 
   /** Erros so aparecem depois da 1 tentativa de salvar; dai somem conforme o campo e corrigido. */
   const [tried, setTried] = useState(false);
-  const [saving, setSaving] = useState(false);
+  /** Qual botão está salvando — evita os dois virarem "Salvando…" ao mesmo tempo. */
+  const [savingAs, setSavingAs] = useState<"draft" | "publish" | null>(null);
+  const saving = savingAs != null;
   const errors: ChallengeFormErrors = tried ? validateChallengeForm(form) : {};
   const submit = async (publish: boolean) => {
     setTried(true);
@@ -208,9 +210,9 @@ export default function ChallengeEditorPage() {
     }
     const wasPublished = Boolean(id && savedChallenge.current?.published !== false);
     const input = challengeFormToInput(form);
-    setSaving(true);
+    setSavingAs(publish ? "publish" : "draft");
     const res = await saveChallenge(session.tenantId, id ?? null, { ...input, ...(wasPublished ? {} : { published: publish }) });
-    setSaving(false);
+    setSavingAs(null);
     if (!res.ok) {
       toast.show(SAVE_ERROR_MSG, "danger");
       return;
@@ -235,7 +237,10 @@ export default function ChallengeEditorPage() {
         }),
       );
     }
-    toast.show(wasPublished ? "Alterações salvas." : publish ? "Desafio publicado." : "Rascunho salvo.", "success");
+    toast.show(
+      wasPublished ? "Alterações salvas." : !publish ? "Rascunho salvo." : id ? "Desafio publicado." : "Desafio criado.",
+      "success",
+    );
     navigate(paths.management.challengeDetail(res.id), { state: location.state });
   };
 
@@ -622,10 +627,10 @@ export default function ChallengeEditorPage() {
         ) : (
           <>
             <Button variant="outline" onClick={() => void submit(false)} disabled={saving || loadingSource}>
-              {saving ? "Salvando…" : "Salvar rascunho"}
+              {savingAs === "draft" ? "Salvando…" : "Salvar rascunho"}
             </Button>
             <Button onClick={() => void submit(true)} disabled={saving || loadingSource}>
-              {saving ? "Salvando…" : "Publicar"}
+              {savingAs === "publish" ? "Salvando…" : id ? "Publicar" : "Criar desafio"}
             </Button>
           </>
         )}
