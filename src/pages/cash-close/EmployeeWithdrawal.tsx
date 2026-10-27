@@ -7,6 +7,7 @@ import {
 } from "@/data/wedash/employeeWithdrawal";
 import { cn } from "@/lib/cn";
 import { brlCent } from "@/lib/format";
+import { NumberInput } from "@/pages/operation/shared";
 
 const field =
   "h-9 w-full min-w-0 rounded-[9px] border border-line bg-bg-inset px-2 text-[13px] text-t0 outline-none focus:border-acc";
@@ -190,20 +191,20 @@ export function EmployeeWithdrawal({
                       }
                     />
                   </label>
-                  <label className="text-[12.5px] font-bold text-t0 sm:w-32">
+                  <label className="text-[12.5px] font-bold text-t0 sm:w-36">
                     Valor<span className="text-bad"> *</span>
-                    <input
+                    <NumberInput
+                      className="mt-1"
+                      compact
+                      unit="R$"
                       value={row.amount}
-                      onChange={(event) =>
+                      onChange={(amount) =>
                         onChange({
                           ...draft,
-                          rows: draft.rows.map((item) => (item.id === row.id ? { ...item, amount: event.target.value } : item)),
+                          rows: draft.rows.map((item) => (item.id === row.id ? { ...item, amount } : item)),
                         })
                       }
-                      inputMode="decimal"
-                      placeholder="0,00"
                       aria-label="Valor da retirada"
-                      className={`${field} mt-1 text-right font-mono font-bold`}
                     />
                   </label>
                   <Button

@@ -66,7 +66,7 @@ import { SALES_SYNCED_EVENT } from "@/pages/dashboard/useForceRefresh";
 import { filterCacheGet, filterCacheSet } from "@/lib/filterCache";
 import { useFilterSkeleton } from "@/lib/useFilterSkeleton";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
-import { parseNum, SectionHeader, useScopedStores } from "@/pages/operation/shared";
+import { NumberInput, parseNum, SectionHeader, useScopedStores } from "@/pages/operation/shared";
 import { HeaderFilters } from "@/pages/stock/shared";
 
 type CashCloseMonthCache = { marks: CashCloseDayMark[]; reviews: CashCloseReview[] };
@@ -165,8 +165,6 @@ function CloseTable({
   pixOnline: boolean;
 }) {
   if (lines.length === 0) return null;
-  const field =
-    "h-9 w-full min-w-0 rounded-[9px] border border-line bg-bg-inset px-2 text-right font-mono text-[13px] font-bold text-t0 outline-none focus:border-acc";
   const cabecalhos = ["Forma", "Millennium", "Total real", "Diferença"];
   const conta = closeDayGap(lines);
   return (
@@ -205,17 +203,16 @@ function CloseTable({
                   <td className="px-3 py-3 text-right font-mono text-[13px] font-bold text-t0">{money(row.systemCents)}</td>
                   <td className="px-3 py-2.5 text-right">
                     {cashEditable ? (
-                      <div className="flex flex-col items-end">
-                        <input
+                      <div className="ml-auto flex w-full max-w-[11rem] flex-col items-stretch">
+                        <NumberInput
+                          compact
+                          unit="R$"
                           value={draft?.typed.cash ?? ""}
-                          onChange={(e) => onTyped?.("cash", e.target.value)}
-                          inputMode="decimal"
-                          placeholder="—"
+                          onChange={(value) => onTyped?.("cash", value)}
                           aria-label={`Total real para ${row.label}`}
-                          className={field}
                         />
                         {(row.withdrawalCents ?? 0) > 0 && (
-                          <span className="mt-0.5 max-w-[220px] text-right text-[11px] leading-tight text-t2">
+                          <span className="mt-0.5 text-right text-[11px] leading-tight text-t2">
                             Digitado {money(fieldToCents(draft?.typed.cash ?? "") ?? row.typedCents)} · Retirada {money(row.withdrawalCents ?? 0)}
                           </span>
                         )}
@@ -235,14 +232,15 @@ function CloseTable({
                         )}
                       </div>
                     ) : (
-                      <input
-                        value={acqTxt}
-                        onChange={(e) => onAcquirer(row.key, e.target.value)}
-                        inputMode="decimal"
-                        placeholder="—"
-                        aria-label={`Total real para ${row.label}`}
-                        className={field}
-                      />
+                      <div className="ml-auto w-full max-w-[11rem]">
+                        <NumberInput
+                          compact
+                          unit="R$"
+                          value={acqTxt}
+                          onChange={(value) => onAcquirer(row.key, value)}
+                          aria-label={`Total real para ${row.label}`}
+                        />
+                      </div>
                     )}
                   </td>
                   <td className={cn("px-3 py-3 text-right font-mono text-[13px] font-bold", closed && diff != null ? diffClass(diff) : "text-t2")}>

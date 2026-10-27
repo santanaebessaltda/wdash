@@ -5,6 +5,7 @@ import {
   type OnlinePixDraftRow,
 } from "@/data/wedash/onlinePix";
 import { brlCent } from "@/lib/format";
+import { NumberInput } from "@/pages/operation/shared";
 
 const field =
   "h-9 w-full min-w-0 rounded-[9px] border border-line bg-bg-inset px-2 text-[13px] text-t0 outline-none focus:border-acc";
@@ -51,13 +52,13 @@ export function OnlinePix({
         {owner && !(pixPending && acquirerCents == null) ? (
           <label className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-3">
             <span className="text-[12.5px] text-t2 sm:w-28">Adquirente</span>
-            <input
+            <NumberInput
+              className="sm:w-36"
+              compact
+              unit="R$"
               value={acquirerText}
-              onChange={(event) => onAcquirer(event.target.value)}
-              inputMode="decimal"
-              placeholder="—"
+              onChange={onAcquirer}
               aria-label="Valor da adquirente no Pix"
-              className={`${field} text-right font-mono font-bold sm:w-32`}
             />
           </label>
         ) : (
@@ -80,15 +81,15 @@ export function OnlinePix({
                     className={`${field} mt-1`}
                   />
                 </label>
-                <label className="text-[12.5px] font-bold text-t0 sm:w-32">
+                <label className="text-[12.5px] font-bold text-t0 sm:w-36">
                   Valor<span className="text-bad"> *</span>
-                  <input
+                  <NumberInput
+                    className="mt-1"
+                    compact
+                    unit="R$"
                     value={row.amount}
-                    onChange={(event) => onRows(rows.map((item) => (item.id === row.id ? { ...item, amount: event.target.value } : item)))}
-                    inputMode="decimal"
-                    placeholder="0,00"
+                    onChange={(amount) => onRows(rows.map((item) => (item.id === row.id ? { ...item, amount } : item)))}
                     aria-label="Valor do PIX online"
-                    className={`${field} mt-1 text-right font-mono font-bold`}
                   />
                 </label>
                 <Button type="button" variant="ghost" size="sm" onClick={() => onRows(rows.filter((item) => item.id !== row.id))}>
