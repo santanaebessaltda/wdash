@@ -26,7 +26,7 @@ import { ProductsWithoutCostNotice } from "@/pages/dashboard/ProductsWithoutCost
 import type { SalesHourAgg } from "@/data/wedash/salesTypes";
 import { calendarTodayIso } from "@/data/wedash/clock";
 import { isOwner } from "@/layout/nav-wedash";
-import { queryStoreIds } from "@/data/wedash/stores";
+import { productStores, queryStoreIds } from "@/data/wedash/stores";
 import { useActiveSession } from "@/session/SessionProvider";
 import { SALES_SYNCED_EVENT } from "@/pages/dashboard/useForceRefresh";
 import { useMonthFill } from "@/pages/dashboard/useMonthFill";
@@ -160,7 +160,8 @@ export default function FinancePage() {
     const scopeAtLoad = scope;
     type FinanceCache = { aggs: FinanceAggInput; covFrom: Date | null };
     const cached = filterCacheGet<FinanceCache>(key);
-    if (cached?.aggs && Array.isArray(cached.aggs.dayAggs)) {
+    // Sem catalogo de lojas a view zera (filtra por storeId) — nao tira o skeleton.
+    if (cached?.aggs && Array.isArray(cached.aggs.dayAggs) && productStores().length > 0) {
       setAggs(cached.aggs);
       setCoverageFrom(filterCacheDate(cached.covFrom));
       setViewScope(scopeAtLoad);

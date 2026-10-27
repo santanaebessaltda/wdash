@@ -18,7 +18,7 @@ import { buildGoalCardView, goalStatus, sellerGoalLevels } from "@/data/wedash/g
 import { TEAM_UNATTRIBUTED_SALE, teamViewWithGoalShare } from "@/data/wedash/engine/generalRanking";
 import { PersonAvatar } from "@/components/wedash/PersonAvatar";
 import type { SalesDayAgg, SalesSellerDayAgg } from "@/data/wedash/salesTypes";
-import { queryStoreIds, storesForSession } from "@/data/wedash/stores";
+import { productStores, queryStoreIds, storesForSession } from "@/data/wedash/stores";
 import { teamChallengesReturn, teamGoalsReturn } from "@/pages/goals/backPath";
 import { GoalCard } from "./blocks";
 import {
@@ -218,7 +218,9 @@ export function TeamPage() {
       challenges: ChallengesData;
     };
     const cached = filterCacheGet<TeamCache>(key);
-    if (cached?.aggs && Array.isArray(cached.aggs.dayAggs)) {
+    // Sem catalogo de lojas, a view zera tudo (filtra por storeId) — nao tira o skeleton.
+    const catalogReady = productStores().length > 0;
+    if (cached?.aggs && Array.isArray(cached.aggs.dayAggs) && catalogReady) {
       setAggs(cached.aggs);
       setCoverageFrom(filterCacheDate(cached.covFrom));
       setGoalsData(cached.goals ?? GOALS_EMPTY);
@@ -277,7 +279,9 @@ export function TeamPage() {
       calendarTodayIso(),
       new Map(stores.map((store) => [store.id, store.tradeName])),
     );
-  }, [viewScope, aggs, goalsData.goals, goalsData.team, session.stores]);
+    // storesTick: catalogo ERP hidrata depois do 1º render — sem isso KPI/ranking ficam zerados.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewScope, aggs, goalsData.goals, goalsData.team, session.stores, storesTick]);
 
   const todayIso = calendarTodayIso();
   const goalCards = useMemo(() => {

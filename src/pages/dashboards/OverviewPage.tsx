@@ -6,7 +6,7 @@ import { Avatar, Badge, Card, CardHeader, CardTitle, RadialProgress, StatCard, D
 import { Tooltip } from "@/components/ui/Tooltip";
 import { AreaLineChart, BarChart, DonutChart } from "@/components/charts";
 import { isOwner } from "@/layout/nav-wedash";
-import { queryStoreIds } from "@/data/wedash/stores";
+import { productStores, queryStoreIds, storesForSession } from "@/data/wedash/stores";
 import { scopeFilterKey, useScope } from "@/pages/dashboard/useScope";
 import { buildOverviewView, resolvePeriod, previousPeriod, OVERVIEW_PRODUCTS_TOP, OVERVIEW_TEAM_TOP, overviewDisplayedProductTotal, type OverviewKpi } from "@/data/wedash/dashboard";
 import {
@@ -64,7 +64,6 @@ import { calendarTodayIso } from "@/data/wedash/clock";
 import { goalHistoryDayRange, goalHistorySameWeekdays } from "@/data/wedash/goalCurve";
 import { goalWeightFrom } from "@/data/wedash/engine/goalProjection";
 import { fetchGoals, fetchGoalTeam, type GoalRecord, type GoalTeamMember } from "@/data/wedash/goalsRepo";
-import { storesForSession } from "@/data/wedash/stores";
 import {
   applyPeriodDateChange,
   dateRangeFromPeriod,
@@ -235,7 +234,8 @@ export default function OverviewPage() {
     const key = filterKey;
     const scopeAtLoad = scope;
     const cached = filterCacheGet<OverviewCache>(key);
-    if (cached) {
+    // Sem catalogo de lojas a view zera (filtra por storeId) — nao tira o skeleton.
+    if (cached && productStores().length > 0) {
       applyOverview(cached);
       setViewScope(scopeAtLoad);
       settle(key);

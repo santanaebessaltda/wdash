@@ -13,7 +13,7 @@ import {
   type ProductsKpi,
 } from "@/data/wedash/dashboard";
 import { fetchSalesCoverage } from "@/data/wedash/salesRepo";
-import { queryStoreIds } from "@/data/wedash/stores";
+import { productStores, queryStoreIds } from "@/data/wedash/stores";
 import { ProductNameCell } from "@/components/wedash/ProductNameCell";
 import {
   BadgeVsPrevious,
@@ -143,7 +143,8 @@ export default function ProductsPage() {
     const scopeAtLoad = scope;
     type ProductsCache = { aggs: ProductsAggInput; covFrom: Date | null };
     const cached = filterCacheGet<ProductsCache>(key);
-    if (cached?.aggs && Array.isArray(cached.aggs.dayAggs)) {
+    // Sem catalogo de lojas a view zera (filtra por storeId) — nao tira o skeleton.
+    if (cached?.aggs && Array.isArray(cached.aggs.dayAggs) && productStores().length > 0) {
       setAggs(cached.aggs);
       setCoverageFrom(filterCacheDate(cached.covFrom));
       setViewScope(scopeAtLoad);
