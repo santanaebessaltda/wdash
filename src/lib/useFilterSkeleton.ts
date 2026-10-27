@@ -2,8 +2,8 @@ import { useCallback, useState } from "react";
 import { useMinSkeleton } from "./useMinSkeleton";
 
 /**
- * Skeleton so na primeira carga (ainda sem nenhum filtro carregado).
- * Troca de filtro: mantem a tela anterior sem escurecer ate `settle(key)`.
+ * Skeleton enquanto o filtro atual ainda nao tem pacote aplicado (`settle`).
+ * 1ª carga e troca de filial/periodo/marca: skeleton ate os dados chegarem.
  * Recarga da mesma chave (venda nova) nao liga skeleton.
  *
  * Na view, use um `viewScope` que so atualiza no settle (junto com os aggs),
@@ -12,8 +12,7 @@ import { useMinSkeleton } from "./useMinSkeleton";
 export function useFilterSkeleton(filterKey: string) {
   const [loadedKey, setLoadedKey] = useState<string | null>(null);
   const pending = loadedKey !== filterKey;
-  const firstLoad = loadedKey === null;
-  const showSkeleton = useMinSkeleton(pending && firstLoad);
+  const showSkeleton = useMinSkeleton(pending);
   const settle = useCallback((key: string) => {
     setLoadedKey((current) => (current === key ? current : key));
   }, []);

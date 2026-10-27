@@ -379,7 +379,7 @@ export default function OverviewPage() {
     } catch (e) {
       if (gen !== reloadGen.current) return;
       console.error("Overview reloadAggs:", e);
-      settle(key);
+      // Sem settle: skeleton fica ate chegar dado (evita KPI zerado).
     }
   }, [scope, session.role, session.stores, session.tenantId, filterKey, settle, applyOverview]);
 

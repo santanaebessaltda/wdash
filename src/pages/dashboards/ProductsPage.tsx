@@ -168,7 +168,7 @@ export default function ProductsPage() {
     } catch (e) {
       if (gen !== reloadGen.current) return;
       console.error("Products reload:", e);
-      settle(key);
+      // Sem settle: skeleton fica ate chegar dado (evita KPI zerado).
     }
   }, [scope, session.role, session.stores, session.tenantId, filterKey, settle]);
 
