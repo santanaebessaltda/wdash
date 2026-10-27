@@ -374,11 +374,15 @@ function CostTableBlock({
         {!tablesLoading && table != null && !tables.some((item) => item.id === table) && (
           <option value={String(table)}>Tabela {table} · indisponível</option>
         )}
-        {tables.map((item) => (
-          <option key={item.id} value={String(item.id)}>
-            {`Tabela ${item.code || item.id}`}
-          </option>
-        ))}
+        {tables.map((item) => {
+          const code = item.code || String(item.id);
+          const name = item.description.trim();
+          return (
+            <option key={item.id} value={String(item.id)}>
+              {name ? `Tabela ${code} · ${name}` : `Tabela ${code}`}
+            </option>
+          );
+        })}
       </Select>
     </FormField>
   );
