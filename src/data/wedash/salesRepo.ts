@@ -982,7 +982,10 @@ export async function fetchSalesProductCostPeriodAggs(
     };
     const bulk = await readAggJsonb(client, "read_sales_product_cost_period_aggs", args);
     if (bulk) {
-      return (bulk as ProductCostDayRow[]).map(mapProductCostDay);
+      // Mesmo fill da leitura dia a dia: CMV 0 + preço na tabela da loja → itens × unitário.
+      // Sem isso o aviso "sem custo" e o lucro por produto ignoram a tabela (bug 2026-10-27).
+      const rows = (bulk as ProductCostDayRow[]).map(mapProductCostDay);
+      return applyFillToProductCosts(rows, await loadTableCostFill(client, rows, query));
     }
     const days = await fetchSalesProductCostDayAggs(query, client);
     return rollupProductCostsToPeriod(days, query.from);
