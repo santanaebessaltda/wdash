@@ -302,13 +302,11 @@ async function loadTableCostFill(
 }
 
 const PAGE_SIZE = 1000;
-/** Quantas paginas de 1000 linhas buscar em paralelo depois da 1ª. */
-const PAGE_PARALLEL = 4;
 
 /**
  * PostgREST corta em 1000 linhas por request (`.limit` maior nao adianta): pagina
- * com `range` quando o client suporta (Supabase). Depois da 1ª pagina, as seguintes
- * sobem em lotes paralelos para periodo longo nao ficar serial.
+ * com `range` quando o client suporta (Supabase). Serial — o builder do supabase-js e
+ * mutavel; varios `.range` em paralelo na mesma query corrompem o header Range.
  * A query precisa de ordem total (inclua a chave da linha no `order`).
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -322,33 +320,16 @@ export async function fetchAllPages<Row>(ordered: any, label: string): Promise<R
     return (data as Row[] | null) ?? [];
   }
 
-  const first = await ordered.range(0, PAGE_SIZE - 1);
-  if (first.error) {
-    console.warn(`${label}:`, first.error.message ?? first.error);
-    return [];
-  }
-  const out: Row[] = [...((first.data as Row[] | null) ?? [])];
-  if (out.length < PAGE_SIZE) return out;
-
-  let offset = PAGE_SIZE;
-  for (;;) {
-    const starts = Array.from({ length: PAGE_PARALLEL }, (_, i) => offset + i * PAGE_SIZE);
-    const pages = await Promise.all(starts.map((start) => ordered.range(start, start + PAGE_SIZE - 1)));
-    let short = false;
-    for (const page of pages) {
-      if (page.error) {
-        console.warn(`${label}:`, page.error.message ?? page.error);
-        return out;
-      }
-      const rows = (page.data as Row[] | null) ?? [];
-      out.push(...rows);
-      if (rows.length < PAGE_SIZE) {
-        short = true;
-        break;
-      }
+  const out: Row[] = [];
+  for (let offset = 0; ; offset += PAGE_SIZE) {
+    const page = await ordered.range(offset, offset + PAGE_SIZE - 1);
+    if (page.error) {
+      console.warn(`${label}:`, page.error.message ?? page.error);
+      return out;
     }
-    if (short) return out;
-    offset += PAGE_PARALLEL * PAGE_SIZE;
+    const rows = (page.data as Row[] | null) ?? [];
+    out.push(...rows);
+    if (rows.length < PAGE_SIZE) return out;
   }
 }
 
@@ -709,14 +690,12 @@ export async function fetchSalesProductDayAggs(
     p_to: query.to,
   };
 
-  // Meses civis fechados: 1 linha por produto/mes em vez de ~30 dias.
+  // Meses civis fechados: 1 linha por produto/mes. Dia a dia nao usa RPC jsonb —
+  // o payload de um mes aberto (Este mes + anterior) passa de vários MB e trava a UI.
   if (rangeIsCompleteMonths(query.from, query.to)) {
     const monthly = await readAggJsonb(client, "read_sales_product_month_aggs", args);
     if (monthly && monthly.length > 0) return (monthly as ProductDayRow[]).map(mapProductDay);
   }
-
-  const bulk = await readAggJsonb(client, "read_sales_product_day_aggs", args);
-  if (bulk) return (bulk as ProductDayRow[]).map(mapProductDay);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let q: any = (client.from("sales_product_day_agg") as any)
@@ -888,20 +867,15 @@ export async function fetchSalesProductCostDayAggs(
       if (monthly && monthly.length > 0) rows = (monthly as ProductCostDayRow[]).map(mapProductCostDay);
     }
     if (!rows) {
-      const bulk = await readAggJsonb(client, "read_sales_product_cost_day_aggs", args);
-      rows = bulk
-        ? (bulk as ProductCostDayRow[]).map(mapProductCostDay)
-        : await (async () => {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            let q: any = (client.from("sales_product_cost_day_agg") as any)
-              .select("tenant_id, store_id, day, product_code, item_count, revenue_cents, cmv_cents")
-              .eq("tenant_id", query.tenantId)
-              .gte("day", query.from)
-              .lte("day", query.to);
-            if (query.storeIds.length > 0) q = q.in("store_id", query.storeIds);
-            const ordered = q.order("day", { ascending: true }).order("store_id").order("product_code");
-            return (await fetchAllPages<ProductCostDayRow>(ordered, "fetchSalesProductCostDayAggs")).map(mapProductCostDay);
-          })();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let q: any = (client.from("sales_product_cost_day_agg") as any)
+        .select("tenant_id, store_id, day, product_code, item_count, revenue_cents, cmv_cents")
+        .eq("tenant_id", query.tenantId)
+        .gte("day", query.from)
+        .lte("day", query.to);
+      if (query.storeIds.length > 0) q = q.in("store_id", query.storeIds);
+      const ordered = q.order("day", { ascending: true }).order("store_id").order("product_code");
+      rows = (await fetchAllPages<ProductCostDayRow>(ordered, "fetchSalesProductCostDayAggs")).map(mapProductCostDay);
     }
     return applyFillToProductCosts(rows, await loadTableCostFill(client, rows, query));
   } catch (e) {
