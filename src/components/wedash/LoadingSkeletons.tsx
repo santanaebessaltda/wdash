@@ -800,10 +800,10 @@ export function ScheduleCardsSkeleton({ count = 1, people = 5, days = 7 }: { cou
               <Skeleton className="h-8 w-20 rounded-[var(--radius-vela-sm)]" />
             </div>
           </div>
-          <div className="min-w-0 overflow-hidden">
+          <div className="min-w-0 overflow-x-auto overscroll-x-contain">
             <div
-              className="grid gap-px rounded-[var(--radius-vela-sm)] border border-line bg-line"
-              style={{ gridTemplateColumns: `minmax(14rem, 16rem) repeat(${days}, minmax(0, 1fr))` }}
+              className="grid w-max min-w-full gap-px rounded-[var(--radius-vela-sm)] border border-line bg-line"
+              style={{ gridTemplateColumns: `minmax(11rem, 14rem) repeat(${days}, minmax(2.5rem, 1fr))` }}
             >
               <div className="bg-bg-2 px-3 py-2">
                 <Skeleton className="h-3 w-14" />

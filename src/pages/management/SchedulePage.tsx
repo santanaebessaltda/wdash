@@ -696,11 +696,13 @@ function ScheduleBoard({
     return { working, closed: floor.closed, min: floor.min, exact: floor.exact };
   }
 
-  const columns = `minmax(14rem, 16rem) repeat(${dates.length}, minmax(0, 1fr))`;
+  /* Dia com largura mínima: no celular a grade rola na horizontal em vez de esmagar os números. */
+  const columns = `minmax(11rem, 14rem) repeat(${dates.length}, minmax(2.5rem, 1fr))`;
+  const stickyPerson = "sticky left-0 z-[1] border-r border-line bg-bg-2";
   return (
-    <div className="min-w-0 overflow-hidden rounded-[18px] border border-line bg-bg-2">
-      <div className="grid w-full min-w-0" style={{ gridTemplateColumns: columns }}>
-        <div className="border-b border-r border-line bg-bg-2 px-2 py-2 text-left text-[11px] font-bold uppercase tracking-wide text-t2">Pessoa</div>
+    <div className="min-w-0 overflow-x-auto overscroll-x-contain rounded-[18px] border border-line bg-bg-2">
+      <div className="grid w-max min-w-full" style={{ gridTemplateColumns: columns }}>
+        <div className={cn(stickyPerson, "border-b px-2 py-2 text-left text-[11px] font-bold uppercase tracking-wide text-t2")}>Pessoa</div>
         {dates.map((iso) => {
           const holiday = holidayLabel(holidays, iso);
           const day = Number(iso.slice(8));
@@ -714,17 +716,17 @@ function ScheduleBoard({
               >
                 {day}
               </span>
-              <span className="mt-0.5 block text-[10px] font-bold uppercase text-t2">{SHORT_WEEK[weekday(iso)]}</span>
+              <span className="mt-0.5 block truncate text-[10px] font-bold uppercase text-t2">{SHORT_WEEK[weekday(iso)]}</span>
             </div>
           );
         })}
         {roster.map((person) => (
           <div key={person.id} className="contents">
-            <div className="flex min-w-0 items-center gap-2 border-b border-r border-line bg-bg-2 px-2 py-1.5">
+            <div className={cn(stickyPerson, "flex min-w-0 items-center gap-2 border-b px-2 py-1.5")}>
               <PersonAvatar name={person.name} employeeId={person.code} storeId={section.storeId} size="sm" />
               <span className="min-w-0">
-                <span className="block text-[12px] font-semibold leading-tight text-t0">{person.name}</span>
-                {person.detail ? <span className="mt-0.5 block text-[11px] leading-snug text-t2">{person.detail}</span> : null}
+                <span className="block truncate text-[12px] font-semibold leading-tight text-t0">{person.name}</span>
+                {person.detail ? <span className="mt-0.5 block truncate text-[11px] leading-snug text-t2">{person.detail}</span> : null}
               </span>
             </div>
             {dates.map((iso) => {
@@ -752,14 +754,15 @@ function ScheduleBoard({
             })}
           </div>
         ))}
-        <div className="border-r border-line bg-bg-2 px-2 py-2 text-left text-[11px] font-bold uppercase leading-tight tracking-wide text-t2">Pessoas presentes</div>
+        <div className={cn(stickyPerson, "px-2 py-2 text-left text-[11px] font-bold uppercase leading-tight tracking-wide text-t2")}>Pessoas presentes</div>
         {dates.map((iso) => {
           const face = presence(iso);
           const title = face.closed ? "A loja fecha neste dia" : face.exact ? "Quantidade exata neste feriado" : "Mínimo do dia";
+          const sub = face.closed ? "Fechado" : face.min > 0 ? `${face.exact ? "Ex." : "Mín."} ${face.min}` : "";
           return (
             <div key={iso} title={title} className="min-w-0 px-0.5 py-1.5 text-center">
               <span className={cn("block text-[11px] font-bold tabular-nums", face.closed ? "text-t2" : "text-t1")}>{face.closed ? "—" : face.working}</span>
-              <span className="block text-[9px] leading-tight text-t2">{face.closed ? "Fechado" : face.min > 0 ? `${face.exact ? "Exato" : "Mínimo"} ${face.min}` : ""}</span>
+              {sub ? <span className="block truncate text-[9px] leading-tight text-t2">{sub}</span> : null}
             </div>
           );
         })}
