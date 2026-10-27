@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Alert, Button, Card, DateRangePicker, Modal, Select, useToast, CALENDAR_QUICK_RANGES, type DatePresetId, type DateRangeChangeMeta } from "@/components/ui";
+import { Alert, Button, Card, Modal, Select, useToast } from "@/components/ui";
 import { ColorLegend, type LegendItem } from "@/components/wedash/ColorLegend";
 import { ScheduleCardsSkeleton } from "@/components/wedash/LoadingSkeletons";
 import { BranchBadge, PeriodBadge } from "@/components/wedash/RecordBadges";
 import { PersonAvatar } from "@/components/wedash/PersonAvatar";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
+import { MonthStep, MonthYearPicker, monthNavBtn } from "@/pages/cash-close/MonthYearPicker";
 import { HeaderFilters } from "@/pages/stock/shared";
 import { SectionHeader, useScopedStores } from "@/pages/operation/shared";
 import { Icon, icons } from "@/pages/users/Icons";
@@ -12,8 +13,7 @@ import { cn } from "@/lib/cn";
 import { filterCacheGet, filterCacheSet } from "@/lib/filterCache";
 import { useFilterSkeleton } from "@/lib/useFilterSkeleton";
 import { calendarTodayIso } from "@/data/wedash/clock";
-import { addDays, addMonths, dateToIso, endOfMonth, isoToDate, shiftName, startOfMonth } from "@/data/wedash/engine/format";
-import { periodLabels } from "@/data/wedash/dashboard";
+import { addDays, addMonths, endOfMonth, isoToDate, shiftName, startOfMonth } from "@/data/wedash/engine/format";
 import { fetchGoals } from "@/data/wedash/goalsRepo";
 import { goalMonthFloor, scheduleStartMonth, type GoalSpan } from "@/data/wedash/goalMonths";
 import { branchRoleLabel, fetchStoreSellers, fetchStoreShifts, isBranchTeamMember, type Store, type StoreSeller, type StoreShift } from "@/data/wedash/stores";
@@ -61,36 +61,73 @@ function shortDate(iso: string): string {
   return `${day}/${month}/${year}`;
 }
 
-function CompOffSummaryCard({ rows }: { rows: CompOffSummaryRow[] }) {
-  if (rows.length === 0) return null;
+/** Calendário do mês seguinte só com quem tem FC prevista — para repasse ao sindicato. */
+function NextMonthOffsBoard({
+  monthStart,
+  rows,
+  view,
+  schedule,
+  today,
+}: {
+  monthStart: string;
+  rows: CompOffSummaryRow[];
+  view: BranchSchedule;
+  schedule: StoredSchedule;
+  today: string;
+}) {
+  const nextStart = addMonths(monthStart, 1);
+  const nextEnd = endOfMonth(nextStart);
+  const planned = rows.filter((row) => row.offDate && row.offDate >= nextStart && row.offDate <= nextEnd);
+  if (planned.length === 0) return null;
+  const nextDates: string[] = [];
+  for (let day = nextStart; day <= nextEnd; day = addDays(day, 1)) nextDates.push(day);
+  const saved = view.months.find((item) => item.monthStart === nextStart);
+  const personIds = [...new Set(planned.map((row) => row.personId))];
+  const people = view.people.filter((person) => personIds.includes(person.id));
+  const days: StoredDay[] = saved
+    ? view.days.filter((row) => row.day >= nextStart && row.day <= nextEnd && personIds.includes(row.sellerId))
+    : personIds.flatMap((personId) =>
+        nextDates.map((day) => ({
+          sellerId: personId,
+          day,
+          status: (planned.some((row) => row.personId === personId && row.offDate === day) ? "comp_off" : "work") as DayStatus,
+          origin: "generated" as const,
+        })),
+      );
+  const boardSchedule = saved?.schedule ?? {
+    ...schedule,
+    holidayRules: [],
+    dayNeeds: defaultDayNeeds(),
+    people: people.map((person) => ({
+      sellerId: person.id,
+      fixedOffDow: schedule.people.find((row) => row.sellerId === person.id)?.fixedOffDow ?? null,
+      sex: schedule.people.find((row) => row.sellerId === person.id)?.sex ?? ("woman" as Sex),
+    })),
+  };
   return (
-    <div className="mt-4 rounded-xl border border-line bg-bg-inset p-3.5 sm:p-4">
+    <div className="mt-4">
       <div className="mb-3">
-        <h4 className="text-[13px] font-bold text-t0">Folgas compensatórias</h4>
+        <h4 className="text-[13px] font-bold text-t0">Folgas compensatórias · {monthLabel(nextStart).toLocaleLowerCase("pt-BR")}</h4>
         <p className="mt-0.5 text-[12px] text-t2">
-          Para repasse ao sindicato: feriado trabalhado e a data da folga, mesmo quando ela cai no mês seguinte.
+          {saved
+            ? "Escala do mês seguinte com as folgas pelo feriado trabalhado."
+            : "Prévia das datas previstas no mês seguinte para repasse ao sindicato. A escala completa desse mês é gerada à parte."}
         </p>
       </div>
-      <ul className="divide-y divide-line">
-        {rows.map((row) => (
-          <li
-            key={`${row.personId}|${row.holidayDate}`}
-            className="flex flex-col gap-0.5 py-2.5 first:pt-0 last:pb-0 sm:flex-row sm:items-baseline sm:justify-between sm:gap-4"
-          >
-            <div className="min-w-0">
-              <p className="truncate text-[13px] font-semibold text-t0">{row.personName}</p>
-              <p className="text-[12px] text-t2">
-                Feriado {shortDate(row.holidayDate)} · {row.holidayName}
-              </p>
-            </div>
-            <p className={cn("shrink-0 text-[12.5px] font-semibold", row.offDate ? "text-info" : "text-warn")}>
-              {row.offDate
-                ? `Folga em ${shortDate(row.offDate)}`
-                : `Folga até ${shortDate(row.until)}`}
-            </p>
-          </li>
-        ))}
-      </ul>
+      <ScheduleBoard
+        dates={nextDates}
+        today={today}
+        readOnly={!saved}
+        section={{
+          storeId: view.store.id,
+          holidays: view.holidays,
+          schedules: [{ monthStart: nextStart, schedule: boardSchedule }],
+          days,
+          people,
+          shifts: view.shifts,
+        }}
+        onOpenDay={() => {}}
+      />
     </div>
   );
 }
@@ -145,11 +182,11 @@ export function SchedulePage() {
   const { session, storeRows } = useScopedStores();
   const many = storeRows.length > 1;
   const today = calendarTodayIso();
-  const [rangeFrom, setRangeFrom] = useState(() => startOfMonth(today));
-  const [rangeTo, setRangeTo] = useState(() => endOfMonth(today));
-  const [presetId, setPresetId] = useState<DatePresetId | null>("thisMonth");
-  const rangeFromRef = useRef(rangeFrom);
-  rangeFromRef.current = rangeFrom;
+  const [monthStart, setMonthStart] = useState(() => startOfMonth(today));
+  const monthStartRef = useRef(monthStart);
+  monthStartRef.current = monthStart;
+  const rangeFrom = monthStart;
+  const rangeTo = endOfMonth(monthStart);
   const [views, setViews] = useState<BranchSchedule[]>([]);
   const [error, setError] = useState(false);
   const [wizardStoreId, setWizardStoreId] = useState<string | null>(null);
@@ -160,14 +197,16 @@ export function SchedulePage() {
   const [reloadKey, setReloadKey] = useState(0);
   const [goalSpans, setGoalSpans] = useState<GoalSpan[] | null>(null);
   const storeIds = storeRows.map((row) => row.id).join(",");
-  const filterKey = `schedule:${session.tenantId}:${storeIds}:${rangeFrom}:${rangeTo}`;
+  const filterKey = `schedule:${session.tenantId}:${storeIds}:${monthStart}`;
   const { showSkeleton, settle } = useFilterSkeleton(filterKey);
   const reloadGen = useRef(0);
   const storesRef = useRef(storeRows);
   storesRef.current = storeRows;
 
   const periodFloor = goalSpans ? goalMonthFloor(scheduleStartMonth(today, goalSpans), goalSpans) : startOfMonth(today);
-  const periodCeil = endOfMonth(addMonths(today, 14));
+  const periodCeil = startOfMonth(endOfMonth(addMonths(today, 14)));
+  const canPrevMonth = monthStart > periodFloor;
+  const canNextMonth = monthStart < periodCeil;
   const dates = useMemo(() => {
     const list: string[] = [];
     for (let day = rangeFrom; day <= rangeTo; day = addDays(day, 1)) list.push(day);
@@ -198,11 +237,7 @@ export function SchedulePage() {
       const spans = rows.map((row) => ({ startsOn: row.startsOn, endsOn: row.endsOn }));
       setGoalSpans(spans);
       const open = scheduleStartMonth(today, spans);
-      if (rangeFromRef.current < open) {
-        setRangeFrom(open);
-        setRangeTo(endOfMonth(open));
-        setPresetId(open === startOfMonth(today) ? "thisMonth" : null);
-      }
+      if (monthStartRef.current < open) setMonthStart(open);
     });
     return () => {
       stop = true;
@@ -227,7 +262,8 @@ export function SchedulePage() {
     }
     void (async () => {
       try {
-        const covered = monthStarts(rangeFrom, rangeTo);
+        // Mês atual + seguinte (para a prévia das FC que caem no mês seguinte).
+        const covered = monthStarts(rangeFrom, endOfMonth(addMonths(rangeFrom, 1)));
         const years = [...new Set(covered.map((month) => Number(month.slice(0, 4))))];
         const [seed, ...nationals] = await Promise.all([loadHolidaySeed(), ...years.map((year) => loadNationalHolidays(year))]);
         const national = nationals.flat();
@@ -409,18 +445,13 @@ export function SchedulePage() {
       const result = await generateFor(view.store.id, value, selected, view.holidays);
       const kept = result.keptManualDays;
       const editing = view.months.length > 0;
-      const end = endOfMonth(result.monthStart);
       setViews((current) => current.map((item) => {
         if (item.store.id !== view.store.id) return item;
         const months = [...item.months.filter((month) => month.monthStart !== result.monthStart), { monthStart: result.monthStart, schedule: result.schedule }];
         const days = [...item.days.filter((row) => startOfMonth(row.day) !== result.monthStart), ...result.days];
         return { ...item, months, days };
       }));
-      if (rangeFrom > result.monthStart || rangeTo < end) {
-        setRangeFrom(result.monthStart);
-        setRangeTo(end);
-        setPresetId(result.monthStart === startOfMonth(today) ? "thisMonth" : null);
-      }
+      if (monthStart !== result.monthStart) setMonthStart(result.monthStart);
       show(
         kept > 0
           ? `Escala salva. ${kept} ${kept === 1 ? "dia ajustado foi mantido" : "dias ajustados foram mantidos"}.`
@@ -462,11 +493,11 @@ export function SchedulePage() {
     );
   }
 
-  const registered = views.filter((view) => view.months.length > 0);
-  const creatable = views.filter((view) => view.months.length === 0 && view.people.length > 0);
+  const registered = views.filter((view) => view.months.some((item) => item.monthStart === monthStart));
+  const creatable = views.filter((view) => !view.months.some((item) => item.monthStart === monthStart) && view.people.length > 0);
   const scheduleCards = registered
-    .flatMap((view) => view.months.map((item) => ({ view, item })))
-    .sort((a, b) => a.item.monthStart.localeCompare(b.item.monthStart) || (a.view.store.tradeName || a.view.store.name).localeCompare(b.view.store.tradeName || b.view.store.name, "pt-BR"));
+    .flatMap((view) => view.months.filter((item) => item.monthStart === monthStart).map((item) => ({ view, item })))
+    .sort((a, b) => (a.view.store.tradeName || a.view.store.name).localeCompare(b.view.store.tradeName || b.view.store.name, "pt-BR"));
 
   function openCreate() {
     setWizardMonth(null);
@@ -516,19 +547,33 @@ export function SchedulePage() {
         subtitle={many ? "Acompanhe a escala das filiais." : "Acompanhe e ajuste a escala da filial."}
         actions={
           <HeaderFilters>
-            <DateRangePicker
-              value={[isoToDate(rangeFrom), isoToDate(rangeTo)]}
-              minDate={isoToDate(periodFloor)}
-              maxDate={isoToDate(periodCeil)}
-              quickRanges={CALENDAR_QUICK_RANGES}
-              displayLabel={presetId ? periodLabels[presetId] : null}
-              activePresetId={presetId}
-              onChange={([start, end], meta?: DateRangeChangeMeta) => {
-                setRangeFrom(dateToIso(start));
-                setRangeTo(dateToIso(end));
-                setPresetId(meta?.presetId ?? null);
-              }}
-            />
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                className={monthNavBtn}
+                disabled={!canPrevMonth}
+                aria-label="Mês anterior"
+                onClick={() => setMonthStart((current) => addMonths(current, -1))}
+              >
+                <MonthStep dir="anterior" />
+              </button>
+              <MonthYearPicker
+                iso={monthStart}
+                today={today}
+                minIso={periodFloor}
+                maxIso={periodCeil}
+                onChange={setMonthStart}
+              />
+              <button
+                type="button"
+                className={monthNavBtn}
+                disabled={!canNextMonth}
+                aria-label="Próximo mês"
+                onClick={() => setMonthStart((current) => addMonths(current, 1))}
+              >
+                <MonthStep dir="proximo" />
+              </button>
+            </div>
             {creatable.length > 0 ? (
               <Button icon={<Icon d={icons.plus} size={16} />} disabled={showSkeleton} onClick={openCreate}>
                 Nova escala
@@ -550,7 +595,7 @@ export function SchedulePage() {
             <EmptyBlock
               icon="📅"
               title="Sem escala cadastrada"
-              description="Nenhuma filial deste filtro tem escala neste período."
+              description="Nenhuma filial deste filtro tem escala neste mês."
               action={creatable.length > 0 ? <Button size="sm" onClick={openCreate}>Criar escala</Button> : undefined}
             />
           </Card>
@@ -594,7 +639,7 @@ export function SchedulePage() {
                       }}
                       onOpenDay={(day, sellerId) => setDayOpen({ storeId: view.store.id, day, sellerId })}
                     />
-                    <CompOffSummaryCard rows={compRows} />
+                    <NextMonthOffsBoard monthStart={item.monthStart} rows={compRows} view={view} schedule={item.schedule} today={today} />
                   </Card>
                 );
               })}
@@ -708,11 +753,13 @@ function ScheduleBoard({
   today,
   section,
   onOpenDay,
+  readOnly = false,
 }: {
   dates: string[];
   today: string;
   section: ScheduleSection;
   onOpenDay: (day: string, sellerId: string) => void;
+  readOnly?: boolean;
 }) {
   const { schedules, people, shifts, holidays } = section;
   const byId = new Map(people.map((person) => [person.id, person]));
@@ -799,6 +846,19 @@ function ScheduleBoard({
               if (!row || !mark) {
                 return <div key={iso} className="min-h-11 border-b border-line" />;
               }
+              const cell = (
+                <span className={cn("flex h-8 w-full max-w-9 flex-col items-center justify-center rounded-[6px] text-[10px] font-bold leading-none", mark.className)}>
+                  {mark.letters}
+                  {mark.note ? <span className="mt-0.5 text-[8px] font-semibold uppercase">{mark.note}</span> : null}
+                </span>
+              );
+              if (readOnly) {
+                return (
+                  <div key={iso} className="flex min-h-11 min-w-0 items-center justify-center border-b border-line p-0.5" title={status}>
+                    {cell}
+                  </div>
+                );
+              }
               return (
                 <button
                   key={iso}
@@ -807,10 +867,7 @@ function ScheduleBoard({
                   aria-label={`${person.name}, ${Number(iso.slice(8))}: ${status}`}
                   onClick={() => onOpenDay(iso, person.id)}
                 >
-                  <span className={cn("flex h-8 w-full max-w-9 flex-col items-center justify-center rounded-[6px] text-[10px] font-bold leading-none", mark.className)}>
-                    {mark.letters}
-                    {mark.note ? <span className="mt-0.5 text-[8px] font-semibold uppercase">{mark.note}</span> : null}
-                  </span>
+                  {cell}
                 </button>
               );
             })}

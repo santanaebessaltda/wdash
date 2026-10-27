@@ -30,17 +30,20 @@ export function MonthYearPicker({
   iso,
   today,
   minIso,
+  maxIso,
   onChange,
 }: {
   iso: string;
   today: string;
   /** Primeiro mês que pode ser escolhido. Antes disso o mês fica bloqueado. */
   minIso: string;
+  /** Último mês permitido. Sem valor, não passa do mês de `today` (Fechamento). */
+  maxIso?: string;
   onChange: (target: string) => void;
 }) {
-  const todayDateValue = isoToDate(today);
-  const todayYear = todayDateValue.getFullYear();
-  const todayMonth = todayDateValue.getMonth();
+  const ceil = isoToDate(startOfMonth(maxIso ?? today));
+  const ceilYear = ceil.getFullYear();
+  const ceilMonth = ceil.getMonth();
   const floor = isoToDate(startOfMonth(minIso));
   const floorYear = floor.getFullYear();
   const floorMonth = floor.getMonth();
@@ -48,7 +51,7 @@ export function MonthYearPicker({
   const [open, setOpen] = useState(false);
   const [modo, setModo] = useState<"month" | "year">("month");
   const [yearView, setYearView] = useState(selected.getFullYear());
-  const [yearPage, setYearPage] = useState(todayYear);
+  const [yearPage, setYearPage] = useState(ceilYear);
   const [panelPos, setPanelPos] = useState<{ top: number; left: number; width: number; maxHeight: number } | null>(null);
   const triggerRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -99,14 +102,18 @@ export function MonthYearPicker({
 
   const anos = Array.from({ length: 12 }, (_, i) => yearPage - 11 + i);
   const canYearPrev = modo === "year" ? anos[0] > floorYear : yearView > floorYear;
-  const canYearProx = modo === "year" ? yearPage < todayYear : yearView < todayYear;
+  const canYearProx = modo === "year" ? yearPage < ceilYear : yearView < ceilYear;
   const navBtn = (ok: boolean) =>
     cn("flex h-[30px] w-[30px] items-center justify-center rounded-lg border border-line text-t1", ok ? "hover:bg-bg-3" : "cursor-not-allowed opacity-40");
 
+  function monthBlocked(year: number, month: number): boolean {
+    const before = year < floorYear || (year === floorYear && month < floorMonth);
+    const after = year > ceilYear || (year === ceilYear && month > ceilMonth);
+    return before || after;
+  }
+
   function pickMonth(month: number) {
-    const before = yearView < floorYear || (yearView === floorYear && month < floorMonth);
-    const future = yearView > todayYear || (yearView === todayYear && month > todayMonth);
-    if (before || future) return;
+    if (monthBlocked(yearView, month)) return;
     onChange(dateToIso(new Date(yearView, month, 1)));
     setOpen(false);
   }
@@ -134,7 +141,7 @@ export function MonthYearPicker({
                 className="rounded-lg px-2 py-1 text-sm font-bold text-t0 hover:bg-bg-3"
                 onClick={() => {
                   if (modo === "month") {
-                    setYearPage(pageEndYear(yearView, todayYear));
+                    setYearPage(pageEndYear(yearView, ceilYear));
                     setModo("year");
                     return;
                   }
@@ -148,7 +155,7 @@ export function MonthYearPicker({
                 disabled={!canYearProx}
                 aria-label={modo === "year" ? "Próximos anos" : "Próximo ano"}
                 className={navBtn(canYearProx)}
-                onClick={() => (modo === "year" ? setYearPage((n) => Math.min(todayYear, n + 12)) : setYearView((n) => n + 1))}
+                onClick={() => (modo === "year" ? setYearPage((n) => Math.min(ceilYear, n + 12)) : setYearView((n) => n + 1))}
               >
                 <MonthStep dir="proximo" />
               </button>
@@ -156,11 +163,7 @@ export function MonthYearPicker({
             {modo === "month" ? (
               <div className="grid grid-cols-3 gap-1">
                 {MONTHS_PT.map((name, month) => {
-                  const blocked =
-                    yearView < floorYear ||
-                    (yearView === floorYear && month < floorMonth) ||
-                    yearView > todayYear ||
-                    (yearView === todayYear && month > todayMonth);
+                  const blocked = monthBlocked(yearView, month);
                   const active = selected.getFullYear() === yearView && selected.getMonth() === month;
                   return (
                     <button
@@ -181,7 +184,7 @@ export function MonthYearPicker({
             ) : (
               <div className="grid grid-cols-3 gap-1">
                 {anos.map((year) => {
-                  const blocked = year < floorYear || year > todayYear;
+                  const blocked = year < floorYear || year > ceilYear;
                   const active = selected.getFullYear() === year;
                   return (
                     <button
