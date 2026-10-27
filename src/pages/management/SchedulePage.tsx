@@ -806,12 +806,13 @@ type ScheduleSection = {
   shifts: StoreShift[];
 };
 
+/** Tile no padrão Heatmap: fundo sólido da legenda, sem borda de grade. */
 function cellMark(status: DayStatus, doublePay: boolean): { letters: string; note: string | null; className: string } {
-  if (status === "holiday_work" && doublePay) return { letters: "FE", note: "2×", className: "bg-acc-soft text-acc" };
-  if (status === "holiday_work") return { letters: "FE", note: null, className: "bg-warn-soft text-warn" };
-  if (status === "comp_off") return { letters: "FC", note: null, className: "bg-info-soft text-info" };
-  if (status === "off") return { letters: "F", note: null, className: "bg-bg-3 text-t2" };
-  return { letters: "T", note: null, className: "bg-ok-soft text-ok" };
+  if (status === "holiday_work" && doublePay) return { letters: "FE", note: "2×", className: "bg-acc text-white" };
+  if (status === "holiday_work") return { letters: "FE", note: null, className: "bg-warn text-white" };
+  if (status === "comp_off") return { letters: "FC", note: null, className: "bg-info text-white" };
+  if (status === "off") return { letters: "F", note: null, className: "bg-chip-gray text-white" };
+  return { letters: "T", note: null, className: "bg-ok text-white" };
 }
 
 function dayFloor(schedule: StoredSchedule, iso: string): { min: number; closed: boolean; exact: boolean } {
@@ -894,18 +895,19 @@ function ScheduleBoard({
     return { working, closed: floor.closed, min: floor.min, exact: floor.exact };
   }
 
-  /* Dia com largura mínima: no celular a grade rola na horizontal em vez de esmagar os números. */
-  const columns = `minmax(11rem, 14rem) repeat(${dates.length}, minmax(2.5rem, 1fr))`;
-  const stickyPerson = "sticky left-0 z-[1] border-r border-line bg-bg-2";
+  /* Heatmap: gap entre tiles, sem linhas; no celular a grade rola na horizontal. */
+  const columns = `minmax(11rem, 14rem) repeat(${dates.length}, minmax(2.75rem, 1fr))`;
+  const stickyPerson = "sticky left-0 z-[1] bg-bg-2 pr-2";
+  const tile = "flex aspect-square w-full min-w-0 flex-col items-center justify-center rounded-[4px] text-[11px] font-bold leading-none";
   return (
-    <div className="min-w-0 overflow-x-auto overscroll-x-contain rounded-[18px] border border-line bg-bg-2">
-      <div className="grid w-max min-w-full" style={{ gridTemplateColumns: columns }}>
-        <div className={cn(stickyPerson, "border-b px-2 py-2 text-left text-[11px] font-bold uppercase tracking-wide text-t2")}>Pessoa</div>
+    <div className="min-w-0 overflow-x-auto overscroll-x-contain">
+      <div className="inline-grid w-max min-w-full gap-1" style={{ gridTemplateColumns: columns }}>
+        <div className={cn(stickyPerson, "flex items-end pb-1 text-left text-[11px] font-bold uppercase tracking-wide text-t2")}>Pessoa</div>
         {dates.map((iso) => {
           const holiday = holidayLabel(holidays, iso);
           const day = Number(iso.slice(8));
           return (
-            <div key={iso} title={holiday ?? dayTitle(iso, null)} className={cn("border-b border-line px-0.5 py-2 text-center", holiday && iso !== today && "text-warn")}>
+            <div key={iso} title={holiday ?? dayTitle(iso, null)} className={cn("px-0.5 pb-1 text-center", holiday && iso !== today && "text-warn")}>
               <span
                 className={cn(
                   "mx-auto inline-flex h-6 w-6 items-center justify-center rounded-full text-[12px] font-bold",
@@ -920,7 +922,7 @@ function ScheduleBoard({
         })}
         {roster.map((person) => (
           <div key={person.id} className="contents">
-            <div className={cn(stickyPerson, "flex min-w-0 items-center gap-2 border-b px-2 py-1.5")}>
+            <div className={cn(stickyPerson, "flex min-w-0 items-center gap-2 py-0.5")}>
               <PersonAvatar name={person.name} employeeId={person.code} storeId={section.storeId} size="sm" />
               <span className="min-w-0">
                 <span className="block truncate text-[12px] font-semibold leading-tight text-t0">{person.name}</span>
@@ -933,18 +935,13 @@ function ScheduleBoard({
               const mark = row ? cellMark(row.status, doublePay) : null;
               const status = row ? statusChip(row.status, doublePay).label : "sem escala";
               if (!row || !mark) {
-                return <div key={iso} className="min-h-11 border-b border-line" />;
+                return <div key={iso} className={cn(tile, "bg-bg-3")} aria-hidden />;
               }
-              const cell = (
-                <span className={cn("flex h-8 w-full max-w-9 flex-col items-center justify-center rounded-[6px] text-[10px] font-bold leading-none", mark.className)}>
-                  {mark.letters}
-                  {mark.note ? <span className="mt-0.5 text-[8px] font-semibold uppercase">{mark.note}</span> : null}
-                </span>
-              );
               if (readOnly) {
                 return (
-                  <div key={iso} className="flex min-h-11 min-w-0 items-center justify-center border-b border-line p-0.5" title={status}>
-                    {cell}
+                  <div key={iso} className={cn(tile, mark.className)} title={status}>
+                    {mark.letters}
+                    {mark.note ? <span className="mt-0.5 text-[8px] font-semibold uppercase opacity-90">{mark.note}</span> : null}
                   </div>
                 );
               }
@@ -952,23 +949,24 @@ function ScheduleBoard({
                 <button
                   key={iso}
                   type="button"
-                  className="flex min-h-11 min-w-0 cursor-pointer items-center justify-center border-b border-line p-0.5"
+                  className={cn(tile, "cursor-pointer transition-opacity hover:opacity-90", mark.className)}
                   aria-label={`${person.name}, ${Number(iso.slice(8))}: ${status}`}
                   onClick={() => onOpenDay(iso, person.id)}
                 >
-                  {cell}
+                  {mark.letters}
+                  {mark.note ? <span className="mt-0.5 text-[8px] font-semibold uppercase opacity-90">{mark.note}</span> : null}
                 </button>
               );
             })}
           </div>
         ))}
-        <div className={cn(stickyPerson, "px-2 py-2 text-left text-[11px] font-bold uppercase leading-tight tracking-wide text-t2")}>Pessoas presentes</div>
+        <div className={cn(stickyPerson, "flex items-center py-1 text-left text-[11px] font-bold uppercase leading-tight tracking-wide text-t2")}>Pessoas presentes</div>
         {dates.map((iso) => {
           const face = presence(iso);
           const title = face.closed ? "A loja fecha neste dia" : face.exact ? "Quantidade exata neste feriado" : "Mínimo do dia";
           const sub = face.closed ? "Fechado" : face.min > 0 ? `${face.exact ? "Ex." : "Mín."} ${face.min}` : "";
           return (
-            <div key={iso} title={title} className="min-w-0 px-0.5 py-1.5 text-center">
+            <div key={iso} title={title} className="min-w-0 px-0.5 py-1 text-center">
               <span className={cn("block text-[11px] font-bold tabular-nums", face.closed ? "text-t2" : "text-t1")}>{face.closed ? "—" : face.working}</span>
               {sub ? <span className="block truncate text-[9px] leading-tight text-t2">{sub}</span> : null}
             </div>

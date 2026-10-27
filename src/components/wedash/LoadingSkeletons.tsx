@@ -883,21 +883,21 @@ export function ScheduleCardsSkeleton({ count = 1, people = 5, days = 7 }: { cou
           </div>
           <div className="min-w-0 overflow-x-auto overscroll-x-contain">
             <div
-              className="grid w-max min-w-full gap-px rounded-[var(--radius-vela-sm)] border border-line bg-line"
-              style={{ gridTemplateColumns: `minmax(11rem, 14rem) repeat(${days}, minmax(2.5rem, 1fr))` }}
+              className="inline-grid w-max min-w-full gap-1"
+              style={{ gridTemplateColumns: `minmax(11rem, 14rem) repeat(${days}, minmax(2.75rem, 1fr))` }}
             >
-              <div className="bg-bg-2 px-3 py-2">
+              <div className="flex items-end pb-1">
                 <Skeleton className="h-3 w-14" />
               </div>
               {Array.from({ length: days }, (_, d) => (
-                <div key={d} className="bg-bg-2 px-1 py-2">
-                  <Skeleton className="mx-auto h-3 w-6" />
+                <div key={d} className="px-0.5 pb-1">
+                  <Skeleton className="mx-auto h-6 w-6 rounded-full" />
                   <Skeleton className="mx-auto mt-1 h-2.5 w-8" />
                 </div>
               ))}
               {Array.from({ length: people }, (_, p) => (
                 <Fragment key={p}>
-                  <div className="flex items-center gap-2.5 bg-bg-2 px-3 py-2.5">
+                  <div className="flex items-center gap-2.5 py-0.5 pr-2">
                     <Skeleton className="h-8 w-8 shrink-0 rounded-full" />
                     <div className="min-w-0 flex-1">
                       <Skeleton className="h-3.5 w-28" />
@@ -905,9 +905,7 @@ export function ScheduleCardsSkeleton({ count = 1, people = 5, days = 7 }: { cou
                     </div>
                   </div>
                   {Array.from({ length: days }, (_, d) => (
-                    <div key={d} className="flex items-center justify-center bg-bg-2 py-2.5">
-                      <Skeleton className="h-7 w-7 rounded-md" />
-                    </div>
+                    <Skeleton key={d} className="aspect-square w-full rounded-[4px]" />
                   ))}
                 </Fragment>
               ))}
