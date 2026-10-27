@@ -4,7 +4,7 @@
    aponta para pacotes que não existem mais. O cache serve só para abrir
    offline e para os arquivos com hash no nome. Nunca cacheia resposta de erro
    (404 de chunk antigo depois de deploy). */
-const VERSAO = "v15";
+const VERSAO = "v16";
 const CACHE = `wedash-${VERSAO}`;
 // Escopo do SW (= base do app). Em dominio proprio fica "/".
 const BASE = self.registration.scope;

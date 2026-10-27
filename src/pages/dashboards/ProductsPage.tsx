@@ -183,11 +183,15 @@ export default function ProductsPage() {
     return () => window.removeEventListener(SALES_SYNCED_EVENT, onSynced);
   }, [reload]);
 
-  const view = useMemo(
-    () => buildProductsView(viewScope, aggs),
+  const view = useMemo(() => {
+    try {
+      return buildProductsView(viewScope, aggs);
+    } catch (e) {
+      console.error("Products view:", e);
+      return buildProductsView(viewScope, { dayAggs: [] });
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [viewScope, aggs, storesTick],
-  );
+  }, [viewScope, aggs, storesTick]);
 
   const dateRange = useMemo(() => dateRangeFromPeriod(scope.period), [scope.period]);
   const currentPeriod = resolvePeriod(scope.period, calendarTodayIso());

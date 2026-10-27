@@ -234,8 +234,8 @@ export default function OverviewPage() {
     const key = filterKey;
     const scopeAtLoad = scope;
     const cached = filterCacheGet<OverviewCache>(key);
-    // Sem catalogo de lojas a view zera (filtra por storeId) — nao tira o skeleton.
-    if (cached && productStores().length > 0) {
+    // Sem catalogo / pacote incompleto: nao settle (evita KPI zero e crash no build).
+    if (cached && Array.isArray(cached.days) && productStores().length > 0) {
       applyOverview(cached);
       setViewScope(scopeAtLoad);
       settle(key);
@@ -416,28 +416,35 @@ export default function OverviewPage() {
 
   const view = useMemo(
     () =>
-      buildOverviewView(viewScope, {
-        dayAggs,
-        hourAggs,
-        categoryDayAggs,
-        categoryCatalog,
-        paymentDayAggs,
-        sellerDayAggs,
-        sellerShifts,
-        sellerAvatars,
-        productDayAggs,
-        productCostDayAggs,
-        goalHistoryDayAggs,
-        goalHistoryHourAggs,
-        prevDayAggs,
-        prevHourAggs,
-        goals,
-        goalDayAggs,
-        goalSellerDayAggs,
-        goalNamedSellerDayAggs,
-        goalTeam,
-        rankingStoreIds: isOwner(session.role) ? undefined : queryStoreIds(session.role, [], session.stores),
-      }),
+      (() => {
+        try {
+          return buildOverviewView(viewScope, {
+            dayAggs,
+            hourAggs,
+            categoryDayAggs,
+            categoryCatalog,
+            paymentDayAggs,
+            sellerDayAggs,
+            sellerShifts,
+            sellerAvatars,
+            productDayAggs,
+            productCostDayAggs,
+            goalHistoryDayAggs,
+            goalHistoryHourAggs,
+            prevDayAggs,
+            prevHourAggs,
+            goals,
+            goalDayAggs,
+            goalSellerDayAggs,
+            goalNamedSellerDayAggs,
+            goalTeam,
+            rankingStoreIds: isOwner(session.role) ? undefined : queryStoreIds(session.role, [], session.stores),
+          });
+        } catch (e) {
+          console.error("Overview view:", e);
+          return buildOverviewView(viewScope, { dayAggs: [] });
+        }
+      })(),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [viewScope, session.role, session.stores, dayAggs, hourAggs, categoryDayAggs, categoryCatalog, paymentDayAggs, sellerDayAggs, sellerShifts, sellerAvatars, productDayAggs, productCostDayAggs, goalHistoryDayAggs, goalHistoryHourAggs, prevDayAggs, prevHourAggs, goals, goalDayAggs, goalSellerDayAggs, goalNamedSellerDayAggs, goalTeam, storesTick],
   );

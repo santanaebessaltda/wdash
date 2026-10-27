@@ -107,12 +107,17 @@ const WEEKDAY_INITIALS = ["D", "S", "T", "Q", "Q", "S", "S"];
 const MONTHS_PT = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 const SHORT_MONTHS = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
 
-function sameCalendarDay(a: Date, b: Date): boolean {
-  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+function sameCalendarDay(a: Date | string, b: Date | string): boolean {
+  const da = asCalendarDate(a);
+  const db = asCalendarDate(b);
+  if (!da || !db) return false;
+  return da.getFullYear() === db.getFullYear() && da.getMonth() === db.getMonth() && da.getDate() === db.getDate();
 }
 
-function formatShort(d: Date): string {
-  return `${d.getDate()} ${SHORT_MONTHS[d.getMonth()]}`;
+function formatShort(d: Date | string): string {
+  const date = asCalendarDate(d);
+  if (!date) return "—";
+  return `${date.getDate()} ${SHORT_MONTHS[date.getMonth()]}`;
 }
 
 function formatRange(r: DateRange): string {

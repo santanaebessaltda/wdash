@@ -23,6 +23,7 @@ export function lazyPage<M, K extends keyof M>(
       .then((m) => {
         try {
           sessionStorage.removeItem(RELOAD_KEY);
+          sessionStorage.removeItem("wedash.boundary-reload");
         } catch {
           /* private mode */
         }

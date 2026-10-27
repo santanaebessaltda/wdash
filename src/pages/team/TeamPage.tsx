@@ -271,14 +271,20 @@ export function TeamPage() {
 
   const view = useMemo(() => {
     const stores = storesForSession(session.stores);
-    return teamViewWithGoalShare(
-      viewScope,
-      aggs,
-      goalsData.goals,
-      goalsData.team,
-      calendarTodayIso(),
-      new Map(stores.map((store) => [store.id, store.tradeName])),
-    );
+    const names = new Map(stores.map((store) => [store.id, store.tradeName]));
+    try {
+      return teamViewWithGoalShare(
+        viewScope,
+        aggs,
+        goalsData.goals,
+        goalsData.team,
+        calendarTodayIso(),
+        names,
+      );
+    } catch (e) {
+      console.error("Team view:", e);
+      return teamViewWithGoalShare(viewScope, { dayAggs: [] }, [], [], calendarTodayIso(), names);
+    }
     // storesTick: catalogo ERP hidrata depois do 1º render — sem isso KPI/ranking ficam zerados.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewScope, aggs, goalsData.goals, goalsData.team, session.stores, storesTick]);
