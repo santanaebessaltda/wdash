@@ -116,7 +116,8 @@ export default function ProductsPage() {
   const [aggs, setAggs] = useState<ProductsAggInput>({ dayAggs: [] });
   const [coverageFrom, setCoverageFrom] = useState<Date | null>(null);
   const filterKey = scopeFilterKey(scope);
-  const { pending, showSkeleton, refreshing, settle } = useFilterSkeleton(filterKey);
+  const { pending, showSkeleton, settle } = useFilterSkeleton(filterKey);
+  const [viewScope, setViewScope] = useState(scope);
   const [search, setSearch] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("revenue");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
@@ -139,18 +140,20 @@ export default function ProductsPage() {
   const reload = useCallback(async () => {
     const gen = ++reloadGen.current;
     const key = filterKey;
+    const scopeAtLoad = scope;
     type ProductsCache = { aggs: ProductsAggInput; covFrom: Date | null };
     const cached = filterCacheGet<ProductsCache>(key);
     if (cached) {
       setAggs(cached.aggs);
       setCoverageFrom(cached.covFrom);
+      setViewScope(scopeAtLoad);
       settle(key);
     }
     try {
-      const storeIds = queryStoreIds(session.role, scope.storeIds, session.stores);
+      const storeIds = queryStoreIds(session.role, scopeAtLoad.storeIds, session.stores);
       // Onda 1: KPIs e cobertura — libera a tela sem esperar dezenas de milhares de SKUs.
       const [kpi, cov] = await Promise.all([
-        fetchProductsKpiAggs(session.tenantId, scope, storeIds),
+        fetchProductsKpiAggs(session.tenantId, scopeAtLoad, storeIds),
         fetchSalesCoverage(session.tenantId, storeIds),
       ]);
       if (gen !== reloadGen.current) return;
@@ -165,9 +168,10 @@ export default function ProductsPage() {
       };
       setAggs(early);
       setCoverageFrom(covFrom);
+      setViewScope(scopeAtLoad);
       settle(key);
 
-      const catalog = await fetchProductsCatalogAggs(session.tenantId, scope, storeIds);
+      const catalog = await fetchProductsCatalogAggs(session.tenantId, scopeAtLoad, storeIds);
       if (gen !== reloadGen.current) return;
       const full: ProductsAggInput = { ...early, ...catalog };
       filterCacheSet(key, { aggs: full, covFrom });
@@ -176,7 +180,6 @@ export default function ProductsPage() {
     } catch (e) {
       if (gen !== reloadGen.current) return;
       console.error("Products reload:", e);
-      settle(key);
     }
   }, [scope, session.role, session.stores, session.tenantId, filterKey, settle]);
 
@@ -191,9 +194,9 @@ export default function ProductsPage() {
   }, [reload]);
 
   const view = useMemo(
-    () => buildProductsView(scope, aggs),
+    () => buildProductsView(viewScope, aggs),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [scope, aggs, storesTick],
+    [viewScope, aggs, storesTick],
   );
 
   const dateRange = useMemo(() => dateRangeFromPeriod(scope.period), [scope.period]);
@@ -364,7 +367,7 @@ export default function ProductsPage() {
       {showSkeleton ? (
         <ProductsSkeleton />
       ) : (
-      <div className={cn(refreshing && "pointer-events-none opacity-60 transition-opacity")}>
+      <div>
 
       <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {view.kpis.map((kpi, i) => (

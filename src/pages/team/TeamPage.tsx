@@ -189,7 +189,8 @@ export function TeamPage() {
   const [aggs, setAggs] = useState<TeamAggInput>({ dayAggs: [] });
   const [coverageFrom, setCoverageFrom] = useState<Date | null>(null);
   const filterKey = scopeFilterKey(scope);
-  const { showSkeleton, refreshing, settle } = useFilterSkeleton(filterKey);
+  const { showSkeleton, settle } = useFilterSkeleton(filterKey);
+  const [viewScope, setViewScope] = useState(scope);
   const [search, setSearch] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("revenue");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
@@ -209,6 +210,7 @@ export function TeamPage() {
   const reload = useCallback(async () => {
     const gen = ++reloadGen.current;
     const key = filterKey;
+    const scopeAtLoad = scope;
     type TeamCache = {
       aggs: TeamAggInput;
       covFrom: Date | null;
@@ -221,13 +223,14 @@ export function TeamPage() {
       setCoverageFrom(cached.covFrom);
       setGoalsData(cached.goals);
       setChallengesData(cached.challenges);
+      setViewScope(scopeAtLoad);
       settle(key);
     }
     try {
-      const storeIds = queryStoreIds(session.role, scope.storeIds, session.stores);
+      const storeIds = queryStoreIds(session.role, scopeAtLoad.storeIds, session.stores);
       // Onda 1: ranking e cobertura — metas/desafios (mais pesados) vêm depois.
       const [next, cov] = await Promise.all([
-        fetchTeamAggInput(session.tenantId, scope, storeIds),
+        fetchTeamAggInput(session.tenantId, scopeAtLoad, storeIds),
         fetchSalesCoverage(session.tenantId, storeIds),
       ]);
       if (gen !== reloadGen.current) return;
@@ -238,11 +241,12 @@ export function TeamPage() {
         setGoalsData(cached.goals);
         setChallengesData(cached.challenges);
       }
+      setViewScope(scopeAtLoad);
       settle(key);
 
       const [goals, challenges] = await Promise.all([
-        fetchGoalsData(session.tenantId, scope, session.stores),
-        fetchPeriodChallenges(session.tenantId, scope, session.stores).catch((e: unknown) => {
+        fetchGoalsData(session.tenantId, scopeAtLoad, session.stores),
+        fetchPeriodChallenges(session.tenantId, scopeAtLoad, session.stores).catch((e: unknown) => {
           console.error("Team challenges:", e);
           return CHALLENGES_EMPTY;
         }),
@@ -255,7 +259,6 @@ export function TeamPage() {
     } catch (e) {
       if (gen !== reloadGen.current) return;
       console.error("Team reload:", e);
-      settle(key);
     }
   }, [scope, session.role, session.stores, session.tenantId, filterKey, settle]);
 
@@ -272,14 +275,14 @@ export function TeamPage() {
   const view = useMemo(() => {
     const stores = storesForSession(session.stores);
     return teamViewWithGoalShare(
-      scope,
+      viewScope,
       aggs,
       goalsData.goals,
       goalsData.team,
       calendarTodayIso(),
       new Map(stores.map((store) => [store.id, store.tradeName])),
     );
-  }, [scope, aggs, goalsData.goals, goalsData.team, session.stores]);
+  }, [viewScope, aggs, goalsData.goals, goalsData.team, session.stores]);
 
   const todayIso = calendarTodayIso();
   const goalCards = useMemo(() => {
@@ -475,7 +478,7 @@ export function TeamPage() {
       {showSkeleton ? (
         <TeamSkeleton />
       ) : (
-        <div className={cn(refreshing && "pointer-events-none opacity-60 transition-opacity")}>
+        <div>
           <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {view.kpis.map((kpi, i) => {
               const Icon = KPI_ICONS[i] ?? IconRevenue;

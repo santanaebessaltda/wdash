@@ -141,7 +141,8 @@ export default function FinancePage() {
   const [aggs, setAggs] = useState<FinanceAggInput>({ dayAggs: [] });
   const [coverageFrom, setCoverageFrom] = useState<Date | null>(null);
   const filterKey = scopeFilterKey(scope);
-  const { pending, showSkeleton, refreshing, settle } = useFilterSkeleton(filterKey);
+  const { pending, showSkeleton, settle } = useFilterSkeleton(filterKey);
+  const [viewScope, setViewScope] = useState(scope);
   // Catalogo de lojas (horario/custos) hidratado depois do 1 render  ->  recalcula.
   const [storesTick, setStoresTick] = useState(0);
   const [evoSort, setEvoSort] = useState<EvoSort>("month");
@@ -157,17 +158,19 @@ export default function FinancePage() {
   const reload = useCallback(async () => {
     const gen = ++reloadGen.current;
     const key = filterKey;
+    const scopeAtLoad = scope;
     type FinanceCache = { aggs: FinanceAggInput; covFrom: Date | null };
     const cached = filterCacheGet<FinanceCache>(key);
     if (cached) {
       setAggs(cached.aggs);
       setCoverageFrom(cached.covFrom);
+      setViewScope(scopeAtLoad);
       settle(key);
     }
-    const period = resolvePeriod(scope.period, calendarTodayIso());
-    const range = financeFetchRange(scope);
-    const costRange = productsFetchRange(scope);
-    const storeIds = queryStoreIds(session.role, scope.storeIds, session.stores);
+    const period = resolvePeriod(scopeAtLoad.period, calendarTodayIso());
+    const range = financeFetchRange(scopeAtLoad);
+    const costRange = productsFetchRange(scopeAtLoad);
+    const storeIds = queryStoreIds(session.role, scopeAtLoad.storeIds, session.stores);
     try {
       // Onda 1: faturamento e formas — libera KPIs.
       const [dayAggs, hourAggs, prevHourAggs, paymentDayAggs, cov, informedCents] = await Promise.all([
@@ -194,6 +197,7 @@ export default function FinancePage() {
       };
       setAggs(early);
       setCoverageFrom(cov.from ? isoToDate(cov.from) : null);
+      setViewScope(scopeAtLoad);
       settle(key);
 
       // Onda 2: CMV por produto (pesado em periodo longo).
@@ -218,7 +222,6 @@ export default function FinancePage() {
     } catch (e) {
       if (gen !== reloadGen.current) return;
       console.error("Finance reload:", e);
-      settle(key);
     }
   }, [scope, session.role, session.stores, session.tenantId, filterKey, settle]);
 
@@ -233,9 +236,9 @@ export default function FinancePage() {
   }, [reload]);
 
   const view = useMemo(
-    () => buildFinanceView({ ...scope, division: null }, aggs),
+    () => buildFinanceView({ ...viewScope, division: null }, aggs),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [scope, aggs, storesTick],
+    [viewScope, aggs, storesTick],
   );
 
   const evoRows = useMemo(() => {
@@ -340,7 +343,7 @@ export default function FinancePage() {
       {showSkeleton ? (
         <FinanceSkeleton />
       ) : (
-      <div className={cn(refreshing && "pointer-events-none opacity-60 transition-opacity")}>
+      <div>
 
       {/* KPI row  -  4 cards. Gerente fica sem CMV, lucro e margem. */}
       <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">

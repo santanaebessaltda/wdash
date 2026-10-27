@@ -154,7 +154,9 @@ export default function OverviewPage() {
   const [productDayAggs, setProductDayAggs] = useState<SalesProductDayAgg[]>([]);
   const [productCostDayAggs, setProductCostDayAggs] = useState<SalesProductCostDayAgg[]>([]);
   const filterKey = scopeFilterKey(scope);
-  const { showSkeleton, refreshing, settle } = useFilterSkeleton(filterKey);
+  const { showSkeleton, settle } = useFilterSkeleton(filterKey);
+  /** Escopo da view: so muda com os dados, senao a filial nova zera os cards velhos. */
+  const [viewScope, setViewScope] = useState(scope);
 
   type OverviewCache = {
     days: SalesDayAgg[];
@@ -232,21 +234,23 @@ export default function OverviewPage() {
   const reloadAggs = useCallback(async () => {
     const gen = ++reloadGen.current;
     const key = filterKey;
+    const scopeAtLoad = scope;
     const cached = filterCacheGet<OverviewCache>(key);
     if (cached) {
       applyOverview(cached);
+      setViewScope(scopeAtLoad);
       settle(key);
     }
-    const period = resolvePeriod(scope.period, calendarTodayIso());
+    const period = resolvePeriod(scopeAtLoad.period, calendarTodayIso());
     const prev = previousPeriod(period);
     const singleDay = period.start === period.end;
     const goalDays = goalHistoryDayRange(period.start);
     const today = calendarTodayIso();
     const owner = isOwner(session.role);
-    const asked = queryStoreIds(session.role, scope.storeIds, session.stores);
+    const asked = queryStoreIds(session.role, scopeAtLoad.storeIds, session.stores);
     const rankingIds = owner ? [] : queryStoreIds(session.role, [], session.stores);
     const goalStoreIds =
-      scope.storeIds.length > 0 ? scope.storeIds : storesForSession(session.stores).map((s) => s.id);
+      scopeAtLoad.storeIds.length > 0 ? scopeAtLoad.storeIds : storesForSession(session.stores).map((s) => s.id);
     const goalsP = fetchGoals({ tenantId: session.tenantId, storeIds: goalStoreIds, from: period.start, to: period.end });
     // Atingimento da meta = do inicio de cada meta ate hoje (pode sair do periodo da tela).
     const empty = { days: [] as SalesDayAgg[], sellers: [] as SalesSellerDayAgg[], named: [] as SalesSellerDayAgg[], team: [] as GoalTeamMember[] };
@@ -371,11 +375,11 @@ export default function OverviewPage() {
       };
       filterCacheSet(key, full);
       applyOverview(full);
+      setViewScope(scopeAtLoad);
       settle(key);
     } catch (e) {
       if (gen !== reloadGen.current) return;
       console.error("Overview reloadAggs:", e);
-      settle(key);
     }
   }, [scope, session.role, session.stores, session.tenantId, filterKey, settle, applyOverview]);
 
@@ -412,7 +416,7 @@ export default function OverviewPage() {
 
   const view = useMemo(
     () =>
-      buildOverviewView(scope, {
+      buildOverviewView(viewScope, {
         dayAggs,
         hourAggs,
         categoryDayAggs,
@@ -435,7 +439,7 @@ export default function OverviewPage() {
         rankingStoreIds: isOwner(session.role) ? undefined : queryStoreIds(session.role, [], session.stores),
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [scope, session.role, session.stores, dayAggs, hourAggs, categoryDayAggs, categoryCatalog, paymentDayAggs, sellerDayAggs, sellerShifts, sellerAvatars, productDayAggs, productCostDayAggs, goalHistoryDayAggs, goalHistoryHourAggs, prevDayAggs, prevHourAggs, goals, goalDayAggs, goalSellerDayAggs, goalNamedSellerDayAggs, goalTeam, storesTick],
+    [viewScope, session.role, session.stores, dayAggs, hourAggs, categoryDayAggs, categoryCatalog, paymentDayAggs, sellerDayAggs, sellerShifts, sellerAvatars, productDayAggs, productCostDayAggs, goalHistoryDayAggs, goalHistoryHourAggs, prevDayAggs, prevHourAggs, goals, goalDayAggs, goalSellerDayAggs, goalNamedSellerDayAggs, goalTeam, storesTick],
   );
 
   // A metrica escolhe quais entram (sempre os maiores); a direcao so reordena esses.
@@ -579,7 +583,7 @@ export default function OverviewPage() {
       {showSkeleton ? (
         <OverviewSkeleton weekdays={currentPeriod.start !== currentPeriod.end} />
       ) : (
-      <div className={cn(refreshing && "pointer-events-none opacity-60 transition-opacity")}>
+      <div>
 
       {/* KPI row  -  4 cards */}
       <div className="mt-4 grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
