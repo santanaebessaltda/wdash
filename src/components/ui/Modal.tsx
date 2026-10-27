@@ -14,6 +14,8 @@ export interface ModalProps {
   bodyClassName?: string;
   /** O portal sai da tela. No placar, repete o tema claro ou escuro da tela. */
   boardTheme?: "light" | "dark";
+  /** Quando muda (ex.: etapa do wizard), o corpo volta ao topo — evita content “sumido” no mobile. */
+  scrollKey?: string | number;
 }
 
 const sizeClasses = {
@@ -42,9 +44,14 @@ function tableScrollDeficit(root: HTMLElement): number {
   return deficit;
 }
 
-export function Modal({ open, onClose, title, children, footer, size = "md", bodyClassName, boardTheme }: ModalProps) {
+export function Modal({ open, onClose, title, children, footer, size = "md", bodyClassName, boardTheme, scrollKey }: ModalProps) {
   const [body, setBody] = useState<HTMLDivElement | null>(null);
   const [fitPx, setFitPx] = useState<number | null>(null);
+
+  useLayoutEffect(() => {
+    if (!open || !body) return;
+    body.scrollTop = 0;
+  }, [open, body, scrollKey]);
 
   useLayoutEffect(() => {
     if (!open || !body) {

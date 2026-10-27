@@ -394,6 +394,7 @@ export function ScheduleWizard({
       onClose={saving ? () => {} : onClose}
       title={hasSchedule ? "Editar escala" : "Criar escala"}
       size="lg"
+      scrollKey={step}
       bodyClassName="overflow-x-hidden overflow-y-auto p-5"
       footer={
         <div className="flex w-full min-w-0 flex-col gap-3">
