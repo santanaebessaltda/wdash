@@ -20,7 +20,7 @@ import { goalStoreClosing } from "./engine/goalProjection";
 import { dayInGeneralGoal, sellerGoalLevels } from "./goalView";
 import { sellerOrigin } from "./engine/salesOrigin";
 import { dayAggregate, salesDay, salesDays, storeOpen, dayWeight, sumAggregates, type Aggregate } from "./sales";
-import { brl, brlCent, fullDate, shortDate, dayAxisLabel, dayPointDetail, isoToDate, delta as fmtDelta, hourSpan, endOfMonth, shortHour, startOfMonth, addMonths, eachDay, labelUpper, monthYear, shortMonth, pct, addDays } from "@/lib/format";
+import { brl, brlCent, fullDate, shortDate, dayAxisLabel, dayPointDetail, isoToDate, delta as fmtDelta, hourSpan, endOfMonth, shortHour, startOfMonth, eachDay, labelUpper, monthYear, shortMonth, pct, addDays } from "@/lib/format";
 import type { TintKey } from "@/pages/dashboards/icons";
 import { buildStoreInsight } from "./insight";
 
@@ -217,9 +217,10 @@ function startOfWeekDate(todayIso: string): string {
   return addDays(todayIso, diff);
 }
 
-/** 1º dia dos últimos `n` meses civis (mês atual conta). Ex.: n=3 em 27/10 → 01/08. */
-function startOfLastMonths(todayIso: string, n: number): string {
-  return addMonths(todayIso, -(n - 1));
+function startOfQuarter(todayIso: string): string {
+  const d = isoToDate(todayIso);
+  const month = Math.floor(d.getMonth() / 3) * 3; // 0,3,6,9
+  return `${d.getFullYear()}-${String(month + 1).padStart(2, "0")}-01`;
 }
 
 function startOfHalf(todayIso: string): string {
@@ -254,8 +255,7 @@ export function resolvePeriod(p: Period, todayIso: string = TODAY_ISO): Resolved
       end = todayIso;
       break;
     case "thisQuarter":
-      // Ultimos 3 meses civis ate hoje (nao o trimestre Q1–Q4 do calendario).
-      start = startOfLastMonths(todayIso, 3);
+      start = startOfQuarter(todayIso);
       end = todayIso;
       break;
     case "thisHalf":

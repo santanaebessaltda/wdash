@@ -1664,17 +1664,7 @@ describe("buildFinanceView com agregados reais", () => {
     });
     expect(months({ kind: "thisMonth" }, "2026-09-01").withPrevious).toBe(true);
     expect(months({ kind: "lastMonth" }).months.at(-1)).toBe("2026-08");
-    // Em setembro, últimos 3 meses = jul–set (bate com o 3º trimestre civil).
     expect(months({ kind: "thisQuarter" })).toEqual({ months: ["2026-07", "2026-08", "2026-09"], withPrevious: false });
-    // Em outubro, últimos 3 meses = ago–out (não só out, que seria o 4º trimestre civil).
-    expect(months({ kind: "thisQuarter" }, "2026-10-27")).toEqual({
-      months: ["2026-08", "2026-09", "2026-10"],
-      withPrevious: false,
-    });
-    expect(resolvePeriod({ kind: "thisQuarter" }, "2026-10-27")).toMatchObject({
-      start: "2026-08-01",
-      end: "2026-10-27",
-    });
     expect(months({ kind: "custom", start: "2026-09-01", end: "2026-09-26" }).withPrevious).toBe(true);
     expect(months({ kind: "today" }).months).toEqual([]);
     expect(months({ kind: "today" }, "2026-09-01").months).toEqual([]);
