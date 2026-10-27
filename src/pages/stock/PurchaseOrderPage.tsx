@@ -25,7 +25,6 @@ import { productBrand } from "@/data/wedash/stockProducts";
 import { storesForSession } from "@/data/wedash/stores";
 import { cn } from "@/lib/cn";
 import { num } from "@/lib/format";
-import { useMinSkeleton } from "@/lib/useMinSkeleton";
 import { buildXlsx } from "@/lib/xlsx";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
 import { ErpStatusNotice } from "@/pages/dashboard/ErpStatusNotice";
@@ -202,7 +201,7 @@ export function PurchaseOrderPage() {
   const [copyDestIds, setCopyDestIds] = useState<string[]>([]);
   const [copiando, setCopiando] = useState(false);
   const [opened, setOpened] = useState<Record<string, boolean>>({});
-  const showSkeleton = useMinSkeleton(storesLoading || (storeRows.length > 0 && po.loading));
+  const showSkeleton = storesLoading || po.showSkeleton;
 
   const counts = po.parts.reduce(
     (acc, part) => ({

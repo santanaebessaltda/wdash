@@ -6,6 +6,8 @@ import { buildPurchaseOrderView, parseMinInput, type PurchaseMinUpdate, type Pur
 import { PURCHASE_SYNC_ERROR, fetchPurchaseMins, fetchPurchaseStock, fetchSold30, fetchSoldEver, savePurchaseMin, syncPurchaseStockNow } from "@/data/wedash/purchaseRepo";
 import type { StockCatalogItem } from "@/data/wedash/stockProducts";
 import { fetchCostPrices, fetchStockCatalog } from "@/data/wedash/stockRepo";
+import { filterCacheGet, filterCacheSet } from "@/lib/filterCache";
+import { useFilterSkeleton } from "@/lib/useFilterSkeleton";
 import { refreshMomentTitle, useScreenRefresh } from "@/pages/dashboard/screenRefresh";
 import { fetchErpConnection } from "@/pages/dashboard/ErpStatusNotice";
 import { SAVE_ERROR_MSG } from "@/pages/operation/shared";
@@ -29,6 +31,21 @@ type Loaded = {
   catalog: Map<string, StockCatalogItem>;
   costs: Map<string, number>;
 };
+
+/** Formato JSON do filterCache (Map/Set nao serializa). */
+type PurchaseCachePart = {
+  storeId: string;
+  rows: PurchaseStockRow[];
+  syncedAt: string | null;
+  mins: Array<[string, number]>;
+  sold30: Array<[string, number]>;
+  soldWindow: SoldWindow;
+  soldEver: string[] | null;
+  catalog: Array<[string, StockCatalogItem]>;
+  costs: Array<[string, number]>;
+};
+
+type PurchaseCache = { parts: PurchaseCachePart[] };
 
 export type PurchaseOrderPart = {
   storeId: string;
@@ -58,15 +75,51 @@ function oldestIso(stamps: Array<string | null>): string | null {
   return oldest;
 }
 
+function toCache(parts: Loaded[]): PurchaseCache {
+  return {
+    parts: parts.map((part) => ({
+      storeId: part.storeId,
+      rows: part.rows,
+      syncedAt: part.syncedAt,
+      mins: [...part.mins.entries()],
+      sold30: [...part.sold30.entries()],
+      soldWindow: part.soldWindow,
+      soldEver: part.soldEver ? [...part.soldEver] : null,
+      catalog: [...part.catalog.entries()],
+      costs: [...part.costs.entries()],
+    })),
+  };
+}
+
+function fromCache(c: PurchaseCache): Loaded[] {
+  return c.parts.map((part) => ({
+    storeId: part.storeId,
+    rows: part.rows,
+    syncedAt: part.syncedAt,
+    mins: new Map(part.mins),
+    sold30: new Map(part.sold30),
+    soldWindow: part.soldWindow,
+    soldEver: part.soldEver ? new Set(part.soldEver) : null,
+    catalog: new Map(part.catalog),
+    costs: new Map(part.costs),
+  }));
+}
+
+function cacheReady(c: PurchaseCache | null): c is PurchaseCache {
+  return c != null && Array.isArray(c.parts) && c.parts.every((p) => p != null && typeof p.storeId === "string" && Array.isArray(p.rows));
+}
+
 /**
  * Pedido de compra das filiais do seletor: saldo guardado + mínimos + vendidos (D-N a D-1) + códigos já vendidos (Novo).
- * Ao abrir (e ao trocar o seletor), busca o saldo no Millennium das filiais cuja última busca tem mais de 30 min;
- * o Atualizar do topo força a busca de todas.
+ * Pacote + settle como Estoque/Dashboard. Ao abrir (e ao trocar o seletor), busca o saldo no Millennium
+ * das filiais cuja última busca tem mais de 30 min; o Atualizar do topo força a busca de todas.
  */
 export function usePurchaseOrder(tenantId: string, stores: PurchaseStoreScope[]) {
   const { show } = useToast();
+  const storeKey = stores.map((s) => `${s.id}:${s.costTableId ?? ""}`).join(",");
+  const filterKey = `purchase:${tenantId}:${storeKey}`;
+  const { showSkeleton, settle } = useFilterSkeleton(filterKey);
   const [data, setData] = useState<Loaded[]>([]);
-  const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
   const [factor, setFactor] = useState(1);
@@ -78,9 +131,23 @@ export function usePurchaseOrder(tenantId: string, stores: PurchaseStoreScope[])
   storesRef.current = stores;
   const dataRef = useRef(data);
   dataRef.current = data;
+  const filterKeyRef = useRef(filterKey);
+  filterKeyRef.current = filterKey;
   /** Trocar o seletor no meio libera a busca da seleção nova. */
   const generation = useRef(0);
-  const scopeKey = stores.map((s) => `${s.id}:${s.costTableId ?? ""}`).join("|");
+
+  const persist = useCallback((key: string, next: Loaded[]) => {
+    filterCacheSet(key, toCache(next));
+    setData(next);
+  }, []);
+
+  const applyPackage = useCallback(
+    (key: string, loaded: Loaded[]) => {
+      persist(key, loaded);
+      settle(key);
+    },
+    [persist, settle],
+  );
 
   const loadAll = useCallback(
     async (scope: PurchaseStoreScope[]): Promise<Loaded[]> => {
@@ -136,13 +203,15 @@ export function usePurchaseOrder(tenantId: string, stores: PurchaseStoreScope[])
         if (okIds.length > 0) {
           const stocks = await Promise.all(okIds.map((id) => fetchPurchaseStock(tenantId, id)));
           if (generation.current !== gen) return true;
-          setData((prev) =>
-            prev.map((part) => {
+          setData((prev) => {
+            const next = prev.map((part) => {
               const i = okIds.indexOf(part.storeId);
               if (i < 0) return part;
               return { ...part, rows: stocks[i].rows, syncedAt: stocks[i].syncedAt };
-            }),
-          );
+            });
+            filterCacheSet(filterKeyRef.current, toCache(next));
+            return next;
+          });
           setNow(Date.now());
         }
         return true;
@@ -153,37 +222,49 @@ export function usePurchaseOrder(tenantId: string, stores: PurchaseStoreScope[])
     [tenantId],
   );
 
-  useEffect(() => {
+  const reload = useCallback(async () => {
     const gen = ++generation.current;
+    const key = filterKey;
     const scope = storesRef.current;
-    if (scope.length === 0) {
-      setData([]);
-      setLoading(false);
-      setSyncError(null);
-      return;
-    }
-    let cancelled = false;
-    setLoading(true);
     setSyncError(null);
-    void (async () => {
-      try {
-        const loaded = await loadAll(scope);
-        if (cancelled || generation.current !== gen) return;
-        setData(loaded);
-        setNow(Date.now());
-        const staleIds = loaded.filter((d) => isStale(d.syncedAt, Date.now())).map((d) => d.storeId);
-        if (!loaded.some((d) => !d.syncedAt)) setLoading(false);
-        if (staleIds.length > 0) await sync(staleIds, gen);
-        if (!cancelled && generation.current === gen) setLoading(false);
-      } catch (e) {
-        console.warn("usePurchaseOrder:", e);
-        if (!cancelled && generation.current === gen) setLoading(false);
+    if (scope.length === 0) {
+      persist(key, []);
+      settle(key);
+      return null;
+    }
+    const cached = filterCacheGet<PurchaseCache>(key);
+    if (cacheReady(cached)) {
+      applyPackage(key, fromCache(cached));
+    }
+    try {
+      const loaded = await loadAll(scope);
+      if (gen !== generation.current) return null;
+      applyPackage(key, loaded);
+      return loaded;
+    } catch (e) {
+      if (gen !== generation.current) return null;
+      console.warn("usePurchaseOrder:", e);
+      // Sem pacote: libera o skeleton para nao ficar eterno (igual falha de rede no Dashboard).
+      if (!cacheReady(cached)) {
+        persist(key, []);
+        settle(key);
       }
+      return null;
+    }
+  }, [filterKey, loadAll, applyPackage, persist, settle]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const loaded = await reload();
+      if (cancelled || !loaded) return;
+      const staleIds = loaded.filter((d) => isStale(d.syncedAt, Date.now())).map((d) => d.storeId);
+      if (staleIds.length > 0) await sync(staleIds, generation.current);
     })();
     return () => {
       cancelled = true;
     };
-  }, [scopeKey, loadAll, sync]);
+  }, [storeKey, reload, sync]);
 
   const windowKey = data.map((p) => `${p.storeId}:${p.soldWindow}`).join("|");
   useEffect(() => {
@@ -196,13 +277,15 @@ export function usePurchaseOrder(tenantId: string, stores: PurchaseStoreScope[])
         const today = calendarTodayIso();
         const sold = await Promise.all(pending.map((p) => fetchSold30(tenantId, p.storeId, addDays(today, -soldDays), addDays(today, -1))));
         if (cancelled || generation.current !== gen) return;
-        setData((prev) =>
-          prev.map((part) => {
+        setData((prev) => {
+          const next = prev.map((part) => {
             const i = pending.findIndex((p) => p.storeId === part.storeId);
             if (i < 0 || part.soldWindow === soldDays) return part;
             return { ...part, sold30: sold[i], soldWindow: soldDays };
-          }),
-        );
+          });
+          filterCacheSet(filterKeyRef.current, toCache(next));
+          return next;
+        });
       } catch (e) {
         console.warn("usePurchaseOrder sold window:", e);
       }
@@ -268,15 +351,17 @@ export function usePurchaseOrder(tenantId: string, stores: PurchaseStoreScope[])
       const before = part.mins.has(code) ? part.mins.get(code)! : null;
       if (before === parsed.value) return true;
       const apply = (value: number | null) =>
-        setData((prev) =>
-          prev.map((row) => {
+        setData((prev) => {
+          const next = prev.map((row) => {
             if (row.storeId !== storeId) return row;
             const mins = new Map(row.mins);
             if (value == null) mins.delete(code);
             else mins.set(code, value);
             return { ...row, mins };
-          }),
-        );
+          });
+          filterCacheSet(filterKeyRef.current, toCache(next));
+          return next;
+        });
       apply(parsed.value);
       const ok = await savePurchaseMin(tenantId, storeId, code, parsed.value);
       if (!ok) {
@@ -289,32 +374,36 @@ export function usePurchaseOrder(tenantId: string, stores: PurchaseStoreScope[])
   );
 
   const applyMins = useCallback((storeId: string, updates: PurchaseMinUpdate[]) => {
-    setData((prev) =>
-      prev.map((part) => {
+    setData((prev) => {
+      const next = prev.map((part) => {
         if (part.storeId !== storeId) return part;
         const mins = new Map(part.mins);
         for (const update of updates) mins.set(update.code, update.value);
         return { ...part, mins };
-      }),
-    );
+      });
+      filterCacheSet(filterKeyRef.current, toCache(next));
+      return next;
+    });
   }, []);
 
   const staleParts = data.filter((p) => isStale(p.syncedAt, now));
   const staleAt = oldestIso(staleParts.map((p) => p.syncedAt));
   const many = stores.length > 1;
-  const staleText = staleParts.length === 0
-    ? null
-    : !staleAt
-      ? many
-        ? "O saldo de alguma filial ainda não foi atualizado. O pedido pode usar quantidades desatualizadas."
-        : null
-      : many
-        ? `O saldo de alguma filial foi atualizado ${clockLabel(staleAt)}. O pedido pode usar quantidades desatualizadas.`
-        : `O saldo foi atualizado ${clockLabel(staleAt)}. O pedido pode usar quantidades desatualizadas.`;
+  const staleText =
+    staleParts.length === 0
+      ? null
+      : !staleAt
+        ? many
+          ? "O saldo de alguma filial ainda não foi atualizado. O pedido pode usar quantidades desatualizadas."
+          : null
+        : many
+          ? `O saldo de alguma filial foi atualizado ${clockLabel(staleAt)}. O pedido pode usar quantidades desatualizadas.`
+          : `O saldo foi atualizado ${clockLabel(staleAt)}. O pedido pode usar quantidades desatualizadas.`;
 
   return {
     parts,
-    loading: stores.length > 0 && (loading || data.length !== stores.length),
+    /** Cabeçalho na hora; tabela em skeleton ate o pacote do filtro (1ª carga e troca de filial). */
+    showSkeleton,
     syncing,
     syncError,
     stale: !syncing && staleParts.length > 0 && staleText != null,
