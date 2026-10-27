@@ -4,6 +4,8 @@ import { buildStockProductsView, type StockCatalogItem, type StockInput } from "
 import { fetchIncomingQty } from "@/data/wedash/purchaseRepo";
 import { fetchCostPrices, fetchStockCatalog, fetchStoreStock, syncStockNow } from "@/data/wedash/stockRepo";
 import type { Store } from "@/data/wedash/stores";
+import { filterCacheGet, filterCacheSet } from "@/lib/filterCache";
+import { useFilterSkeleton } from "@/lib/useFilterSkeleton";
 import { refreshMomentTitle, useScreenRefresh } from "@/pages/dashboard/screenRefresh";
 import { fetchErpConnection } from "@/pages/dashboard/ErpStatusNotice";
 import { useScopedStores } from "@/pages/operation/shared";
@@ -13,11 +15,55 @@ const STOCK_MAX_AGE_MS = 30 * 60 * 1000;
 type StockLoaded = {
   catalog: Map<string, StockCatalogItem>;
   stock: StockInput["stock"];
-  costPrices: StockInput["costPrices"];
+  costPrices: Map<number, Map<string, number>>;
   syncedAt: Map<string, string | null>;
   incoming: Map<string, number>;
   incomingSyncedAt: Map<string, string | null>;
 };
+
+/** Formato JSON do filterCache (Map nao serializa). */
+type StockCache = {
+  catalog: Array<[string, StockCatalogItem]>;
+  stock: StockInput["stock"];
+  costPrices: Array<[number, Array<[string, number]>]>;
+  syncedAt: Array<[string, string | null]>;
+  incoming: Array<[string, number]>;
+  incomingSyncedAt: Array<[string, string | null]>;
+};
+
+function toCache(d: StockLoaded): StockCache {
+  return {
+    catalog: [...d.catalog.entries()],
+    stock: d.stock,
+    costPrices: [...d.costPrices.entries()].map(([id, prices]) => [id, [...prices.entries()]]),
+    syncedAt: [...d.syncedAt.entries()],
+    incoming: [...d.incoming.entries()],
+    incomingSyncedAt: [...d.incomingSyncedAt.entries()],
+  };
+}
+
+function fromCache(c: StockCache): StockLoaded {
+  return {
+    catalog: new Map(c.catalog),
+    stock: c.stock,
+    costPrices: new Map(c.costPrices.map(([id, prices]) => [id, new Map(prices)])),
+    syncedAt: new Map(c.syncedAt),
+    incoming: new Map(c.incoming),
+    incomingSyncedAt: new Map(c.incomingSyncedAt),
+  };
+}
+
+function cacheReady(c: StockCache | null): c is StockCache {
+  return (
+    c != null &&
+    Array.isArray(c.catalog) &&
+    Array.isArray(c.stock) &&
+    Array.isArray(c.costPrices) &&
+    Array.isArray(c.syncedAt) &&
+    Array.isArray(c.incoming) &&
+    Array.isArray(c.incomingSyncedAt)
+  );
+}
 
 function clockLabel(iso: string): string {
   const d = new Date(iso);
@@ -38,23 +84,53 @@ async function loadAll(tenantId: string, storeRows: Store[]): Promise<StockLoade
   return { catalog, stock: stock.rows, costPrices, syncedAt: stock.syncedAt, incoming: incoming.qty, incomingSyncedAt: incoming.syncedAt };
 }
 
-/** Estoque das lojas do escopo. Ao abrir, busca no Millennium o estoque com mais de 30 min. */
+/** Estoque das lojas do escopo. Pacote + settle como o Dashboard; busca Millennium se >30 min. */
 export function useStockData() {
   const { show } = useToast();
   const { session, storeRows, loading: storesLoading } = useScopedStores();
   const storeKey = storeRows.map((s) => s.id).join(",");
+  const filterKey = `stock:${session.tenantId}:${storeKey}`;
+  const { showSkeleton, settle } = useFilterSkeleton(filterKey);
   const [data, setData] = useState<StockLoaded | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [viewStores, setViewStores] = useState<Store[]>(storeRows);
   const [syncing, setSyncing] = useState(false);
   const syncRef = useRef(false);
   const storesRef = useRef(storeRows);
   storesRef.current = storeRows;
+  const reloadGen = useRef(0);
+
+  const applyPackage = useCallback((key: string, stores: Store[], loaded: StockLoaded) => {
+    filterCacheSet(key, toCache(loaded));
+    setData(loaded);
+    setViewStores(stores);
+    settle(key);
+  }, [settle]);
 
   const reload = useCallback(async () => {
-    const d = await loadAll(session.tenantId, storesRef.current);
-    setData(d);
-    return d;
-  }, [session.tenantId]);
+    const gen = ++reloadGen.current;
+    const key = filterKey;
+    const storesAtLoad = storesRef.current;
+    const cached = filterCacheGet<StockCache>(key);
+    if (cacheReady(cached)) {
+      applyPackage(key, storesAtLoad, fromCache(cached));
+    }
+    try {
+      const loaded = await loadAll(session.tenantId, storesAtLoad);
+      if (gen !== reloadGen.current) return null;
+      applyPackage(key, storesAtLoad, loaded);
+      return loaded;
+    } catch (e) {
+      if (gen !== reloadGen.current) return null;
+      console.warn("useStockData:", e);
+      // Sem pacote: libera o skeleton para nao ficar eterno (igual falha de rede no Dashboard).
+      if (!cacheReady(cached)) {
+        setData(null);
+        setViewStores(storesAtLoad);
+        settle(key);
+      }
+      return null;
+    }
+  }, [session.tenantId, filterKey, applyPackage, settle]);
 
   const syncIfStale = useCallback(
     async (d: StockLoaded, opts: { force?: boolean } = {}) => {
@@ -90,17 +166,10 @@ export function useStockData() {
   useEffect(() => {
     if (storesLoading) return;
     let cancelled = false;
-    setLoading(true);
     (async () => {
-      try {
-        const d = await reload();
-        if (cancelled) return;
-        setLoading(false);
-        void syncIfStale(d);
-      } catch (e) {
-        console.warn("useStockData:", e);
-        if (!cancelled) setLoading(false);
-      }
+      const d = await reload();
+      if (cancelled || !d) return;
+      void syncIfStale(d);
     })();
     return () => {
       cancelled = true;
@@ -109,7 +178,7 @@ export function useStockData() {
 
   const dataRef = useRef(data);
   dataRef.current = data;
-  const syncedTimes = storeRows.map((s) => data?.syncedAt.get(s.id) ?? null);
+  const syncedTimes = viewStores.map((s) => data?.syncedAt.get(s.id) ?? null);
   const oldestSync = syncedTimes.every((t) => t != null)
     ? syncedTimes.reduce<string | null>((m, t) => (m == null || Date.parse(t!) < Date.parse(m) ? t : m), null)
     : null;
@@ -128,7 +197,7 @@ export function useStockData() {
     () =>
       data
         ? buildStockProductsView({
-            stores: storeRows,
+            stores: viewStores,
             catalog: data.catalog,
             stock: data.stock,
             costPrices: data.costPrices,
@@ -139,7 +208,7 @@ export function useStockData() {
             charged: [],
           })
         : null,
-    [data, storeRows],
+    [data, viewStores],
   );
 
   const atualizadoText = syncing
@@ -152,7 +221,8 @@ export function useStockData() {
     storeRows,
     storeKey,
     view,
-    loading: loading || storesLoading,
+    /** Cabeçalho na hora; tabela em skeleton ate o pacote do filtro (1ª carga e troca de filial). */
+    showSkeleton: storesLoading || showSkeleton,
     syncing,
     atualizadoText,
   };

@@ -1,10 +1,9 @@
 import type { RouteObject } from "react-router-dom";
-import { lazyPage } from "@/lib/lazyPage";
 import { paths } from "@/router/paths";
 import { RedirectTo } from "@/router/RedirectTo";
 import { RequireRole } from "@/session/RequireSession";
-
-const InventoryPage = lazyPage(() => import("./InventoryPage"), "InventoryPage");
+import { InventoryPage } from "./InventoryPage";
+/* Estoque sync — cabeçalho na hora; só a tabela em skeleton (igual ao Dashboard). */
 
 /** Estoque — Gestor e Gerente. O pedido de compra é item direto do menu. */
 export const stockRoutes: RouteObject[] = [

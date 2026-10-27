@@ -8,7 +8,6 @@ import { productBrand, stockCostAmount, stockStatus, storeStockStatus, type Stoc
 import { cn } from "@/lib/cn";
 import { num } from "@/lib/format";
 import { usePrintMode } from "@/lib/printMode";
-import { useMinSkeleton } from "@/lib/useMinSkeleton";
 import { TABLE_PAGE_SIZE } from "@/lib/usePagedRows";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
 import { ErpStatusNotice } from "@/pages/dashboard/ErpStatusNotice";
@@ -35,7 +34,7 @@ type SortKey = "name" | "estoque" | "receber" | "totalGeral" | "custo" | "valor"
 const STATUS_WEIGHT: Record<StockStatus, number> = { negative: 2, awaiting: 1, ok: 0 };
 
 export function InventoryPage() {
-  const { storeRows, storeKey, view, loading, syncing, atualizadoText } = useStockData();
+  const { storeRows, storeKey, view, showSkeleton, syncing, atualizadoText } = useStockData();
   const [search, setSearch] = useState("");
   const [statusPicked, setStatus] = useState<StatusFilter>("todos");
   const [brand, setBrand] = useState<BrandFilter>("");
@@ -45,7 +44,6 @@ export function InventoryPage() {
   const [page, setPage] = useState(1);
   const [opened, setOpened] = useState<Record<string, boolean>>({});
   const printing = usePrintMode();
-  const showSkeleton = useMinSkeleton(loading);
   const exportScreenPdf = useExportPdf("Estoque", null, { period: false });
   const fileTitle = useReportFileTitle("Estoque", null, { period: false });
   const multipleStores = storeRows.length > 1;
