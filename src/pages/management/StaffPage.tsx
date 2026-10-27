@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Badge, Button, Card, DataTable, Dropdown, EmptyState, FormField, Modal, Segmented, Skeleton, useToast, type DataTableColumn, type DropdownItem } from "@/components/ui";
 import { PersonAvatar } from "@/components/wedash/PersonAvatar";
-import { SegmentedSkeleton, StoreCardsSkeleton, TeamTableSkeleton } from "@/components/wedash/LoadingSkeletons";
+import { SegmentedSkeleton, TeamTableSkeleton } from "@/components/wedash/LoadingSkeletons";
 import {
   fetchLatestSellerSyncedAt,
   fetchStoreSellers,
@@ -18,6 +18,8 @@ import {
 } from "@/data/wedash/stores";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
 import { refreshMomentTitle, useScreenRefresh } from "@/pages/dashboard/screenRefresh";
+import { filterCacheGet, filterCacheSet } from "@/lib/filterCache";
+import { useFilterSkeleton } from "@/lib/useFilterSkeleton";
 import { shiftName } from "@/lib/format";
 import { matchesCodeOrName } from "@/lib/personSearch";
 import { InviteSellerModal } from "@/pages/management/InviteSellerModal";
@@ -38,9 +40,32 @@ import {
 import { ACCESS_LABEL, hasSalesGroup, type AccessState } from "@/data/wedash/engine/sellerAccess";
 import { statusBadgeVariant } from "@/lib/status";
 
+type StaffCache = {
+  byStore: Array<[string, StoreSeller[]]>;
+  shifts: Array<[string, StoreShift[]]>;
+};
+
+function staffCacheReady(c: StaffCache | null): c is StaffCache {
+  return c != null && Array.isArray(c.byStore) && Array.isArray(c.shifts);
+}
+
+function StaffContentSkeleton() {
+  return (
+    <Card className="min-w-0 overflow-hidden" padding="none">
+      <div className="px-5 pt-5">
+        <Skeleton className="h-5 w-40" />
+      </div>
+      <div className="px-5 pb-4 pt-4">
+        <SegmentedSkeleton widths={["w-24", "w-32"]} />
+      </div>
+      <TeamTableSkeleton withShift />
+    </Card>
+  );
+}
+
 /** Equipe. Pessoas da filial no Millennium; grupo e acesso à WDash só do vendedor. */
 export function StaffPage() {
-  const { session, storeRows, loading } = useScopedStores();
+  const { session, storeRows, loading: storesLoading } = useScopedStores();
   const { show } = useToast();
   const [reloadKey, setReloadKey] = useState(0);
   const [groupsTick, setGroupsTick] = useState(0);
@@ -53,7 +78,7 @@ export function StaffPage() {
   const [sellerSyncAt, setSellerSyncAt] = useState<string | null | undefined>(undefined);
 
   useEffect(() => {
-    if (loading) return;
+    if (storesLoading) return;
     let stop = false;
     const ids = storeRows.map((store) => store.id);
     void fetchLatestSellerSyncedAt(session.tenantId, ids).then((at) => {
@@ -62,7 +87,7 @@ export function StaffPage() {
     return () => {
       stop = true;
     };
-  }, [loading, storeRows, reloadKey, session.tenantId]);
+  }, [storesLoading, storeRows, reloadKey, session.tenantId]);
 
   async function refreshTeam() {
     const list = storesRef.current;
@@ -113,8 +138,8 @@ export function StaffPage() {
         }
       />
       <div className="mt-6">
-        {loading ? (
-          <StoreCardsSkeleton count={1} title team wide />
+        {storesLoading ? (
+          <StaffContentSkeleton />
         ) : storeRows.length === 0 ? (
           <Card className="flex min-h-[280px] flex-col">
             <EmptyBlock icon="🏬" title="Nenhuma filial disponível" description="Não há filiais disponíveis para este acesso." />
@@ -156,15 +181,18 @@ function StaffList({
   groupsTick: number;
   manage: boolean;
 }) {
-  const showStore = stores.length > 1;
   const { show } = useToast();
   const [team, setTeam] = useState<StaffPerson[]>([]);
-  const [loaded, setLoaded] = useState(false);
   const [tick, setTick] = useState(0);
   const [shifts, setShifts] = useState<Map<string, StoreShift[]>>(() => new Map());
+  const [viewStores, setViewStores] = useState(stores);
   const storesRef = useRef(stores);
   storesRef.current = stores;
   const storeKey = stores.map((store) => store.id).join(",");
+  const filterKey = `staff:${tenantId}:${storeKey}`;
+  const { showSkeleton, settle } = useFilterSkeleton(filterKey);
+  const reloadGen = useRef(0);
+  const showStore = viewStores.length > 1;
   const [shiftOf, setShiftOf] = useState<Record<string, string | null>>({});
   const [tab, setTab] = useState<"ativos" | "desligados">("ativos");
   const [search, setSearch] = useState("");
@@ -177,26 +205,53 @@ function StaffList({
   const [removingBusy, setRemovingBusy] = useState(false);
   const [creating, setCreating] = useState<{ sellerId: string; storeId: string; start: string; end: string } | null>(null);
 
+  const applyPackage = useCallback(
+    (key: string, storesAtLoad: Store[], byStore: Map<string, StoreSeller[]>, shiftsMap: Map<string, StoreShift[]>) => {
+      const people: StaffPerson[] = [];
+      for (const store of storesAtLoad) {
+        for (const seller of byStore.get(store.id) ?? []) people.push({ seller, store });
+      }
+      filterCacheSet(key, { byStore: [...byStore.entries()], shifts: [...shiftsMap.entries()] } satisfies StaffCache);
+      setTeam(people);
+      setShifts(shiftsMap);
+      setViewStores(storesAtLoad);
+      setShiftOf({});
+      settle(key);
+    },
+    [settle],
+  );
+
+  const reload = useCallback(async () => {
+    const gen = ++reloadGen.current;
+    const key = filterKey;
+    const storesAtLoad = storesRef.current;
+    const cached = filterCacheGet<StaffCache>(key);
+    if (staffCacheReady(cached)) {
+      applyPackage(key, storesAtLoad, new Map(cached.byStore), new Map(cached.shifts));
+    }
+    try {
+      const storeIds = storesAtLoad.map((store) => store.id);
+      const [sellersMap, shiftPairs] = await Promise.all([
+        fetchStoreSellers(tenantId, storeIds),
+        Promise.all(storesAtLoad.map(async (store) => [store.id, await fetchStoreShifts(tenantId, store.id)] as const)),
+      ]);
+      if (gen !== reloadGen.current) return;
+      applyPackage(key, storesAtLoad, sellersMap, new Map(shiftPairs));
+    } catch (e) {
+      if (gen !== reloadGen.current) return;
+      console.warn("StaffList reload:", e);
+      if (!staffCacheReady(cached)) {
+        setTeam([]);
+        setShifts(new Map());
+        setViewStores(storesAtLoad);
+        settle(key);
+      }
+    }
+  }, [tenantId, filterKey, applyPackage, settle]);
+
   useEffect(() => {
-    let cancelled = false;
-    const list = storesRef.current;
-    void fetchStoreSellers(tenantId, list.map((store) => store.id))
-      .then((map) => {
-        if (cancelled) return;
-        const people: StaffPerson[] = [];
-        for (const store of list) {
-          for (const seller of map.get(store.id) ?? []) people.push({ seller, store });
-        }
-        setTeam(people);
-        setShiftOf({});
-      })
-      .finally(() => {
-        if (!cancelled) setLoaded(true);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [tenantId, storeKey, tick, reloadKey, groupsTick]);
+    void reload();
+  }, [reload, tick, reloadKey, groupsTick]);
 
   useEffect(() => {
     let cancelled = false;
@@ -214,17 +269,6 @@ function StaffList({
       cancelled = true;
     };
   }, [storeKey, tick, reloadKey]);
-
-  useEffect(() => {
-    let cancelled = false;
-    const list = storesRef.current;
-    void Promise.all(list.map(async (store) => [store.id, await fetchStoreShifts(tenantId, store.id)] as const)).then((pairs) => {
-      if (!cancelled) setShifts(new Map(pairs));
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [tenantId, storeKey, groupsTick]);
 
   const salesPerson = (person: StaffPerson) => isBranchSalesPerson(person.seller, person.store);
   const ativos = useMemo(() => team.filter((person) => isBranchTeamMember(person.seller, person.store)), [team]);
@@ -390,18 +434,16 @@ function StaffList({
     [identity, shifts, shiftOf, savingIds, access, manage],
   );
 
-  const withoutTeam = loaded && team.length === 0;
+  const withoutTeam = !showSkeleton && team.length === 0;
+
+  if (showSkeleton) return <StaffContentSkeleton />;
 
   return (
     <Card className="min-w-0 overflow-hidden" padding="none">
       <div className="px-5 pt-5">
         <CostCardTitle title={showStore ? "Equipe" : "Equipe da filial"} />
       </div>
-      {!loaded ? (
-        <div className="px-5 pb-4">
-          <SegmentedSkeleton widths={["w-24", "w-32"]} />
-        </div>
-      ) : !withoutTeam && (
+      {!withoutTeam && (
         <div className="flex flex-wrap items-center justify-between gap-3 px-5 pb-4">
           <Segmented
             options={[
@@ -420,9 +462,7 @@ function StaffList({
           />
         </div>
       )}
-      {!loaded ? (
-        <TeamTableSkeleton withShift={tab === "ativos"} />
-      ) : rows.length === 0 ? (
+      {rows.length === 0 ? (
         <EmptyState
           framed={false}
           className="pt-4!"
@@ -504,7 +544,7 @@ function StaffList({
       </Modal>
       <SellerEditor
         seller={editing?.seller ?? null}
-        store={editing?.store ?? stores[0]!}
+        store={editing?.store ?? viewStores[0]!}
         shifts={editing ? (shifts.get(editing.store.id) ?? []) : []}
         pendingShift={pendingShift}
         onClose={() => setEditing(null)}
