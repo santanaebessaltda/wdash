@@ -113,7 +113,7 @@ describe("geração da escala", () => {
     expect(generated.compDue).toEqual([]);
   });
 
-  it("deixa a folga do feriado para o mês seguinte", () => {
+  it("deixa a folga do feriado para o mês seguinte com data prevista", () => {
     const generated = generateMonth({
       year: 2026,
       month: 10,
@@ -124,10 +124,13 @@ describe("geração da escala", () => {
       holidayDates: [],
       holidayRules: [{ date: "2026-10-12", name: "Aparecida", open: true, workers: 1, pay: "extra_off", window: "next_month" }],
     });
-    expect(generated.compDue).toEqual([{ personId: "a", holiday: "2026-10-12", until: "2026-11-30" }]);
+    expect(generated.compDue).toHaveLength(1);
+    expect(generated.compDue[0]).toMatchObject({ personId: "a", holiday: "2026-10-12", until: "2026-11-30" });
+    expect(generated.compDue[0]?.day).toMatch(/^2026-11-\d{2}$/);
+    expect(generated.days.some((row) => row.status === "comp_off")).toBe(false);
   });
 
-  it("lista folga compensatória pendente no mês seguinte", () => {
+  it("lista a data prevista da FC no mês seguinte", () => {
     const rows = buildCompOffSummary({
       monthStart: "2026-11-01",
       monthDays: [
@@ -135,7 +138,7 @@ describe("geração da escala", () => {
         { sellerId: "a", day: "2026-11-21", status: "work" },
       ],
       rules: [{ date: "2026-11-20", name: "Consciência Negra", open: true, workers: 1, pay: "extra_off", window: "next_month" }],
-      compDue: [{ personId: "a", holiday: "2026-11-20", until: "2026-12-31" }],
+      compDue: [{ personId: "a", holiday: "2026-11-20", until: "2026-12-31", day: "2026-12-02" }],
       people: [{ id: "a", name: "Ana" }],
     });
     expect(rows).toEqual([
@@ -144,7 +147,7 @@ describe("geração da escala", () => {
         personName: "Ana",
         holidayDate: "2026-11-20",
         holidayName: "Consciência Negra",
-        offDate: null,
+        offDate: "2026-12-02",
         until: "2026-12-31",
       },
     ]);
@@ -264,6 +267,8 @@ describe("geração da escala", () => {
     expect(generated.days.some((row) => row.date.startsWith("2026-11"))).toBe(true);
     expect(generated.compDue.length).toBe(3);
     expect(generated.compDue.every((due) => due.holiday === "2026-11-20" && due.until === "2026-12-31")).toBe(true);
+    expect(generated.compDue.every((due) => typeof due.day === "string" && due.day!.startsWith("2026-12"))).toBe(true);
+    expect(new Set(generated.compDue.map((due) => due.day)).size).toBeGreaterThanOrEqual(2);
   });
 
   it("respeita a folga fixa dentro do período pedido", () => {

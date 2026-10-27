@@ -36,7 +36,8 @@ export type HolidayRule = {
   window: CompWindow;
 };
 
-export type CompDue = { personId: string; holiday: string; until: string };
+/** Pendência de FC. `day` = data prevista (pode cair no mês seguinte); sem ela, só o prazo. */
+export type CompDue = { personId: string; holiday: string; until: string; day?: string | null };
 
 export type GeneratedDay = {
   personId: string;
@@ -317,19 +318,84 @@ function markStatus(mark: string): DayStatus {
 
 function placeIncoming(days: GeneratedDay[], needs: DayNeed[] | undefined, rules: HolidayRule[], due: CompDue): boolean {
   const blocked = new Set(rules.map((rule) => rule.date));
-  for (const cell of days) {
-    if (cell.personId !== due.personId || cell.date > due.until) continue;
-    if (cell.status !== "work" && cell.status !== "holiday_work") continue;
-    if (blocked.has(cell.date)) continue;
+  const tryCell = (cell: GeneratedDay | undefined): boolean => {
+    if (!cell || cell.date > due.until) return false;
+    if (cell.status !== "work" && cell.status !== "holiday_work") return false;
+    if (blocked.has(cell.date)) return false;
     const row = needs?.find((item) => item.dow === weekday(cell.date));
-    if (row && !row.open) continue;
+    if (row && !row.open) return false;
     const min = row?.open ? row.min : 0;
     const working = days.filter((item) => item.date === cell.date && item.status !== "off" && item.status !== "comp_off").length;
-    if (working - 1 < min) continue;
+    if (working - 1 < min) return false;
     cell.status = "comp_off";
     return true;
+  };
+  // Data já combinada no mês anterior (repasse ao sindicato): tenta nela primeiro.
+  if (due.day) {
+    const preferred = days.find((cell) => cell.personId === due.personId && cell.date === due.day);
+    if (tryCell(preferred)) return true;
+  }
+  for (const cell of days) {
+    if (cell.personId !== due.personId) continue;
+    if (tryCell(cell)) return true;
   }
   return false;
+}
+
+/** Escolhe dias de trabalho no mês seguinte para FC com prazo “mês seguinte” (sem estender a grade do motor). */
+function planNextMonthCompDays(input: {
+  people: SchedulePerson[];
+  days: GeneratedDay[];
+  rules: HolidayRule[];
+  dayNeeds: DayNeed[];
+  monthEnd: string;
+  skip: Set<string>;
+}): CompDue[] {
+  const dues: CompDue[] = [];
+  const load = new Map<string, number>();
+  for (const rule of input.rules) {
+    if (rule.pay !== "extra_off" || rule.window !== "next_month" || !rule.open) continue;
+    const until = holidayDeadline(rule, input.monthEnd);
+    const from = addDays(input.monthEnd, 1);
+    const workers = input.days
+      .filter((row) => row.date === rule.date && row.status === "holiday_work")
+      .map((row) => row.personId);
+    let slot = 0;
+    for (const personId of workers) {
+      const key = `${personId}|${rule.date}`;
+      if (input.skip.has(key)) continue;
+      const day = pickNextMonthCompDay({ from, until, dayNeeds: input.dayNeeds, load, slot: slot++ });
+      dues.push({ personId, holiday: rule.date, until, day });
+      if (day) load.set(day, (load.get(day) ?? 0) + 1);
+    }
+  }
+  return dues;
+}
+
+function pickNextMonthCompDay(input: {
+  from: string;
+  until: string;
+  dayNeeds: DayNeed[];
+  load: Map<string, number>;
+  slot: number;
+}): string | null {
+  const candidates: string[] = [];
+  for (let cursor = input.from; cursor <= input.until; cursor = addDays(cursor, 1)) {
+    const need = input.dayNeeds.find((item) => item.dow === weekday(cursor));
+    if (need && !need.open) continue;
+    candidates.push(cursor);
+  }
+  if (candidates.length === 0) return null;
+  // Espalha as FCs: menos gente no mesmo dia, depois o próximo slot livre.
+  candidates.sort(
+    (a, b) =>
+      (input.load.get(a) ?? 0) - (input.load.get(b) ?? 0) ||
+      (weekday(a) === 0 ? 1 : 0) - (weekday(b) === 0 ? 1 : 0) ||
+      a.localeCompare(b),
+  );
+  const lightest = input.load.get(candidates[0]!) ?? 0;
+  const pool = candidates.filter((date) => (input.load.get(date) ?? 0) === lightest);
+  return pool[input.slot % pool.length] ?? pool[0] ?? null;
 }
 
 type EngineMonth = {
@@ -450,18 +516,19 @@ export function generateMonth(input: {
     if (link.day >= from && link.day <= to) continue;
     const person = people[link.employee];
     if (!person) continue;
-    pushDue({ personId: person.id, holiday: link.holiday, until: link.deadline || monthEnd });
+    pushDue({ personId: person.id, holiday: link.holiday, until: link.deadline || monthEnd, day: link.day });
   }
-  // "No mês seguinte": o motor não estende a grade; quem trabalhou o feriado fica pendente.
-  for (const rule of rules) {
-    if (rule.pay !== "extra_off" || rule.window !== "next_month" || !rule.open) continue;
-    const until = holidayDeadline(rule, monthEnd);
-    for (const person of people) {
-      if (!days.some((row) => row.personId === person.id && row.date === rule.date && row.status === "holiday_work")) {
-        continue;
-      }
-      pushDue({ personId: person.id, holiday: rule.date, until });
-    }
+  // "No mês seguinte": o motor não estende a grade (senão herda domingo/EC 141).
+  // Escolhemos a data prevista aqui para o sindicato e para o mês seguinte.
+  for (const due of planNextMonthCompDays({
+    people,
+    days,
+    rules,
+    dayNeeds: input.dayNeeds ?? defaultDayNeeds(),
+    monthEnd,
+    skip: seenDue,
+  })) {
+    pushDue(due);
   }
   for (const due of input.incomingComp ?? []) {
     if (!placeIncoming(days, input.dayNeeds, rules, due)) pushDue(due);
@@ -556,13 +623,13 @@ export function buildCompOffSummary(input: {
     for (const personId of workers) {
       if (usedPeopleHolidays.has(`${personId}|${rule.date}`)) continue;
       const due = input.compDue.find((item) => item.personId === personId && item.holiday === rule.date);
-      // Sem FC marcada: lista como pendente (com prazo do due ou da regra).
+      // Sem FC na grade: usa a data prevista em compDue (ex.: mês seguinte) ou só o prazo.
       rows.push({
         personId,
         personName: nameOf.get(personId) || "Pessoa",
         holidayDate: rule.date,
         holidayName: rule.name,
-        offDate: null,
+        offDate: due?.day || null,
         until: due?.until || until,
       });
       usedPeopleHolidays.add(`${personId}|${rule.date}`);

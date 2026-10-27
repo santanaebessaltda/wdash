@@ -68,7 +68,7 @@ function CompOffSummaryCard({ rows }: { rows: CompOffSummaryRow[] }) {
       <div className="mb-3">
         <h4 className="text-[13px] font-bold text-t0">Folgas compensatórias</h4>
         <p className="mt-0.5 text-[12px] text-t2">
-          Para repasse ao sindicato: feriado trabalhado e a data da folga (ou o prazo, se ainda estiver no mês seguinte).
+          Para repasse ao sindicato: feriado trabalhado e a data da folga, mesmo quando ela cai no mês seguinte.
         </p>
       </div>
       <ul className="divide-y divide-line">
