@@ -5,7 +5,8 @@ import { RedirectTo } from "@/router/RedirectTo";
 import { OWNER_ROLES } from "@/layout/nav-wedash";
 import { RequireRole } from "@/session/RequireSession";
 import { StaffPage } from "./StaffPage";
-/* Gestão > Equipe sync — cabeçalho na hora; só a tabela em skeleton. */
+import { SchedulePage } from "./SchedulePage";
+/* Gestão > Equipe / Escala sync — cabeçalho na hora; só o conteúdo em skeleton. */
 
 const ChallengesPage = lazyPage(() => import("./ChallengesPage"), "ChallengesPage");
 const ChallengeDetailPage = lazyPage(() => import("../challenges/ChallengeDetailPage"), "default");
@@ -14,7 +15,6 @@ const CashClosePage = lazyPage(() => import("../cash-close/CashClosePage"), "Cas
 const WalletPage = lazyPage(() => import("../wallet/WalletPage"), "default");
 const CashDropPage = lazyPage(() => import("./CashDropPage"), "CashDropPage");
 const SalesReportPage = lazyPage(() => import("./SalesReportPage"), "SalesReportPage");
-const SchedulePage = lazyPage(() => import("./SchedulePage"), "SchedulePage");
 const PurchaseOrderPage = lazyPage(() => import("../stock/PurchaseOrderPage"), "PurchaseOrderPage");
 
 function LegacyChallengeRedirect({ edit = false }: { edit?: boolean }) {

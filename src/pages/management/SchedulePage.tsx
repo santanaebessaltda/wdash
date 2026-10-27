@@ -9,7 +9,8 @@ import { HeaderFilters } from "@/pages/stock/shared";
 import { SectionHeader, useScopedStores } from "@/pages/operation/shared";
 import { Icon, icons } from "@/pages/users/Icons";
 import { cn } from "@/lib/cn";
-import { useMinSkeleton } from "@/lib/useMinSkeleton";
+import { filterCacheGet, filterCacheSet } from "@/lib/filterCache";
+import { useFilterSkeleton } from "@/lib/useFilterSkeleton";
 import { calendarTodayIso } from "@/data/wedash/clock";
 import { addDays, addMonths, dateToIso, endOfMonth, isoToDate, shiftName, startOfMonth } from "@/data/wedash/engine/format";
 import { periodLabels } from "@/data/wedash/dashboard";
@@ -96,6 +97,10 @@ function monthsBetween(from: string, to: string): string[] {
   return months;
 }
 
+function scheduleCacheReady(c: BranchSchedule[] | null): c is BranchSchedule[] {
+  return Array.isArray(c);
+}
+
 export function SchedulePage() {
   const { show } = useToast();
   const { session, storeRows } = useScopedStores();
@@ -107,8 +112,6 @@ export function SchedulePage() {
   const rangeFromRef = useRef(rangeFrom);
   rangeFromRef.current = rangeFrom;
   const [views, setViews] = useState<BranchSchedule[]>([]);
-  const [loading, setLoading] = useState(false);
-  const showSkeleton = useMinSkeleton(loading);
   const [error, setError] = useState(false);
   const [wizardStoreId, setWizardStoreId] = useState<string | null>(null);
   const [wizardMonth, setWizardMonth] = useState<string | null>(null);
@@ -118,6 +121,11 @@ export function SchedulePage() {
   const [reloadKey, setReloadKey] = useState(0);
   const [goalSpans, setGoalSpans] = useState<GoalSpan[] | null>(null);
   const storeIds = storeRows.map((row) => row.id).join(",");
+  const filterKey = `schedule:${session.tenantId}:${storeIds}:${rangeFrom}:${rangeTo}`;
+  const { showSkeleton, settle } = useFilterSkeleton(filterKey);
+  const reloadGen = useRef(0);
+  const storesRef = useRef(storeRows);
+  storesRef.current = storeRows;
 
   const periodFloor = goalSpans ? goalMonthFloor(scheduleStartMonth(today, goalSpans), goalSpans) : startOfMonth(today);
   const periodCeil = endOfMonth(addMonths(today, 14));
@@ -163,13 +171,21 @@ export function SchedulePage() {
   }, [storeIds, session.tenantId, today]);
 
   useEffect(() => {
-    if (storeRows.length === 0) {
+    const gen = ++reloadGen.current;
+    const key = filterKey;
+    const storesAtLoad = storesRef.current;
+    if (storesAtLoad.length === 0) {
       setViews([]);
+      settle(key);
       return;
     }
     let stop = false;
-    setLoading(true);
     setError(false);
+    const cached = filterCacheGet<BranchSchedule[]>(key);
+    if (scheduleCacheReady(cached)) {
+      setViews(cached);
+      settle(key);
+    }
     void (async () => {
       try {
         const covered = monthStarts(rangeFrom, rangeTo);
@@ -177,7 +193,7 @@ export function SchedulePage() {
         const [seed, ...nationals] = await Promise.all([loadHolidaySeed(), ...years.map((year) => loadNationalHolidays(year))]);
         const national = nationals.flat();
         const loaded = await Promise.all(
-          storeRows.map(async (store) => {
+          storesAtLoad.map(async (store) => {
             const teamPromise = fetchStoreSellers(session.tenantId, [store.id]);
             const shiftPromise = fetchStoreShifts(session.tenantId, store.id);
             const stored = await Promise.all(covered.map((month) => fetchSchedule(store.id, month)));
@@ -196,9 +212,9 @@ export function SchedulePage() {
               .map((rule) => ({ date: rule.date, name: rule.name }));
             const seen = new Set<string>();
             const local = years.flatMap((year) => holidaysForStore(seed, year, place.uf, place.city, extras).filter((row) => row.kind !== "national")).filter((row) => {
-              const key = `${row.date}|${row.name}`;
-              if (seen.has(key)) return false;
-              seen.add(key);
+              const holidayKey = `${row.date}|${row.name}`;
+              if (seen.has(holidayKey)) return false;
+              seen.add(holidayKey);
               return true;
             });
             const holidays = [...national, ...local];
@@ -206,18 +222,20 @@ export function SchedulePage() {
             return { store, people: active, shifts: storeShifts, holidays, months, days };
           }),
         );
-        if (stop) return;
+        if (stop || gen !== reloadGen.current) return;
+        filterCacheSet(key, loaded);
         setViews(loaded);
+        settle(key);
       } catch {
-        if (!stop) setError(true);
-      } finally {
-        if (!stop) setLoading(false);
+        if (stop || gen !== reloadGen.current) return;
+        setError(true);
+        if (!scheduleCacheReady(cached)) settle(key);
       }
     })();
     return () => {
       stop = true;
     };
-  }, [storeRows, rangeFrom, rangeTo, session.tenantId, reloadKey]);
+  }, [storeRows, rangeFrom, rangeTo, session.tenantId, reloadKey, filterKey, settle]);
 
   function scheduleOn(view: BranchSchedule, day: string): StoredSchedule | null {
     return view.months.find((item) => item.monthStart === startOfMonth(day))?.schedule ?? null;
@@ -409,7 +427,7 @@ export function SchedulePage() {
         <Button size="sm" variant="outline" onClick={() => setDeleteTarget({ storeId: view.store.id, monthStart })}>
           Apagar escala
         </Button>
-        <Button size="sm" disabled={view.people.length === 0 || loading} onClick={() => { setWizardMonth(monthStart); setWizardStoreId(view.store.id); }}>
+        <Button size="sm" disabled={view.people.length === 0 || showSkeleton} onClick={() => { setWizardMonth(monthStart); setWizardStoreId(view.store.id); }}>
           Editar escala
         </Button>
       </>
@@ -460,7 +478,7 @@ export function SchedulePage() {
               }}
             />
             {creatable.length > 0 ? (
-              <Button icon={<Icon d={icons.plus} size={16} />} disabled={loading} onClick={openCreate}>
+              <Button icon={<Icon d={icons.plus} size={16} />} disabled={showSkeleton} onClick={openCreate}>
                 Nova escala
               </Button>
             ) : null}
