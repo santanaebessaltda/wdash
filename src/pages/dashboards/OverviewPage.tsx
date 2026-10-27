@@ -267,6 +267,21 @@ export default function OverviewPage() {
       return { days, sellers, named, team };
     });
     const categoryFrom = prev.start < period.start ? prev.start : period.start;
+    // Produtos / CMV / catalogo sobem JA com a onda 1 (antes esperavam ela terminar).
+    const productsP = fetchSalesProductDayAggs({
+      tenantId: session.tenantId,
+      storeIds: asked,
+      from: categoryFrom,
+      to: period.end,
+    });
+    const productCostsP = fetchSalesProductCostDayAggs({
+      tenantId: session.tenantId,
+      storeIds: asked,
+      from: categoryFrom,
+      to: period.end,
+    });
+    const catalogTypesP = fetchProductCatalogTypes();
+    const catalogTypeNamesP = fetchProductTypeNames();
     try {
       // Onda 1: KPIs, formas, equipe, comparativo — libera a tela cedo.
       const [days, hours, payments, sellers, wm, cov, goalHistDays, goalHistHours, prevDays, prevHours, shifts, avatars, goalsLoaded] =
@@ -329,12 +344,12 @@ export default function OverviewPage() {
       applyOverview(early);
       settle(key);
 
-      // Onda 2: produtos, custos e metas (o que mais pesa em periodo longo).
+      // Onda 2: ja estava em voo — so espera o que faltava (meta + SKUs).
       const [products, productCosts, typeByProductId, typeNameById, goalAggs] = await Promise.all([
-        fetchSalesProductDayAggs({ tenantId: session.tenantId, storeIds: asked, from: categoryFrom, to: period.end }),
-        fetchSalesProductCostDayAggs({ tenantId: session.tenantId, storeIds: asked, from: categoryFrom, to: period.end }),
-        fetchProductCatalogTypes(),
-        fetchProductTypeNames(),
+        productsP,
+        productCostsP,
+        catalogTypesP,
+        catalogTypeNamesP,
         goalDataP,
       ]);
       if (gen !== reloadGen.current) return;
