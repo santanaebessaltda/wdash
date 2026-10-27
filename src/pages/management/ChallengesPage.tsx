@@ -320,7 +320,7 @@ export function ChallengesPage() {
                     {statusSections.titles[status]}
                   </p>
                 )}
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                   {cards
                     .filter((card) => card.view.status === status)
                     .map(({ challenge, view, store }) => (

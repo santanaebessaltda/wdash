@@ -32,7 +32,7 @@ const VIEW_OPTIONS = [
 type ScheduleViewMode = (typeof VIEW_OPTIONS)[number]["id"];
 const SCHEDULE_LEGEND: LegendItem[] = [
   { key: "work", color: "bg-ok", label: "T · Trabalha" },
-  { key: "off", color: "bg-bg-3", label: "F · Folga" },
+  { key: "off", color: "bg-chip-gray", label: "F · Folga" },
   { key: "holiday", color: "bg-warn", label: "FE · Feriado trabalhado" },
   { key: "comp", color: "bg-info", label: "FC · Folga compensatória" },
 ];
@@ -682,7 +682,7 @@ export function SchedulePage() {
           </Card>
         ) : (
           <>
-            <div className="flex flex-col gap-4">
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
               {scheduleCards.map(({ view, item }) => {
                 const visible =
                   viewMode === "month"
@@ -806,11 +806,11 @@ type ScheduleSection = {
   shifts: StoreShift[];
 };
 
-/** Tile no padrão Heatmap: fundo sólido da legenda, sem borda de grade. Folga usa texto forte para ler o F. */
+/** Tile no padrão Heatmap: fundo sólido da legenda, sem borda de grade. */
 function cellMark(status: DayStatus, _doublePay: boolean): { letters: string; note: string | null; className: string } {
   if (status === "holiday_work") return { letters: "FE", note: null, className: "bg-warn text-white" };
   if (status === "comp_off") return { letters: "FC", note: null, className: "bg-info text-white" };
-  if (status === "off") return { letters: "F", note: null, className: "bg-bg-3 text-t0" };
+  if (status === "off") return { letters: "F", note: null, className: "bg-chip-gray text-white" };
   return { letters: "T", note: null, className: "bg-ok text-white" };
 }
 
@@ -880,8 +880,9 @@ function ScheduleBoard({
       const fixed = schedules.flatMap((item) => item.schedule.people).find((row) => row.sellerId === id)?.fixedOffDow ?? null;
       const shift = shifts.find((item) => item.id === person?.shiftId);
       const offDow = offDowOf(id, fixed);
-      const detail = [person ? branchRoleLabel(person.role).toLocaleUpperCase("pt-BR") : "", shift ? shiftName(shift.name) : "", offDow != null ? `FOLGA: ${DOW_LABELS[offDow as 0 | 1 | 2 | 3 | 4 | 5 | 6].toLocaleUpperCase("pt-BR")}` : ""].filter(Boolean).join(" · ");
-      return { id, name: person?.name ?? "Pessoa", detail, shiftId: person?.shiftId ?? null, code: person?.code ?? null };
+      const roleShift = [person ? branchRoleLabel(person.role).toLocaleUpperCase("pt-BR") : "", shift ? shiftName(shift.name) : ""].filter(Boolean).join(" · ");
+      const offLabel = offDow != null ? `FOLGA: ${DOW_LABELS[offDow as 0 | 1 | 2 | 3 | 4 | 5 | 6].toLocaleUpperCase("pt-BR")}` : null;
+      return { id, name: person?.name ?? "Pessoa", roleShift, offLabel, shiftId: person?.shiftId ?? null, code: person?.code ?? null };
     })
     .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
 
@@ -894,13 +895,13 @@ function ScheduleBoard({
     return { working, closed: floor.closed, min: floor.min, exact: floor.exact };
   }
 
-  /* Heatmap: gap entre tiles, sem linhas; no celular a grade rola na horizontal. */
-  const columns = `minmax(11rem, 14rem) repeat(${dates.length}, minmax(2.75rem, 1fr))`;
+  /* Heatmap compacto: gap entre tiles, sem linhas; no celular a grade rola na horizontal. */
+  const columns = `minmax(9.5rem, 11rem) repeat(${dates.length}, minmax(1.75rem, 1fr))`;
   const stickyPerson = "sticky left-0 z-[1] bg-bg-2 pr-2";
-  const tile = "flex aspect-square w-full min-w-0 flex-col items-center justify-center rounded-[4px] text-[13px] font-extrabold leading-none";
+  const tile = "flex aspect-square w-full min-w-0 flex-col items-center justify-center rounded-[4px] text-[10px] font-bold leading-none";
   return (
     <div className="min-w-0 overflow-x-auto overscroll-x-contain">
-      <div className="inline-grid w-max min-w-full gap-1" style={{ gridTemplateColumns: columns }}>
+      <div className="inline-grid w-max min-w-full gap-0.5" style={{ gridTemplateColumns: columns }}>
         <div className={cn(stickyPerson, "flex items-end pb-1 text-left text-[11px] font-bold uppercase tracking-wide text-t2")}>Pessoa</div>
         {dates.map((iso) => {
           const holiday = holidayLabel(holidays, iso);
@@ -909,13 +910,13 @@ function ScheduleBoard({
             <div key={iso} title={holiday ?? dayTitle(iso, null)} className={cn("px-0.5 pb-1 text-center", holiday && iso !== today && "text-warn")}>
               <span
                 className={cn(
-                  "mx-auto inline-flex h-6 w-6 items-center justify-center rounded-full text-[12px] font-bold",
+                  "mx-auto inline-flex h-5 w-5 items-center justify-center rounded-full text-[11px] font-bold",
                   iso === today ? "bg-acc text-white" : holiday ? "text-warn" : "text-t0",
                 )}
               >
                 {day}
               </span>
-              <span className="mt-0.5 block truncate text-[10px] font-bold uppercase text-t2">{SHORT_WEEK[weekday(iso)]}</span>
+              <span className="mt-0.5 block truncate text-[9px] font-bold uppercase text-t2">{SHORT_WEEK[weekday(iso)]}</span>
             </div>
           );
         })}
@@ -925,7 +926,8 @@ function ScheduleBoard({
               <PersonAvatar name={person.name} employeeId={person.code} storeId={section.storeId} size="sm" />
               <span className="min-w-0">
                 <span className="block truncate text-[12px] font-semibold leading-tight text-t0">{person.name}</span>
-                {person.detail ? <span className="mt-0.5 block truncate text-[11px] leading-snug text-t2">{person.detail}</span> : null}
+                {person.roleShift ? <span className="mt-0.5 block truncate text-[11px] leading-snug text-t2">{person.roleShift}</span> : null}
+                {person.offLabel ? <span className="mt-0.5 block truncate text-[11px] font-semibold leading-snug text-t1">{person.offLabel}</span> : null}
               </span>
             </div>
             {dates.map((iso) => {

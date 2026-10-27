@@ -749,9 +749,9 @@ export function TeamTableSkeleton({ withShift = true, rows = 3 }: { withShift?: 
 }
 
 /** Metas: card da listagem (icone + nome/periodo + status  |  meta  |  barra  |  chips  |  avatares + botoes). */
-export function GoalCardsSkeleton({ count = 3 }: { count?: number }) {
+export function GoalCardsSkeleton({ count = 2 }: { count?: number }) {
   return (
-    <Busy className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+    <Busy className="grid grid-cols-1 gap-4 lg:grid-cols-2">
       {Array.from({ length: count }, (_, i) => (
         <div key={i} className="rounded-2xl border border-line bg-bg-2 p-5 shadow-[var(--shadow-vela)]">
           <div className="mb-3.5 flex items-center gap-3.5">
@@ -851,10 +851,10 @@ export function GoalDetailSkeleton() {
   );
 }
 
-/** Escala: cards com selos, botões e grade heatmap (a legenda fica no cabeçalho da página). */
-export function ScheduleCardsSkeleton({ count = 1, people = 5, days = 7 }: { count?: number; people?: number; days?: number }) {
+/** Escala: 2 cards por linha no desktop; grade heatmap compacta (legenda no cabeçalho). */
+export function ScheduleCardsSkeleton({ count = 2, people = 5, days = 7 }: { count?: number; people?: number; days?: number }) {
   return (
-    <Busy className="flex flex-col gap-4">
+    <Busy className="grid grid-cols-1 gap-4 lg:grid-cols-2">
       {Array.from({ length: count }, (_, c) => (
         <Card key={c} className="min-w-0 overflow-hidden">
           <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
@@ -872,25 +872,26 @@ export function ScheduleCardsSkeleton({ count = 1, people = 5, days = 7 }: { cou
           </div>
           <div className="min-w-0 overflow-x-auto overscroll-x-contain">
             <div
-              className="inline-grid w-max min-w-full gap-1"
-              style={{ gridTemplateColumns: `minmax(11rem, 14rem) repeat(${days}, minmax(2.75rem, 1fr))` }}
+              className="inline-grid w-max min-w-full gap-0.5"
+              style={{ gridTemplateColumns: `minmax(9.5rem, 11rem) repeat(${days}, minmax(1.75rem, 1fr))` }}
             >
               <div className="flex items-end pb-1">
                 <Skeleton className="h-3 w-14" />
               </div>
               {Array.from({ length: days }, (_, d) => (
                 <div key={d} className="px-0.5 pb-1">
-                  <Skeleton className="mx-auto h-6 w-6 rounded-full" />
-                  <Skeleton className="mx-auto mt-1 h-2.5 w-8" />
+                  <Skeleton className="mx-auto h-5 w-5 rounded-full" />
+                  <Skeleton className="mx-auto mt-1 h-2 w-6" />
                 </div>
               ))}
               {Array.from({ length: people }, (_, p) => (
                 <Fragment key={p}>
-                  <div className="flex items-center gap-2.5 py-0.5 pr-2">
+                  <div className="flex items-center gap-2 py-0.5 pr-2">
                     <Skeleton className="h-8 w-8 shrink-0 rounded-full" />
                     <div className="min-w-0 flex-1">
-                      <Skeleton className="h-3.5 w-28" />
-                      <Skeleton className="mt-1.5 h-2.5 w-40 max-w-full" />
+                      <Skeleton className="h-3.5 w-24" />
+                      <Skeleton className="mt-1 h-2.5 w-28 max-w-full" />
+                      <Skeleton className="mt-1 h-2.5 w-20 max-w-full" />
                     </div>
                   </div>
                   {Array.from({ length: days }, (_, d) => (
@@ -907,9 +908,9 @@ export function ScheduleCardsSkeleton({ count = 1, people = 5, days = 7 }: { cou
 }
 
 /** Desafios: card da listagem (icone + nome/periodo + botoes  |  lider  |  premio  |  prazo  |  chips). */
-export function ChallengeCardsSkeleton({ count = 3 }: { count?: number }) {
+export function ChallengeCardsSkeleton({ count = 2 }: { count?: number }) {
   return (
-    <Busy className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+    <Busy className="grid grid-cols-1 gap-4 lg:grid-cols-2">
       {Array.from({ length: count }, (_, i) => (
         <div key={i} className="rounded-2xl border border-line bg-bg-2 p-5 shadow-[var(--shadow-vela)]">
           <div className="mb-3.5 flex items-center gap-3.5">
