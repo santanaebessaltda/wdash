@@ -495,6 +495,88 @@ function cellChoice(status: DayStatus): CellChoice {
   return "work";
 }
 
+export type CompOffSummaryRow = {
+  personId: string;
+  personName: string;
+  holidayDate: string;
+  holidayName: string;
+  /** Dia da FC, se já marcado. Null = ainda pendente (ex.: mês seguinte). */
+  offDate: string | null;
+  until: string;
+};
+
+/**
+ * Folgas compensatórias do mês: FC já marcada (mesmo no mês seguinte, se vier em `allDays`)
+ * e pendências de `compDue` (prazo “no mês seguinte”).
+ */
+export function buildCompOffSummary(input: {
+  monthStart: string;
+  monthDays: { sellerId: string; day: string; status: DayStatus }[];
+  /** Dias carregados do filtro (pode incluir o mês seguinte já gerado). */
+  allDays?: { sellerId: string; day: string; status: DayStatus }[];
+  rules: HolidayRule[];
+  compDue: CompDue[];
+  people: { id: string; name: string }[];
+}): CompOffSummaryRow[] {
+  const monthEnd = endOfMonth(input.monthStart);
+  const nameOf = new Map(input.people.map((person) => [person.id, person.name]));
+  const pool = input.allDays ?? input.monthDays;
+  const editable: EditableDay[] = pool.map((row) => ({
+    sellerId: row.sellerId,
+    day: row.day,
+    status: row.status,
+  }));
+  const links = inferCompLinks(editable, input.rules, monthEnd);
+  const usedPeopleHolidays = new Set(links.map((link) => `${link.personId}|${link.holiday}`));
+  const rows: CompOffSummaryRow[] = [];
+
+  for (const link of links) {
+    const rule = input.rules.find((item) => item.date === link.holiday);
+    if (!rule || !link.holiday.startsWith(input.monthStart.slice(0, 7))) continue;
+    // Só entra se a pessoa trabalhou o feriado neste mês.
+    if (!input.monthDays.some((row) => row.sellerId === link.personId && row.day === link.holiday && row.status === "holiday_work")) {
+      continue;
+    }
+    rows.push({
+      personId: link.personId,
+      personName: nameOf.get(link.personId) || "Pessoa",
+      holidayDate: link.holiday,
+      holidayName: rule.name,
+      offDate: link.day,
+      until: link.deadline,
+    });
+  }
+
+  for (const rule of input.rules) {
+    if (!rule.open || rule.pay !== "extra_off" || !rule.date.startsWith(input.monthStart.slice(0, 7))) continue;
+    const until = holidayDeadline(rule, monthEnd);
+    const workers = input.monthDays
+      .filter((row) => row.day === rule.date && row.status === "holiday_work")
+      .map((row) => row.sellerId);
+    for (const personId of workers) {
+      if (usedPeopleHolidays.has(`${personId}|${rule.date}`)) continue;
+      const due = input.compDue.find((item) => item.personId === personId && item.holiday === rule.date);
+      // Sem FC marcada: lista como pendente (com prazo do due ou da regra).
+      rows.push({
+        personId,
+        personName: nameOf.get(personId) || "Pessoa",
+        holidayDate: rule.date,
+        holidayName: rule.name,
+        offDate: null,
+        until: due?.until || until,
+      });
+      usedPeopleHolidays.add(`${personId}|${rule.date}`);
+    }
+  }
+
+  return rows.sort(
+    (a, b) =>
+      a.holidayDate.localeCompare(b.holidayDate) ||
+      a.personName.localeCompare(b.personName, "pt-BR") ||
+      (a.offDate || a.until).localeCompare(b.offDate || b.until),
+  );
+}
+
 /** Liga cada folga pelo feriado ao feriado trabalhado, como a lista de compensação do gerador. */
 export function inferCompLinks(days: EditableDay[], rules: HolidayRule[], monthEnd: string): CompLink[] {
   const links: CompLink[] = [];

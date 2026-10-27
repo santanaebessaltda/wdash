@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { applyDayChoices, generateMonth, previousFromSnapshot, scheduleIssueFromEngine, weekday, type EditableDay, type HolidayRule } from "./scheduleGenerate";
+import { applyDayChoices, buildCompOffSummary, generateMonth, previousFromSnapshot, scheduleIssueFromEngine, weekday, type EditableDay, type HolidayRule } from "./scheduleGenerate";
 import { easter, nationalHolidays, storePlace } from "./scheduleHolidays";
 
 describe("feriados nacionais", () => {
@@ -125,6 +125,44 @@ describe("geração da escala", () => {
       holidayRules: [{ date: "2026-10-12", name: "Aparecida", open: true, workers: 1, pay: "extra_off", window: "next_month" }],
     });
     expect(generated.compDue).toEqual([{ personId: "a", holiday: "2026-10-12", until: "2026-11-30" }]);
+  });
+
+  it("lista folga compensatória pendente no mês seguinte", () => {
+    const rows = buildCompOffSummary({
+      monthStart: "2026-11-01",
+      monthDays: [
+        { sellerId: "a", day: "2026-11-20", status: "holiday_work" },
+        { sellerId: "a", day: "2026-11-21", status: "work" },
+      ],
+      rules: [{ date: "2026-11-20", name: "Consciência Negra", open: true, workers: 1, pay: "extra_off", window: "next_month" }],
+      compDue: [{ personId: "a", holiday: "2026-11-20", until: "2026-12-31" }],
+      people: [{ id: "a", name: "Ana" }],
+    });
+    expect(rows).toEqual([
+      {
+        personId: "a",
+        personName: "Ana",
+        holidayDate: "2026-11-20",
+        holidayName: "Consciência Negra",
+        offDate: null,
+        until: "2026-12-31",
+      },
+    ]);
+  });
+
+  it("mostra a data da FC no mês seguinte quando a escala seguinte já existe", () => {
+    const rows = buildCompOffSummary({
+      monthStart: "2026-11-01",
+      monthDays: [{ sellerId: "a", day: "2026-11-20", status: "holiday_work" }],
+      allDays: [
+        { sellerId: "a", day: "2026-11-20", status: "holiday_work" },
+        { sellerId: "a", day: "2026-12-03", status: "comp_off" },
+      ],
+      rules: [{ date: "2026-11-20", name: "Consciência Negra", open: true, workers: 1, pay: "extra_off", window: "next_month" }],
+      compDue: [{ personId: "a", holiday: "2026-11-20", until: "2026-12-31" }],
+      people: [{ id: "a", name: "Ana" }],
+    });
+    expect(rows[0]?.offDate).toBe("2026-12-03");
   });
 
   it("explica como destravar erro de domingo", () => {

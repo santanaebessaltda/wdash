@@ -18,7 +18,7 @@ import { fetchGoals } from "@/data/wedash/goalsRepo";
 import { goalMonthFloor, scheduleStartMonth, type GoalSpan } from "@/data/wedash/goalMonths";
 import { branchRoleLabel, fetchStoreSellers, fetchStoreShifts, isBranchTeamMember, type Store, type StoreSeller, type StoreShift } from "@/data/wedash/stores";
 import { DOW_LABELS } from "@/data/wedash/storeHours";
-import { applyDayChoices, dayEditOptions, defaultDayNeeds, generateMonth, inferCompLinks, issueFromUnknown, PREVIOUS_MONTH_EDIT, weekday, type CellChoice, type DayNeed, type DayStatus, type HolidayRule, type ScheduleGenerateIssue, type SchedulePattern, type Sex } from "@/data/wedash/scheduleGenerate";
+import { applyDayChoices, buildCompOffSummary, dayEditOptions, defaultDayNeeds, generateMonth, inferCompLinks, issueFromUnknown, PREVIOUS_MONTH_EDIT, weekday, type CellChoice, type CompOffSummaryRow, type DayNeed, type DayStatus, type HolidayRule, type ScheduleGenerateIssue, type SchedulePattern, type Sex } from "@/data/wedash/scheduleGenerate";
 import { holidayLabel, holidaysForStore, loadHolidaySeed, loadNationalHolidays, storePlace, type Holiday } from "@/data/wedash/scheduleHolidays";
 import { deleteSchedule, fetchCompDue, fetchPreviousSnapshot, fetchSchedule, saveManualDay, saveSchedule, type StoredDay, type StoredSchedule } from "@/data/wedash/scheduleRepo";
 import { ScheduleWizard, type ScheduleWizardValue, type WizardBranch } from "./ScheduleWizard";
@@ -54,6 +54,45 @@ function dayTitle(iso: string, holiday: string | null): string {
   const date = isoToDate(iso);
   const label = `${date.getDate()} de ${MONTHS[date.getMonth()].toLowerCase()}`;
   return holiday ? `${label} · ${holiday}` : label;
+}
+
+function shortDate(iso: string): string {
+  const [year, month, day] = iso.split("-");
+  return `${day}/${month}/${year}`;
+}
+
+function CompOffSummaryCard({ rows }: { rows: CompOffSummaryRow[] }) {
+  if (rows.length === 0) return null;
+  return (
+    <div className="mt-4 rounded-xl border border-line bg-bg-inset p-3.5 sm:p-4">
+      <div className="mb-3">
+        <h4 className="text-[13px] font-bold text-t0">Folgas compensatórias</h4>
+        <p className="mt-0.5 text-[12px] text-t2">
+          Para repasse ao sindicato: feriado trabalhado e a data da folga (ou o prazo, se ainda estiver no mês seguinte).
+        </p>
+      </div>
+      <ul className="divide-y divide-line">
+        {rows.map((row) => (
+          <li
+            key={`${row.personId}|${row.holidayDate}`}
+            className="flex flex-col gap-0.5 py-2.5 first:pt-0 last:pb-0 sm:flex-row sm:items-baseline sm:justify-between sm:gap-4"
+          >
+            <div className="min-w-0">
+              <p className="truncate text-[13px] font-semibold text-t0">{row.personName}</p>
+              <p className="text-[12px] text-t2">
+                Feriado {shortDate(row.holidayDate)} · {row.holidayName}
+              </p>
+            </div>
+            <p className={cn("shrink-0 text-[12.5px] font-semibold", row.offDate ? "text-info" : "text-warn")}>
+              {row.offDate
+                ? `Folga em ${shortDate(row.offDate)}`
+                : `Folga até ${shortDate(row.until)}`}
+            </p>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
 }
 
 function statusChip(status: DayStatus, doublePay: boolean): { color: string; label: string } {
@@ -521,6 +560,15 @@ export function SchedulePage() {
             <div className="flex flex-col gap-4">
               {scheduleCards.map(({ view, item }) => {
                 const monthDates = dates.filter((iso) => startOfMonth(iso) === item.monthStart);
+                const monthDays = view.days.filter((row) => startOfMonth(row.day) === item.monthStart);
+                const compRows = buildCompOffSummary({
+                  monthStart: item.monthStart,
+                  monthDays,
+                  allDays: view.days,
+                  rules: item.schedule.holidayRules,
+                  compDue: item.schedule.compDue,
+                  people: view.people.map((person) => ({ id: person.id, name: person.name })),
+                });
                 return (
                   <Card key={`${view.store.id}-${item.monthStart}`}>
                     <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
@@ -540,12 +588,13 @@ export function SchedulePage() {
                         storeId: view.store.id,
                         holidays: view.holidays,
                         schedules: [item],
-                        days: view.days.filter((row) => startOfMonth(row.day) === item.monthStart),
+                        days: monthDays,
                         people: view.people,
                         shifts: view.shifts,
                       }}
                       onOpenDay={(day, sellerId) => setDayOpen({ storeId: view.store.id, day, sellerId })}
                     />
+                    <CompOffSummaryCard rows={compRows} />
                   </Card>
                 );
               })}
