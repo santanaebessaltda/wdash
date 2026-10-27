@@ -2,8 +2,9 @@ import { useSyncExternalStore } from "react";
 import { flushSync } from "react-dom";
 
 /**
- * Modo de impressao (Exportar PDF): tabelas mostram todas as linhas, o tema
- * vira claro e o titulo da aba vira o nome do arquivo sugerido pelo navegador.
+ * Modo de impressao (Exportar PDF): tabelas mostram todas as linhas e o titulo
+ * da aba vira o nome do arquivo sugerido pelo navegador. O PDF sai no tema
+ * claro via `@media print` (index.css) — sem trocar `data-theme` na tela.
  * Vale tambem para o Ctrl+P (listeners instalados no AppShell).
  */
 
@@ -28,13 +29,9 @@ export function usePrintMode(): boolean {
 
 function enter(fileTitle?: string) {
   if (restore) return;
-  const html = document.documentElement;
-  const prevTheme = html.getAttribute("data-theme");
   const prevTitle = document.title;
-  html.setAttribute("data-theme", "light");
   if (fileTitle) document.title = fileTitle;
   restore = () => {
-    if (prevTheme) html.setAttribute("data-theme", prevTheme);
     document.title = prevTitle;
   };
   setPrinting(true);
