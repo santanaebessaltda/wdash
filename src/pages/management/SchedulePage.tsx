@@ -205,8 +205,11 @@ export function SchedulePage() {
 
   const periodFloor = goalSpans ? goalMonthFloor(scheduleStartMonth(today, goalSpans), goalSpans) : startOfMonth(today);
   const periodCeil = startOfMonth(endOfMonth(addMonths(today, 14)));
-  const canPrevMonth = monthStart > periodFloor;
-  const canNextMonth = monthStart < periodCeil;
+  const prevMonth = addMonths(monthStart, -1);
+  const nextMonth = addMonths(monthStart, 1);
+  // Setas só liberam se já existe escala no mês vizinho (em alguma filial do filtro).
+  const canPrevMonth = views.some((view) => view.months.some((item) => item.monthStart === prevMonth));
+  const canNextMonth = views.some((view) => view.months.some((item) => item.monthStart === nextMonth));
   const dates = useMemo(() => {
     const list: string[] = [];
     for (let day = rangeFrom; day <= rangeTo; day = addDays(day, 1)) list.push(day);
@@ -262,8 +265,8 @@ export function SchedulePage() {
     }
     void (async () => {
       try {
-        // Mês atual + seguinte (para a prévia das FC que caem no mês seguinte).
-        const covered = monthStarts(rangeFrom, endOfMonth(addMonths(rangeFrom, 1)));
+        // Anterior + atual + seguinte (setas e prévia das FC no mês seguinte).
+        const covered = monthStarts(addMonths(rangeFrom, -1), endOfMonth(addMonths(rangeFrom, 1)));
         const years = [...new Set(covered.map((month) => Number(month.slice(0, 4))))];
         const [seed, ...nationals] = await Promise.all([loadHolidaySeed(), ...years.map((year) => loadNationalHolidays(year))]);
         const national = nationals.flat();
