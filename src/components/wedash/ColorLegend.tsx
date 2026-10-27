@@ -1,6 +1,6 @@
 import { cn } from "@/lib/cn";
 
-export type LegendMark = "bar" | "chip" | "dot";
+export type LegendMark = "bar" | "chip" | "dot" | "square";
 
 export type LegendItem = {
   key: string;
@@ -14,17 +14,19 @@ const MARK: Record<LegendMark, string> = {
   bar: "h-3.5 w-1 rounded-full",
   chip: "h-2.5 w-3.5 rounded-[4px]",
   dot: "h-2.5 w-2.5 rounded-full",
+  /** Mesmo indicador do Gantt View: quadrado levemente arredondado. */
+  square: "h-2.5 w-2.5 rounded-[3px]",
 };
 
-/** Cor + nome + detalhe, no mesmo desenho da legenda do Pedido de compra. No celular, um item por linha. */
+/** Cor + nome (+ detalhe opcional). No celular, um item por linha. */
 export function ColorLegend({ items, mark = "chip", className }: { items: LegendItem[]; mark?: LegendMark; className?: string }) {
   return (
-    <ul className={cn("flex flex-col gap-y-1.5 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-4", className)}>
+    <ul className={cn("flex flex-col gap-y-1.5 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-3.5", className)}>
       {items.map((item) => (
-        <li key={item.key} className="inline-flex items-center gap-1.5 text-[12px] text-t1">
+        <li key={item.key} className="inline-flex items-center gap-1.5 text-xs font-semibold text-t1">
           <span className={cn("shrink-0", MARK[mark], item.color)} aria-hidden />
-          <span className="font-semibold">{item.label}</span>
-          {item.hint ? <span className="text-t2">{item.hint}</span> : null}
+          {item.label}
+          {item.hint ? <span className="font-normal text-t2">{item.hint}</span> : null}
         </li>
       ))}
     </ul>

@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { Alert, Badge, Button, Card, CardTitle, Checkbox, Dropdown, FormField, Modal, Select, ThSort, useToast, type DropdownItem, type SortDir } from "@/components/ui";
 import { ColorLegend } from "@/components/wedash/ColorLegend";
-import { StockProductsSkeleton } from "@/components/wedash/LoadingSkeletons";
+import { PurchaseOrderSkeleton } from "@/components/wedash/LoadingSkeletons";
 import { ProductNameCell } from "@/components/wedash/ProductNameCell";
 import { StoreDivisionTitle } from "@/components/wedash/StoreDivisionTitle";
 import {
@@ -137,15 +137,15 @@ const TONE_BORDER: Record<Exclude<PurchaseOrderTone, null>, string> = {
   warn: "border-l-warn",
 };
 
-/** A barra da linha: vermelho = total zero ou negativo; amarelo = ainda há saldo, abaixo do alvo. */
-function ToneLegend() {
+/** Legenda das barras laterais: vermelho = sem estoque; amarelo = abaixo do alvo. */
+function ToneLegend({ className }: { className?: string }) {
   return (
     <ColorLegend
-      className="mt-2.5"
-      mark="bar"
+      className={className}
+      mark="square"
       items={[
-        { key: "bad", color: "bg-bad", label: "Sem estoque", hint: "total zero ou negativo" },
-        { key: "warn", color: "bg-warn", label: "Abaixo do alvo", hint: "ainda há saldo" },
+        { key: "bad", color: "bg-bad", label: "Sem estoque" },
+        { key: "warn", color: "bg-warn", label: "Abaixo do alvo" },
       ]}
     />
   );
@@ -527,27 +527,29 @@ export function PurchaseOrderPage() {
       />
 
       <div className="mt-8">
+      {anyRows && !showSkeleton && storeRows.length > 0 && (
+        <div className="mb-3 flex justify-end">
+          <ToneLegend />
+        </div>
+      )}
       {showSkeleton ? (
-        <StockProductsSkeleton />
+        <PurchaseOrderSkeleton />
       ) : storeRows.length === 0 ? (
         <Card className="flex min-h-[280px] flex-col">
           <EmptyBlock icon="🏬" title="Nenhuma filial disponível" description="Não há filiais disponíveis para este acesso." />
         </Card>
       ) : (
         <Card className="flex min-w-0 flex-col overflow-hidden">
-          <div className="mb-4">
-            <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <span className="inline-flex items-center gap-1.5">
-                <CardTitle>Produtos</CardTitle>
-                <TipHelp label="Novo: produto cadastrado no Millennium há menos de 30 dias ou que a filial ainda não vendeu. A segunda regra só é usada quando há histórico suficiente desde a inauguração ou dos últimos 12 meses. Produtos bloqueados para compra não aparecem." />
+          <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
+            <span className="inline-flex items-center gap-1.5">
+              <CardTitle>Produtos</CardTitle>
+              <TipHelp label="Novo: produto cadastrado no Millennium há menos de 30 dias ou que a filial ainda não vendeu. A segunda regra só é usada quando há histórico suficiente desde a inauguração ou dos últimos 12 meses. Produtos bloqueados para compra não aparecem." />
+            </span>
+            {anyRows && (
+              <span className="text-[12.5px] font-semibold text-t1">
+                {num(summary.products)} produto{summary.products === 1 ? "" : "s"} · {num(summary.items)} ite{summary.items === 1 ? "m" : "ns"} no pedido
               </span>
-              {anyRows && (
-                <span className="text-[12.5px] font-semibold text-t1">
-                  {num(summary.products)} produto{summary.products === 1 ? "" : "s"} · {num(summary.items)} ite{summary.items === 1 ? "m" : "ns"} no pedido
-                </span>
-              )}
-            </div>
-            {anyRows && <ToneLegend />}
+            )}
           </div>
           {lines.length === 0 ? (
             <div className="flex flex-1">
