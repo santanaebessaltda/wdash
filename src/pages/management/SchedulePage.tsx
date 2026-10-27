@@ -32,9 +32,8 @@ const VIEW_OPTIONS = [
 type ScheduleViewMode = (typeof VIEW_OPTIONS)[number]["id"];
 const SCHEDULE_LEGEND: LegendItem[] = [
   { key: "work", color: "bg-ok", label: "T · Trabalha" },
-  { key: "off", color: "bg-chip-gray", label: "F · Folga" },
+  { key: "off", color: "bg-bg-3", label: "F · Folga" },
   { key: "holiday", color: "bg-warn", label: "FE · Feriado trabalhado" },
-  { key: "double", color: "bg-acc", label: "FE 2× · Pagamento em dobro" },
   { key: "comp", color: "bg-info", label: "FC · Folga compensatória" },
 ];
 const PATTERN_LABEL: Record<SchedulePattern, string> = {
@@ -806,12 +805,11 @@ type ScheduleSection = {
   shifts: StoreShift[];
 };
 
-/** Tile no padrão Heatmap: fundo sólido da legenda, sem borda de grade. */
-function cellMark(status: DayStatus, doublePay: boolean): { letters: string; note: string | null; className: string } {
-  if (status === "holiday_work" && doublePay) return { letters: "FE", note: "2×", className: "bg-acc text-white" };
+/** Tile no padrão Heatmap: fundo sólido da legenda, sem borda de grade. Folga usa texto forte para ler o F. */
+function cellMark(status: DayStatus, _doublePay: boolean): { letters: string; note: string | null; className: string } {
   if (status === "holiday_work") return { letters: "FE", note: null, className: "bg-warn text-white" };
   if (status === "comp_off") return { letters: "FC", note: null, className: "bg-info text-white" };
-  if (status === "off") return { letters: "F", note: null, className: "bg-chip-gray text-white" };
+  if (status === "off") return { letters: "F", note: null, className: "bg-bg-3 text-t0" };
   return { letters: "T", note: null, className: "bg-ok text-white" };
 }
 
@@ -898,7 +896,7 @@ function ScheduleBoard({
   /* Heatmap: gap entre tiles, sem linhas; no celular a grade rola na horizontal. */
   const columns = `minmax(11rem, 14rem) repeat(${dates.length}, minmax(2.75rem, 1fr))`;
   const stickyPerson = "sticky left-0 z-[1] bg-bg-2 pr-2";
-  const tile = "flex aspect-square w-full min-w-0 flex-col items-center justify-center rounded-[4px] text-[11px] font-bold leading-none";
+  const tile = "flex aspect-square w-full min-w-0 flex-col items-center justify-center rounded-[4px] text-[13px] font-extrabold leading-none";
   return (
     <div className="min-w-0 overflow-x-auto overscroll-x-contain">
       <div className="inline-grid w-max min-w-full gap-1" style={{ gridTemplateColumns: columns }}>

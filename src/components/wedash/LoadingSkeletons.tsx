@@ -858,7 +858,7 @@ export function ScheduleCardsSkeleton({ count = 1, people = 5, days = 7 }: { cou
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Skeleton className="h-7 w-48" />
         <ul className="flex flex-col gap-y-1.5 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-3.5">
-          {Array.from({ length: 5 }, (_, i) => (
+          {Array.from({ length: 4 }, (_, i) => (
             <li key={i} className="inline-flex items-center gap-1.5">
               <Skeleton className="h-2.5 w-2.5 rounded-[3px]" />
               <Skeleton className={cn("h-3", i % 2 === 0 ? "w-20" : "w-28")} />
