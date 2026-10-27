@@ -833,11 +833,6 @@ function ScheduleBoard({
   );
 }
 
-function shortDate(iso: string): string {
-  const [year, month, day] = iso.split("-");
-  return `${day}/${month}/${year}`;
-}
-
 function choiceOf(status: DayStatus): CellChoice {
   if (status === "off") return "off";
   if (status === "comp_off") return "comp_off";
