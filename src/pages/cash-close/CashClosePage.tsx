@@ -640,10 +640,14 @@ export function CashClosePage() {
     if (!info || (info.systemCents === 0 && info.realCents === 0 && !info.pending)) return { kind: "zero", totalCents: 0, diffCents: 0, withdrawalCents: 0, ...counts };
     if (!info.hasMillennium && !info.hasLines && !info.pending) return { kind: "empty", totalCents: 0, diffCents: 0, withdrawalCents: 0, ...counts };
     if (manyStores) {
-      if (info.pending && info.closedRealCents === 0) return { kind: "pending", totalCents: info.systemCents, diffCents: 0, withdrawalCents: 0, ...counts };
+      if (info.pending && info.closedRealCents === 0) {
+        return { kind: "pending", totalCents: info.systemCents, diffCents: 0, withdrawalCents: info.withdrawalCents, ...counts };
+      }
       return { kind: "total", totalCents: info.realCents, diffCents: 0, withdrawalCents: info.withdrawalCents, ...counts };
     }
-    if (info.pending) return { kind: "pending", totalCents: info.systemCents, diffCents: 0, withdrawalCents: 0, ...counts };
+    if (info.pending) {
+      return { kind: "pending", totalCents: info.systemCents, diffCents: 0, withdrawalCents: info.withdrawalCents, ...counts };
+    }
     return { kind: "total", totalCents: info.realCents, diffCents: info.diffCents, withdrawalCents: info.withdrawalCents, ...counts };
   }
 
@@ -988,7 +992,7 @@ function manyBadges(face: CalendarFace): Array<{ color: string; text: string }> 
   if (face.shortageStores > 0) chips.push({ color: "bg-bad", text: groupedClose(face.shortageStores, "fechada", `Quebra ${brlCent(face.shortageCents / 100)}`) });
   if (face.pendingStores > 0) chips.push({ color: "bg-warn", text: groupedClose(face.pendingStores, "pendente", brlCent(face.pendingCents / 100)) });
   if (face.kind === "today") chips.push({ color: "bg-acc", text: "Em aberto" });
-  if ((face.kind === "today" || face.kind === "total") && face.withdrawalCents > 0) {
+  if ((face.kind === "today" || face.kind === "pending" || face.kind === "total") && face.withdrawalCents > 0) {
     chips.push({ color: "bg-info", text: `Retirada ${brlCent(face.withdrawalCents / 100)}` });
   }
   return chips;
@@ -1005,7 +1009,7 @@ function dayHint(face: CalendarFace, many: boolean): string | undefined {
     const partes = manyBadges(face).map((chip) => chip.text);
     return partes.length > 0 ? partes.join(" · ") : undefined;
   }
-  if (face.kind === "today") {
+  if (face.kind === "today" || face.kind === "pending") {
     return face.withdrawalCents > 0 ? `Retirada ${brlCent(face.withdrawalCents / 100)}` : undefined;
   }
   if (face.kind !== "total") return undefined;
@@ -1059,7 +1063,7 @@ function Month({
                   <>
                     {face.kind === "pending" && <DayChip color="bg-warn">{`Pendente ${brlCent(face.totalCents / 100)}`}</DayChip>}
                     {face.kind === "today" && <DayChip color="bg-acc">Em aberto</DayChip>}
-                    {face.kind === "today" && face.withdrawalCents > 0 && (
+                    {(face.kind === "today" || face.kind === "pending") && face.withdrawalCents > 0 && (
                       <DayChip color="bg-info">{`Retirada ${brlCent(face.withdrawalCents / 100)}`}</DayChip>
                     )}
                     {face.kind === "total" && (face.diffCents !== 0 || face.withdrawalCents === 0) && (
