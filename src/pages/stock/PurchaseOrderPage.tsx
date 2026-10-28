@@ -846,18 +846,14 @@ export function PurchaseOrderPage() {
         footer={
           <>
             <span className="mr-auto min-w-0 text-[13px] font-extrabold text-t0">
-              {summaryBrandOptions.length > 1 ? (
+              {summaryBrands.length > 1 ? (
                 <span className="flex flex-col gap-0.5 sm:flex-row sm:flex-wrap sm:items-baseline sm:gap-x-3">
-                  {summaryBrandOptions.map((brand) => {
-                    const on = summaryBrands.includes(brand);
-                    const cents = summaryTotalCents((summaryGroups ?? []).filter((g) => g.brand === brand));
-                    return (
-                      <span key={brand} className={cn("tabular-nums", on ? "text-t0" : "text-t2 line-through")}>
-                        {brand} {money(brl(cents))}
-                      </span>
-                    );
-                  })}
-                  <span className="text-t0">Total {money(brl(summaryTotalCents(selectedSummary)))}</span>
+                  {summaryBrands.map((brand) => (
+                    <span key={brand} className="tabular-nums">
+                      {brand} {money(brl(summaryTotalCents((summaryGroups ?? []).filter((g) => g.brand === brand))))}
+                    </span>
+                  ))}
+                  <span>Total {money(brl(summaryTotalCents(selectedSummary)))}</span>
                 </span>
               ) : (
                 <>Total {money(brl(summaryTotalCents(selectedSummary)))}</>
@@ -903,37 +899,40 @@ export function PurchaseOrderPage() {
               )}
             </div>
             <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 pb-5 pt-3">
-              {summaryGroups.map((group) => {
-                const included = group.brand == null || summaryBrands.includes(group.brand);
-                const titleParts = [group.branchCode, group.storeName, group.brand].filter(Boolean);
-                const showTitle = summaryGroups.length > 1 || group.brand != null;
-                return (
-                  <div key={`${group.storeId}:${group.brand ?? "all"}`} className={cn(!included && "opacity-45")}>
-                    {showTitle && <StoreDivisionTitle className="mb-2">{titleParts.join(" · ")}</StoreDivisionTitle>}
-                    <ul className="overflow-hidden rounded-[var(--radius-vela-lg)] border border-line">
-                      {group.rows.map((r) => (
-                        <li key={`${group.storeId}:${r.code}`} className="flex items-center gap-3 border-b border-line px-3 py-2.5 last:border-b-0">
-                          <div className="min-w-0 flex-1">
-                            <p className="truncate text-[13px] font-bold text-t0">{r.name}</p>
-                            <p className="truncate text-[11px] text-t2">{r.code}</p>
-                          </div>
-                          <div className="shrink-0 text-right">
-                            <p className="font-mono text-[13px] font-extrabold tabular-nums text-t0">{money(brl(purchaseLineCents(r)))}</p>
-                            <p className="whitespace-nowrap font-mono text-[11px] tabular-nums text-t2">
-                              {qty(r.aRequest ?? 0)} × {money(r.costCents == null ? null : r.costCents / 100)}
-                            </p>
-                          </div>
-                        </li>
-                      ))}
-                    </ul>
-                    {(summaryGroups.length > 1 || group.brand != null) && (
-                      <p className="mt-1.5 text-right font-mono text-[12px] font-extrabold tabular-nums text-t1">
-                        Subtotal {money(brl(summaryTotalCents([group])))}
-                      </p>
-                    )}
-                  </div>
-                );
-              })}
+              {selectedSummary.length === 0 ? (
+                <p className="text-[13.5px] leading-relaxed text-t2">Marque pelo menos uma marca para ver o resumo.</p>
+              ) : (
+                selectedSummary.map((group) => {
+                  const titleParts = [group.branchCode, group.storeName, group.brand].filter(Boolean);
+                  const showTitle = selectedSummary.length > 1 || group.brand != null;
+                  return (
+                    <div key={`${group.storeId}:${group.brand ?? "all"}`}>
+                      {showTitle && <StoreDivisionTitle className="mb-2">{titleParts.join(" · ")}</StoreDivisionTitle>}
+                      <ul className="overflow-hidden rounded-[var(--radius-vela-lg)] border border-line">
+                        {group.rows.map((r) => (
+                          <li key={`${group.storeId}:${r.code}`} className="flex items-center gap-3 border-b border-line px-3 py-2.5 last:border-b-0">
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate text-[13px] font-bold text-t0">{r.name}</p>
+                              <p className="truncate text-[11px] text-t2">{r.code}</p>
+                            </div>
+                            <div className="shrink-0 text-right">
+                              <p className="font-mono text-[13px] font-extrabold tabular-nums text-t0">{money(brl(purchaseLineCents(r)))}</p>
+                              <p className="whitespace-nowrap font-mono text-[11px] tabular-nums text-t2">
+                                {qty(r.aRequest ?? 0)} × {money(r.costCents == null ? null : r.costCents / 100)}
+                              </p>
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                      {(selectedSummary.length > 1 || group.brand != null) && (
+                        <p className="mt-1.5 text-right font-mono text-[12px] font-extrabold tabular-nums text-t1">
+                          Subtotal {money(brl(summaryTotalCents([group])))}
+                        </p>
+                      )}
+                    </div>
+                  );
+                })
+              )}
             </div>
           </div>
         )}
