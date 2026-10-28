@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Accordion, Alert, Button, Card, Checkbox, Modal, PageHeader, Select, useToast } from "@/components/ui";
+import { Accordion, Alert, Badge, Button, Card, Dropdown, Modal, PageHeader, Select, Switch, useToast } from "@/components/ui";
 import { ColorLegend, type LegendItem } from "@/components/wedash/ColorLegend";
 import { ScheduleCardsSkeleton } from "@/components/wedash/LoadingSkeletons";
 import { PersonAvatar } from "@/components/wedash/PersonAvatar";
@@ -9,6 +9,7 @@ import { HeaderFilters } from "@/pages/stock/shared";
 import { useScopedStores } from "@/pages/operation/shared";
 import { Icon, icons } from "@/pages/users/Icons";
 import { cn } from "@/lib/cn";
+import { titleName } from "@/lib/format";
 import { filterCacheGet, filterCacheSet } from "@/lib/filterCache";
 import { useFilterSkeleton } from "@/lib/useFilterSkeleton";
 import { calendarTodayIso } from "@/data/wedash/clock";
@@ -46,10 +47,6 @@ const SHORT_WEEK = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 function monthLabel(iso: string): string {
   const date = isoToDate(startOfMonth(iso));
   return `${MONTHS[date.getMonth()]} de ${date.getFullYear()}`;
-}
-
-function scheduleTitle(pattern: SchedulePattern, storeName: string): string {
-  return `${PATTERN_LABEL[pattern]} · ${storeName.toLocaleUpperCase("pt-BR")}`;
 }
 
 /** Semana começando no domingo, como no Calendar. */
@@ -104,7 +101,7 @@ function shortDate(iso: string): string {
   return `${day}/${month}/${year}`;
 }
 
-/** Folgas pelo feriado: mesmo Accordion do wizard (“Folgas aos domingos”) + tabela. */
+/** Folgas compensatórias: apoio compacto sob a grade (fechado por padrão). */
 function CompOffAccordion({ rows }: { rows: CompOffSummaryRow[] }) {
   if (rows.length === 0) return null;
   return (
@@ -113,22 +110,27 @@ function CompOffAccordion({ rows }: { rows: CompOffSummaryRow[] }) {
         items={[
           {
             key: "comp-offs",
-            title: "Ver as folgas pelos feriados trabalhados",
+            title: (
+              <span className="inline-flex min-w-0 flex-wrap items-baseline gap-x-1.5">
+                <span>Folgas compensatórias</span>
+                <span className="font-semibold text-t2">· {rows.length}</span>
+              </span>
+            ),
             content: (
               <div className="min-w-0 overflow-x-auto">
                 <table className="w-full min-w-[36rem] border-collapse text-[12.5px]">
                   <thead>
                     <tr className="text-[11px] font-bold uppercase tracking-wide text-t2">
                       <th className="pb-2 pr-3 text-left font-bold">Pessoa</th>
-                      <th className="pb-2 pr-3 text-left font-bold">Feriado</th>
-                      <th className="pb-2 pr-3 text-left font-bold">Folga pelo feriado</th>
+                      <th className="pb-2 pr-3 text-left font-bold">Feriado trabalhado</th>
+                      <th className="pb-2 pr-3 text-left font-bold">Folga compensatória</th>
                       <th className="pb-2 text-left font-bold">Prazo</th>
                     </tr>
                   </thead>
                   <tbody>
                     {rows.map((row) => (
                       <tr key={`${row.personId}|${row.holidayDate}`}>
-                        <td className="py-1.5 pr-3 font-bold uppercase tracking-wide text-t0">{row.personName}</td>
+                        <td className="py-1.5 pr-3 font-semibold text-t0">{titleName(row.personName)}</td>
                         <td className="py-1.5 pr-3 text-t1">
                           <span className="font-semibold tabular-nums text-t0">{shortDate(row.holidayDate)}</span>
                           {row.holidayName ? <span className="mt-0.5 block text-[11px] text-t2">{row.holidayName}</span> : null}
@@ -725,12 +727,36 @@ export function SchedulePage() {
   function registeredActions(view: BranchSchedule, monthStart: string) {
     return (
       <>
-        <Button size="sm" variant="outline" onClick={() => setDeleteTarget({ storeId: view.store.id, monthStart })}>
-          Apagar escala
-        </Button>
-        <Button size="sm" disabled={view.people.length === 0 || showSkeleton} onClick={() => { setWizardMonth(monthStart); setWizardStoreId(view.store.id); }}>
+        <Button
+          size="sm"
+          disabled={view.people.length === 0 || showSkeleton}
+          onClick={() => {
+            setWizardMonth(monthStart);
+            setWizardStoreId(view.store.id);
+          }}
+        >
           Editar escala
         </Button>
+        <Dropdown
+          align="right"
+          portal
+          items={[
+            {
+              label: "Apagar escala",
+              danger: true,
+              onClick: () => setDeleteTarget({ storeId: view.store.id, monthStart }),
+            },
+          ]}
+          trigger={
+            <button
+              type="button"
+              aria-label="Mais ações da escala"
+              className="inline-flex h-8 w-8 items-center justify-center rounded-[10px] text-t1 hover:bg-bg-3"
+            >
+              <Icon d={icons.dots} size={16} />
+            </button>
+          }
+        />
       </>
     );
   }
@@ -879,13 +905,21 @@ export function SchedulePage() {
                 return (
                   <Card key={`${view.store.id}-${item.monthStart}`}>
                     <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-                      <h3 className="min-w-0 truncate text-[15px] font-bold text-t0">{scheduleTitle(item.schedule.pattern, storeLabel)}</h3>
+                      <div className="min-w-0">
+                        <h3 className="text-[17px] font-extrabold leading-tight tracking-tight text-t0">
+                          {PATTERN_LABEL[item.schedule.pattern]}
+                        </h3>
+                        <div className="mt-1 flex min-w-0 flex-wrap items-center gap-2">
+                          <p className="min-w-0 truncate text-[13px] font-semibold text-t1">{storeLabel}</p>
+                          <Badge variant="neutral">{monthLabel(item.monthStart)}</Badge>
+                        </div>
+                      </div>
                       <div className="flex flex-wrap items-center gap-2">{registeredActions(view, item.monthStart)}</div>
                     </div>
                     <div className="mb-3">
-                      <Checkbox
+                      <Switch
                         checked={showNeighbors}
-                        onChange={(event) => setShowNeighbors(event.target.checked)}
+                        onChange={setShowNeighbors}
                         label="Ver também os dias dos meses vizinhos"
                       />
                     </div>
@@ -1002,12 +1036,15 @@ type ScheduleSection = {
   people: StoreSeller[];
 };
 
-/** Tile no padrão Heatmap: fundo sólido da legenda, sem borda de grade. */
-function cellMark(status: DayStatus, _doublePay: boolean): { letters: string; note: string | null; className: string } {
-  if (status === "holiday_work") return { letters: "FE", note: null, className: "bg-warn text-white" };
-  if (status === "comp_off") return { letters: "FC", note: null, className: "bg-info text-white" };
-  if (status === "off") return { letters: "F", note: null, className: "bg-chip-gray text-white" };
-  return { letters: "T", note: null, className: "bg-ok text-white" };
+/** Tile leve: fundo soft + letra na cor do status (a grade não compete com o topo). */
+function cellMark(status: DayStatus, doublePay: boolean): { letters: string; className: string; tight: boolean } {
+  if (status === "holiday_work" && doublePay) {
+    return { letters: "FE 2×", className: "bg-warn-soft text-warn", tight: true };
+  }
+  if (status === "holiday_work") return { letters: "FE", className: "bg-warn-soft text-warn", tight: false };
+  if (status === "comp_off") return { letters: "FC", className: "bg-info-soft text-info", tight: false };
+  if (status === "off") return { letters: "F", className: "bg-bg-3 text-t2", tight: false };
+  return { letters: "T", className: "bg-ok-soft text-ok", tight: false };
 }
 
 function dayFloor(schedule: StoredSchedule, iso: string): { min: number; closed: boolean; exact: boolean } {
@@ -1082,10 +1119,10 @@ function ScheduleBoard({
       const person = byId.get(id);
       const fixed = schedules.flatMap((item) => item.schedule.people).find((row) => row.sellerId === id)?.fixedOffDow ?? null;
       const offDow = offDowOf(id, fixed);
-      const role = person ? branchRoleLabel(person.role).toLocaleUpperCase("pt-BR") : "";
-      const offLabel = offDow != null ? `FOLGA: ${DOW_LABELS[offDow as 0 | 1 | 2 | 3 | 4 | 5 | 6].toLocaleUpperCase("pt-BR")}` : "";
+      const role = person ? branchRoleLabel(person.role) : "";
+      const offLabel = offDow != null ? `Folga: ${DOW_LABELS[offDow as 0 | 1 | 2 | 3 | 4 | 5 | 6]}` : "";
       const detail = [role, offLabel].filter(Boolean).join("  ·  ");
-      return { id, name: person?.name ?? "Pessoa", detail, code: person?.code ?? null };
+      return { id, name: titleName(person?.name ?? "Pessoa"), detail, code: person?.code ?? null };
     })
     .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
 
@@ -1101,9 +1138,11 @@ function ScheduleBoard({
   /* Heatmap compacto: coluna Pessoa mais larga no desktop; no celular a grade rola na horizontal. */
   const dayCols = `repeat(${dates.length}, minmax(1.75rem, 1fr))`;
   const stickyPerson = "sticky left-0 z-[1] bg-bg-2 pr-2";
-  const tile = "flex aspect-square w-full min-w-0 flex-col items-center justify-center rounded-[4px] text-[10px] font-bold leading-none";
+  const tile = "flex aspect-square w-full min-w-0 flex-col items-center justify-center rounded-[4px] font-extrabold leading-none";
   /** Fora do foco (semana/dia): mesma coluna, só escurece — padrão do Heatmap/calendário. */
   const dimOut = "opacity-[0.28]";
+  /** Coluna de hoje: fundo vertical sutil em cabeçalho, células e rodapé. */
+  const todayCol = "bg-acc/[0.08]";
   return (
     <div className="min-w-0 overflow-x-auto overscroll-x-contain">
       <div
@@ -1115,16 +1154,22 @@ function ScheduleBoard({
           const holiday = holidayLabel(holidays, iso);
           const day = Number(iso.slice(8));
           const focused = inFocus(iso);
+          const isToday = iso === today;
           return (
             <div
               key={iso}
               title={holiday ?? dayTitle(iso, null)}
-              className={cn("px-0.5 pb-1 text-center", !focused && dimOut, holiday && iso !== today && focused && "text-warn")}
+              className={cn(
+                "rounded-[4px] px-0.5 pb-1 text-center",
+                isToday && todayCol,
+                !focused && dimOut,
+                holiday && !isToday && focused && "text-warn",
+              )}
             >
               <span
                 className={cn(
                   "mx-auto inline-flex h-5 w-5 items-center justify-center rounded-full text-[11px] font-bold",
-                  iso === today ? "bg-acc text-white" : holiday && focused ? "text-warn" : "text-t0",
+                  isToday ? "bg-acc text-white" : holiday && focused ? "text-warn" : "text-t0",
                 )}
               >
                 {day}
@@ -1149,15 +1194,26 @@ function ScheduleBoard({
               const mark = row ? cellMark(row.status, doublePay) : null;
               const status = row ? statusChip(row.status, doublePay).label : "sem escala";
               const focused = inFocus(iso);
+              const isToday = iso === today;
+              const letterSize = mark?.tight ? "text-[8px]" : "text-[10px]";
               if (!row || !mark) {
-                return <div key={iso} className={cn(tile, "bg-bg-3", !focused && dimOut)} aria-hidden />;
+                return (
+                  <div
+                    key={iso}
+                    className={cn(tile, "bg-bg-3", isToday && todayCol, !focused && dimOut)}
+                    aria-hidden
+                  />
+                );
               }
               /* Sem escala no mês do tile (FC planejada no vizinho): ainda abre o editor pela escala dona. */
               if (readOnly) {
                 return (
-                  <div key={iso} className={cn(tile, mark.className, !focused && dimOut)} title={status}>
+                  <div
+                    key={iso}
+                    className={cn(tile, letterSize, mark.className, isToday && "ring-1 ring-inset ring-acc/35", !focused && dimOut)}
+                    title={status}
+                  >
                     {mark.letters}
-                    {mark.note ? <span className="mt-0.5 text-[8px] font-semibold uppercase opacity-90">{mark.note}</span> : null}
                   </div>
                 );
               }
@@ -1165,12 +1221,18 @@ function ScheduleBoard({
                 <button
                   key={iso}
                   type="button"
-                  className={cn(tile, "cursor-pointer transition-opacity hover:opacity-90", mark.className, !focused && dimOut)}
+                  className={cn(
+                    tile,
+                    letterSize,
+                    "cursor-pointer transition-opacity hover:opacity-90",
+                    mark.className,
+                    isToday && "ring-1 ring-inset ring-acc/35",
+                    !focused && dimOut,
+                  )}
                   aria-label={`${person.name}, ${Number(iso.slice(8))}: ${status}`}
                   onClick={() => onOpenDay(iso, person.id)}
                 >
                   {mark.letters}
-                  {mark.note ? <span className="mt-0.5 text-[8px] font-semibold uppercase opacity-90">{mark.note}</span> : null}
                 </button>
               );
             })}
@@ -1180,10 +1242,15 @@ function ScheduleBoard({
         {dates.map((iso) => {
           const face = presence(iso);
           const title = face.closed ? "A loja fecha neste dia" : face.exact ? "Quantidade exata neste feriado" : "Mínimo do dia";
-          const sub = face.closed ? "Fechado" : face.min > 0 ? `${face.exact ? "Ex." : "Mín."} ${face.min}` : "";
+          const sub = face.closed ? "Fechado" : face.min > 0 ? `${face.exact ? "Exato" : "Mínimo"} ${face.min}` : "";
           const focused = inFocus(iso);
+          const isToday = iso === today;
           return (
-            <div key={iso} title={title} className={cn("min-w-0 px-0.5 py-1 text-center", !focused && dimOut)}>
+            <div
+              key={iso}
+              title={title}
+              className={cn("min-w-0 rounded-[4px] px-0.5 py-1 text-center", isToday && todayCol, !focused && dimOut)}
+            >
               <span className={cn("block text-[11px] font-bold tabular-nums", face.closed ? "text-t2" : "text-t1")}>{face.closed ? "—" : face.working}</span>
               {sub ? <span className="block truncate text-[9px] leading-tight text-t2">{sub}</span> : null}
             </div>
@@ -1226,7 +1293,7 @@ function DayEditor({
 }) {
   const links = inferCompLinks(monthDays, rules, monthEnd);
   const roster = monthDays.filter((row) => row.day === day && row.sellerId === sellerId);
-  const personName = names.get(sellerId)?.name ?? "Pessoa";
+  const personName = titleName(names.get(sellerId)?.name ?? "Pessoa");
   const [drafts, setDrafts] = useState<Record<string, { value: CellChoice; holiday: string }>>(() =>
     Object.fromEntries(
       roster.map((row) => {
