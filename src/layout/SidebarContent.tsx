@@ -3,7 +3,7 @@ import { padBottom, padTop } from "@/lib/safeArea";
 import { NavLink, useLocation } from "react-router-dom";
 import { cn } from "@/lib/cn";
 import { isNavGroup, type NavEntry } from "./nav-config";
-import { applyShoppingMenu, navForRole } from "./nav-wedash";
+import { applyShoppingMenu, helpNavItem, navForRole } from "./nav-wedash";
 import { useShoppingMenu } from "./useShoppingMenu";
 import { WedashBrand } from "@/components/wedash/WedashBrand";
 import { searchForRoute } from "@/pages/dashboard/periodQuery";
@@ -24,6 +24,9 @@ function owningGroupLabel(entries: NavEntry[], path: string): string | null {
 const linkBase =
   "flex items-center gap-3 rounded-[11px] px-2.5 py-2.5 text-[13px] font-semibold text-t1 transition-colors hover:bg-bg-3 hover:text-t0";
 const linkActive = "bg-acc-soft text-acc!";
+/** Rodapé de ajuda: tom secundário, sem competir com o miolo. */
+const linkFooter =
+  "flex items-center gap-3 rounded-[11px] px-2.5 py-2 text-[12.5px] font-medium text-t2 transition-colors hover:bg-bg-3 hover:text-t1";
 
 const chevron = (open: boolean) => (
   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={cn("shrink-0 text-t2 transition-transform duration-200", open && "rotate-180")}>
@@ -128,6 +131,23 @@ export function SidebarContent({ collapsed = false, onNavigate }: { collapsed?: 
           );
         })}
       </nav>
+
+      <div className="shrink-0 border-t border-line px-3.5 py-3">
+        {!collapsed && (
+          <p className="px-2.5 pb-1 text-[10.5px] font-bold uppercase tracking-wider text-t2">Ajuda</p>
+        )}
+        <NavLink
+          to={withSearch(helpNavItem.to, search)}
+          onClick={onNavigate}
+          title={collapsed ? helpNavItem.label : undefined}
+          className={({ isActive }) =>
+            cn(linkFooter, collapsed && "justify-center", isActive && linkActive)
+          }
+        >
+          <GroupIcon d={helpNavItem.icon} />
+          {!collapsed && <span className="flex-1">{helpNavItem.label}</span>}
+        </NavLink>
+      </div>
     </div>
   );
 }

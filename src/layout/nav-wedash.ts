@@ -82,8 +82,8 @@ const finance: NavGroup = {
   ],
 };
 
-/** Biblioteca de vídeos. Página direta, sem submenu. */
-const tutorials: NavSingle = {
+/** Biblioteca de vídeos — rodapé do menu (ajuda), não no miolo. */
+export const helpNavItem: NavSingle = {
   label: "Guia prático",
   icon: ICON.help,
   to: paths.help,
@@ -152,7 +152,6 @@ const navOwner: NavEntry[] = [
   purchaseOrder,
   performance,
   finance,
-  tutorials,
   integrations,
   settings,
 ];
@@ -183,7 +182,6 @@ const navManager: NavEntry[] = [
   performance,
   finance,
   settingsHours,
-  tutorials,
 ];
 
 /** Telas só do Gestor (custos, Integrações, Configurações, ERP, Usuários, Logs, pedido de compra). */
@@ -196,7 +194,6 @@ export function isOwner(role: Role): boolean {
 const sellerNav: NavEntry[] = [
   { label: "Início", icon: ICON.dashboard, to: paths.seller.home },
   { label: "Carteira", icon: ICON.wallet, to: paths.seller.wallet },
-  tutorials,
 ];
 
 export function navForRole(role: Role): NavEntry[] {
