@@ -677,7 +677,8 @@ export function SchedulePage() {
       const selected = value.selectedIds.map((id) => ({
         id,
         name: view.people.find((person) => person.id === id)?.name ?? "Pessoa",
-        fixedOffDow: value.fixedOff[id] > 0 ? value.fixedOff[id] : null,
+        // Folga útil no 6×1 é automática (pós-domingo); o wizard não oferece dia fixo.
+        fixedOffDow: null,
         sex: value.sex[id] ?? "woman",
         groupId: null,
       }));

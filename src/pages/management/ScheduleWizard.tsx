@@ -36,7 +36,6 @@ const TYPES: { id: SchedulePattern; title: string; detail: string }[] = [
   { id: "12x36", title: "12×36", detail: "Um dia trabalha, o outro folga" },
 ];
 
-const WEEKDAYS = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
 const MONTHS = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 
 const SUNDAY_OPTIONS: { id: SundayRule; label: string }[] = [
@@ -554,40 +553,22 @@ export function ScheduleWizard({
                   <span className="block truncate text-[11px] text-t2">{[person.role, person.groupName].filter(Boolean).join(" · ")}</span>
                 </span>
                 {selected ? (
-                  <span className="flex min-w-0 flex-wrap items-end gap-2">
-                    <label className="w-[9.5rem] text-[11px] font-bold text-t0">
-                      Dia de folga<span className="text-bad"> *</span>
-                      <Select
-                        className="mt-1 h-8! px-2!"
-                        aria-label={`Dia de folga de ${person.name}`}
-                        value={value.fixedOff[person.id] ?? ""}
-                        onChange={(event) =>
-                          setValue((current) => ({
-                            ...current,
-                            fixedOff: event.target.value ? { ...current.fixedOff, [person.id]: Number(event.target.value) } : Object.fromEntries(Object.entries(current.fixedOff).filter(([id]) => id !== person.id)),
-                          }))
-                        }
-                      >
-                        <option value="">Automático</option>
-                        {WEEKDAYS.map((label, index) => (
-                          <option key={label} value={index + 1}>{label}</option>
-                        ))}
-                      </Select>
-                    </label>
-                    <label className="w-[7.5rem] text-[11px] font-bold text-t0">
-                      Sexo<span className="text-bad"> *</span>
-                      <Select className="mt-1 h-8! px-2!" aria-label={`Sexo de ${person.name}`} value={value.sex[person.id] ?? "woman"} onChange={(event) => setValue((current) => ({ ...current, sex: { ...current.sex, [person.id]: event.target.value as Sex } }))}>
-                        <option value="woman">Mulher</option>
-                        <option value="man">Homem</option>
-                      </Select>
-                    </label>
-                  </span>
+                  <label className="w-[7.5rem] shrink-0 text-[11px] font-bold text-t0">
+                    Sexo<span className="text-bad"> *</span>
+                    <Select className="mt-1 h-8! px-2!" aria-label={`Sexo de ${person.name}`} value={value.sex[person.id] ?? "woman"} onChange={(event) => setValue((current) => ({ ...current, sex: { ...current.sex, [person.id]: event.target.value as Sex } }))}>
+                      <option value="woman">Mulher</option>
+                      <option value="man">Homem</option>
+                    </Select>
+                  </label>
                 ) : null}
               </li>
               );
             })}
           </ul>
-          <p className="mt-3 text-[12px] text-t2">No automático, a folga é definida pela escala. Para fixar um dia da semana, escolha-o aqui.</p>
+          <p className="mt-3 text-[12px] text-t2">
+            A folga útil do 6×1 segue o domingo anterior: quem trabalhou folga na terça (ou quarta/quinta se precisar);
+            quem folgou no domingo folga na quarta ou quinta. No domingo de revezamento a folga útil não cai na segunda.
+          </p>
           <div className="mt-4">
           <Accordion
             items={[

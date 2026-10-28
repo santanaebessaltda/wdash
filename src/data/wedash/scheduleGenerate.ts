@@ -461,15 +461,18 @@ export function generateMonth(input: {
     previous: linked?.previous,
     employees: people.map((person, index) => {
       const fixedChosen = person.fixedOffDow == null ? -1 : generatorDow(person.fixedOffDow);
-      // Sem folga fixa na tela: herda o dia-base do mês anterior (como continuar no gerador).
+      // 6×1 automático: fixed=-1 (folga útil pela regra pós-domingo). Nos outros modelos,
+      // sem folga fixa na tela, herda o dia-base do mês anterior.
       const inherited =
         fixedChosen < 0 && previousAssignment?.[index] && Number.isInteger(previousAssignment[index].base)
           ? previousAssignment[index].base
           : -1;
+      const fixed =
+        fixedChosen >= 0 ? fixedChosen : input.pattern === "6x1" ? -1 : inherited;
       return {
         name: person.name?.trim() || "Pessoa",
         sex: person.sex === "man" ? "M" : "F",
-        fixed: fixedChosen >= 0 ? fixedChosen : inherited,
+        fixed,
       };
     }),
     open,

@@ -122,6 +122,26 @@
     const cadence=c.employees[employee].sex==='F'?c.sundayF:c.sundayM;
     return cadence&&((weekIndex(monday)-a.phase)%cadence+cadence)%cadence===0;
   }
+  /** Dom. anterior: matriz/histórico, lista planejada, ou cadência. */
+  function prevSundayRested(c, assignment, monday, employee) {
+    const prevSun = iso(add(monday, -1));
+    const hist = historyCell(c, employee, prevSun);
+    if (hist) return off(hist);
+    const a = assignment[employee];
+    if (a?.sundays) return a.sundays.includes(prevSun);
+    return !!sundayOff(c, a, add(monday, -7), employee);
+  }
+  /**
+   * 6×1 automático — faixa da folga útil:
+   * trabalhou no domingo anterior → Terça (nunca segunda com domingo);
+   * folgou → Qua/Qui.
+   * No domingo de revezamento a faixa antecipada permanece (precisa quebrar
+   * a sequência de 6 dias); só não cai na segunda.
+   */
+  function postSundayWeekday(c, assignment, monday, employee, sundayDue) {
+    if (sundayDue || !prevSundayRested(c, assignment, monday, employee)) return [1, 2, 3];
+    return [2, 3];
+  }
   function planSundays(c,calendar,assignment,attempt) {
     if(c.model==='12x36')return assignment;
     const sundays=calendar.days.filter(day=>dow(date(day))===6),n=c.employees.length;
@@ -177,6 +197,16 @@
     const n = c.employees.length, monday = date(days[0]);
     const limits = days.map(d => business(c, d));
     const maxOff = limits.map(b => n - b.min), minOff = limits.map(b => n - b.max);
+    // Cargas da folga útil (para redistribuir segunda no revezamento e preferir a faixa).
+    const weekdayLoads = Array(7).fill(0);
+    c.employees.forEach((e, i) => {
+      const due = sundayOff(c, assignment[i], monday, i);
+      if (c.model === 'espanhola' && target(c, monday) === 1 && due && e.fixed < 0) return;
+      const base = assignment[i].base;
+      // Segunda + domingo de revezamento: conta depois, na redistribuição.
+      if (c.model === '6x1' && e.fixed < 0 && due && base === 0) return;
+      if (base >= 0 && base <= 6) weekdayLoads[base]++;
+    });
     const lists = c.employees.map((e, i) => {
       let mandatory = 0;
       limits.forEach((b, d) => { if (b.closed) mandatory |= 1 << d; });
@@ -184,10 +214,33 @@
       const sundayDue = sundayOff(c,assignment[i],monday,i);
       if (sundayDue) mandatory |= 1 << 6;
       const quota = target(c, monday);
+      const postSunday = c.model === '6x1' && e.fixed < 0;
       // Na semana de uma única folga, o domingo de revezamento substitui
-      // a base automática; uma base fixada pela pessoa continua obrigatória.
+      // a base automática (espanhola); uma base fixada pela pessoa continua.
+      // 6×1 automático: mantém base+domingo; se a base é segunda, move para a faixa
+      // antecipada (Ter/Qua/Qui) respeitando o mínimo do dia.
       if (!(c.model === 'espanhola' && quota === 1 && sundayDue && e.fixed < 0)) {
-        const base=assignment[i].base;
+        let base = assignment[i].base;
+        if (postSunday) {
+          const band = postSundayWeekday(c, assignment, monday, i, sundayDue);
+          if (sundayDue && base === 0) {
+            // Revezamento com base na segunda → Ter/Qua/Qui quando o mínimo couber.
+            const alt = band.filter((d) => !limits[d].closed && weekdayLoads[d] < maxOff[d]);
+            alt.sort((a, b) => weekdayLoads[a] - weekdayLoads[b] || a - b);
+            if (alt.length) {
+              base = alt[0];
+              weekdayLoads[base]++;
+            }
+          } else if (!sundayDue && !band.includes(base)) {
+            const alt = band.filter((d) => !limits[d].closed && weekdayLoads[d] < maxOff[d]);
+            alt.sort((a, b) => weekdayLoads[a] - weekdayLoads[b] || a - b);
+            if (alt.length) {
+              weekdayLoads[base]--;
+              base = alt[0];
+              weekdayLoads[base]++;
+            }
+          }
+        }
         if(days[base]>=c.month+'-01'||!c.previous)mandatory |= 1 << base;
       }
       let fixedOff=0,fixedWork=0,extraFC=0;
@@ -464,8 +517,10 @@
           const wd = dow(date(day));
           const monday = add(date(day), -wd);
           const sundayDue = sundayOff(c,r.assignment[i],monday,i);
+          const postSunday = c.model === '6x1' && e.fixed < 0;
           const replacesBase = c.model === 'espanhola' && target(c, monday) === 1 && sundayDue && e.fixed < 0;
-          if ((!c.previous||day>=r.first)&&wd === r.assignment[i].base && !replacesBase && row[j] !== 'F') fail(e.name + ': folga-base de ' + weekdays[wd] + ' não respeitada em ' + day + '.', 'base');
+          // 6×1 automático pode mover segunda→Ter/Qua/Qui no revezamento.
+          if (!postSunday && (!c.previous||day>=r.first)&&wd === r.assignment[i].base && !replacesBase && row[j] !== 'F') fail(e.name + ': folga-base de ' + weekdays[wd] + ' não respeitada em ' + day + '.', 'base');
           if (wd === 6 && sundayDue && row[j] !== 'F') fail(e.name + ': domingo de folga não respeitado em ' + day + '.', 'domingos');
         });
         const sundays=r.days.map((day,j)=>({day,j})).filter(x=>dow(date(x.day))===6);
