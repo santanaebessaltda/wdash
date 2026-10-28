@@ -75,16 +75,22 @@ function viewHeading(mode: ScheduleViewMode, focusDay: string, monthStart: strin
   return `${dayHeading(from)} a ${dayHeading(to)}`;
 }
 
-function visibleDatesFor(mode: ScheduleViewMode, focusDay: string, monthStart: string): string[] {
+/** Dias do mês civil — a grade sempre usa essa largura (semana/dia só destaca o foco). */
+function monthDates(monthStart: string): string[] {
+  const list: string[] = [];
+  const last = endOfMonth(monthStart);
+  for (let day = monthStart; day <= last; day = addDays(day, 1)) list.push(day);
+  return list;
+}
+
+/** Recorte de foco (semana/dia) — usado para escurecer o que fica fora, sem tirar coluna. */
+function focusDatesFor(mode: ScheduleViewMode, focusDay: string, monthStart: string): string[] {
   if (mode === "day") return [focusDay];
   if (mode === "week") {
     const from = startOfWeek(focusDay);
     return Array.from({ length: 7 }, (_, index) => addDays(from, index));
   }
-  const list: string[] = [];
-  const last = endOfMonth(monthStart);
-  for (let day = monthStart; day <= last; day = addDays(day, 1)) list.push(day);
-  return list;
+  return monthDates(monthStart);
 }
 
 function dayTitle(iso: string, holiday: string | null): string {
@@ -237,7 +243,8 @@ export function SchedulePage() {
       : viewMode === "week"
         ? Array.from({ length: 7 }, (_, index) => addDays(weekStart, 7 + index)).some(hasScheduleOn)
         : hasScheduleOn(addDays(focusDay, 1));
-  const dates = useMemo(() => visibleDatesFor(viewMode, focusDay, monthStart), [viewMode, focusDay, monthStart]);
+  const boardDates = useMemo(() => monthDates(monthStart), [monthStart]);
+  const focusDates = useMemo(() => focusDatesFor(viewMode, focusDay, monthStart), [viewMode, focusDay, monthStart]);
   const rangeHeading = viewHeading(viewMode, focusDay, monthStart);
 
   function goPrev() {
@@ -681,11 +688,9 @@ export function SchedulePage() {
           <>
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
               {scheduleCards.map(({ view, item }) => {
-                const visible =
-                  viewMode === "month"
-                    ? dates.filter((iso) => startOfMonth(iso) === item.monthStart)
-                    : dates;
-                const boardDays = view.days.filter((row) => visible.includes(row.day));
+                const dates = boardDates.filter((iso) => startOfMonth(iso) === item.monthStart);
+                const active = new Set(focusDates.filter((iso) => startOfMonth(iso) === item.monthStart));
+                const boardDays = view.days.filter((row) => dates.includes(row.day));
                 const compRows = buildCompOffSummary({
                   monthStart: item.monthStart,
                   monthDays: view.days.filter((row) => startOfMonth(row.day) === item.monthStart),
@@ -694,10 +699,6 @@ export function SchedulePage() {
                   compDue: item.schedule.compDue,
                   people: view.people.map((person) => ({ id: person.id, name: person.name })),
                 });
-                const boardSchedules =
-                  viewMode === "month"
-                    ? [item]
-                    : view.months.filter((month) => visible.some((iso) => startOfMonth(iso) === month.monthStart));
                 const storeLabel = view.store.tradeName || view.store.name;
                 return (
                   <Card key={`${view.store.id}-${item.monthStart}`}>
@@ -706,12 +707,13 @@ export function SchedulePage() {
                       <div className="flex flex-wrap items-center gap-2">{registeredActions(view, item.monthStart)}</div>
                     </div>
                     <ScheduleBoard
-                      dates={visible}
+                      dates={dates}
+                      activeDates={active}
                       today={today}
                       section={{
                         storeId: view.store.id,
                         holidays: view.holidays,
-                        schedules: boardSchedules.length > 0 ? boardSchedules : [item],
+                        schedules: [item],
                         days: boardDays,
                         people: view.people,
                       }}
@@ -827,12 +829,15 @@ function isWorking(row: StoredDay | undefined): boolean {
 
 function ScheduleBoard({
   dates,
+  activeDates,
   today,
   section,
   onOpenDay,
   readOnly = false,
 }: {
   dates: string[];
+  /** Dias em foco (semana/dia). Fora disso a coluna permanece, só escurece. */
+  activeDates?: Set<string>;
   today: string;
   section: ScheduleSection;
   onOpenDay: (day: string, sellerId: string) => void;
@@ -841,6 +846,10 @@ function ScheduleBoard({
   const { schedules, people, holidays } = section;
   const byId = new Map(people.map((person) => [person.id, person]));
   const byDay = daysByDate(section.days);
+  const focusAll = !activeDates || activeDates.size === 0 || activeDates.size === dates.length;
+  function inFocus(iso: string) {
+    return focusAll || activeDates!.has(iso);
+  }
   function scheduleFor(iso: string): StoredSchedule | null {
     return schedules.find((item) => item.monthStart === startOfMonth(iso))?.schedule ?? null;
   }
@@ -887,6 +896,8 @@ function ScheduleBoard({
   const dayCols = `repeat(${dates.length}, minmax(1.75rem, 1fr))`;
   const stickyPerson = "sticky left-0 z-[1] bg-bg-2 pr-2";
   const tile = "flex aspect-square w-full min-w-0 flex-col items-center justify-center rounded-[4px] text-[10px] font-bold leading-none";
+  /** Fora do foco (semana/dia): mesma coluna, só escurece — padrão do Heatmap/calendário. */
+  const dimOut = "opacity-[0.28]";
   return (
     <div className="min-w-0 overflow-x-auto overscroll-x-contain">
       <div
@@ -897,12 +908,17 @@ function ScheduleBoard({
         {dates.map((iso) => {
           const holiday = holidayLabel(holidays, iso);
           const day = Number(iso.slice(8));
+          const focused = inFocus(iso);
           return (
-            <div key={iso} title={holiday ?? dayTitle(iso, null)} className={cn("px-0.5 pb-1 text-center", holiday && iso !== today && "text-warn")}>
+            <div
+              key={iso}
+              title={holiday ?? dayTitle(iso, null)}
+              className={cn("px-0.5 pb-1 text-center", !focused && dimOut, holiday && iso !== today && focused && "text-warn")}
+            >
               <span
                 className={cn(
                   "mx-auto inline-flex h-5 w-5 items-center justify-center rounded-full text-[11px] font-bold",
-                  iso === today ? "bg-acc text-white" : holiday ? "text-warn" : "text-t0",
+                  iso === today ? "bg-acc text-white" : holiday && focused ? "text-warn" : "text-t0",
                 )}
               >
                 {day}
@@ -925,12 +941,13 @@ function ScheduleBoard({
               const doublePay = scheduleFor(iso)?.holidayRules.some((rule) => rule.date === iso && rule.pay === "double") ?? false;
               const mark = row ? cellMark(row.status, doublePay) : null;
               const status = row ? statusChip(row.status, doublePay).label : "sem escala";
+              const focused = inFocus(iso);
               if (!row || !mark) {
-                return <div key={iso} className={cn(tile, "bg-bg-3")} aria-hidden />;
+                return <div key={iso} className={cn(tile, "bg-bg-3", !focused && dimOut)} aria-hidden />;
               }
               if (readOnly) {
                 return (
-                  <div key={iso} className={cn(tile, mark.className)} title={status}>
+                  <div key={iso} className={cn(tile, mark.className, !focused && dimOut)} title={status}>
                     {mark.letters}
                     {mark.note ? <span className="mt-0.5 text-[8px] font-semibold uppercase opacity-90">{mark.note}</span> : null}
                   </div>
@@ -940,7 +957,7 @@ function ScheduleBoard({
                 <button
                   key={iso}
                   type="button"
-                  className={cn(tile, "cursor-pointer transition-opacity hover:opacity-90", mark.className)}
+                  className={cn(tile, "cursor-pointer transition-opacity hover:opacity-90", mark.className, !focused && dimOut)}
                   aria-label={`${person.name}, ${Number(iso.slice(8))}: ${status}`}
                   onClick={() => onOpenDay(iso, person.id)}
                 >
@@ -956,8 +973,9 @@ function ScheduleBoard({
           const face = presence(iso);
           const title = face.closed ? "A loja fecha neste dia" : face.exact ? "Quantidade exata neste feriado" : "Mínimo do dia";
           const sub = face.closed ? "Fechado" : face.min > 0 ? `${face.exact ? "Ex." : "Mín."} ${face.min}` : "";
+          const focused = inFocus(iso);
           return (
-            <div key={iso} title={title} className="min-w-0 px-0.5 py-1 text-center">
+            <div key={iso} title={title} className={cn("min-w-0 px-0.5 py-1 text-center", !focused && dimOut)}>
               <span className={cn("block text-[11px] font-bold tabular-nums", face.closed ? "text-t2" : "text-t1")}>{face.closed ? "—" : face.working}</span>
               {sub ? <span className="block truncate text-[9px] leading-tight text-t2">{sub}</span> : null}
             </div>
