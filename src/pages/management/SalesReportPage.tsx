@@ -75,7 +75,7 @@ const REPORT_LEGEND: LegendItem[] = [
   { key: "today", color: "bg-acc", label: "Em aberto" },
   { key: "missing", color: "bg-warn", label: "Não informado" },
   { key: "match", color: "bg-ok", label: "Informado" },
-  { key: "diff", color: "bg-bad", label: "Informado diferente" },
+  { key: "diff", color: "bg-bad", label: "Com diferença" },
 ];
 
 function dayStatus(soldCents: number, informedCents: number | null): { text: string; color: string } {
@@ -622,8 +622,8 @@ function GroupDayModal({
     : [];
   const missing = blocks.some((block) => block.informedCents == null);
   const gap = blocks.some((block) => block.informedCents != null && block.soldCents != null && block.informedCents !== block.soldCents);
-  const status = todayDay ? "Em aberto" : missing ? "Não informado" : "Informado";
-  const variant = !todayDay && !missing && gap ? "danger" : statusBadgeVariant(status);
+  const status = todayDay ? "Em aberto" : missing ? "Não informado" : gap ? "Com diferença" : "Informado";
+  const variant = statusBadgeVariant(status);
   return (
     <Modal
       open={day != null}
@@ -685,8 +685,8 @@ function InformedDayModal({
   const todayDay = day === today;
   const faltando = day != null && !todayDay && informed == null;
   const diferente = day != null && !todayDay && informed != null && sold != null && informed !== sold;
-  const status = todayDay ? "Em aberto" : faltando ? "Não informado" : "Informado";
-  const variant = diferente ? "danger" : statusBadgeVariant(status);
+  const status = todayDay ? "Em aberto" : faltando ? "Não informado" : diferente ? "Com diferença" : "Informado";
+  const variant = statusBadgeVariant(status);
   const difference = sold != null && informed != null ? informed - sold : null;
   return (
     <Modal

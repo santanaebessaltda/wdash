@@ -1,9 +1,11 @@
 export type StatusVariant = "success" | "warning" | "danger" | "info" | "accent" | "neutral";
 
 const SUCCESS = ["active", "completed", "paid", "delivered", "approved", "success", "in stock", "won", "resolved", "verified", "published", "online", "confirmed", "shipped"];
-const WARNING = ["pending", "in progress", "processing", "on hold", "low stock", "review", "draft", "trial", "warning", "scheduled", "waiting"];
+const WARNING = ["pending", "processing", "on hold", "low stock", "review", "draft", "trial", "warning", "scheduled", "waiting"];
 const DANGER = ["inactive", "cancelled", "canceled", "failed", "rejected", "overdue", "out of stock", "lost", "error", "expired", "blocked", "urgent", "high"];
-const INFO = ["new", "info", "open", "invited", "queued", "medium"];
+const INFO = ["new", "info", "invited", "queued", "medium"];
+/** Mesma semântica das legendas: estado atual / aberto. */
+const ACCENT = ["in progress", "open"];
 
 /** Maps a free-text status/severity label to a badge color variant, so
  * mock data can stay plain strings instead of baking colors into records. */
@@ -13,20 +15,21 @@ export function statusVariant(status: string): StatusVariant {
   if (WARNING.includes(s)) return "warning";
   if (DANGER.includes(s)) return "danger";
   if (INFO.includes(s)) return "info";
+  if (ACCENT.includes(s)) return "accent";
   return "neutral";
 }
 
 /**
- * Semântica fixa do produto (uma cor = um significado):
- * - success (mint): resultado positivo, confirmado, saudável
- * - warning (âmbar): pendência / atenção — ainda não é erro
- * - danger (vermelho): erro, bloqueio, resultado negativo
- * - info (azul): futuro / ainda não iniciado
- * - accent (rosa): estado atual / aberto / “agora”
- * - neutral (cinza): encerrado, desligado, sem configuração
+ * Semântica fixa do produto — mesma língua das legendas (`ColorLegend`):
+ * - success / bg-ok: resultado positivo, concluído, saudável
+ * - warning / bg-warn: pendência / atenção
+ * - danger / bg-bad: problema / negativo
+ * - info / bg-info: futuro / informativo / exceção neutra
+ * - accent / bg-acc: estado atual / aberto / “agora” (Em aberto, Em andamento)
+ * - neutral / bg-chip-gray: neutro / encerrado / inativo
  *
- * Sequência típica de ciclo: A começar → Em andamento → Concluído/Encerrado
- * (azul → rosa → verde ou cinza).
+ * Sequência típica: A começar → Em andamento → Concluído/Encerrado
+ * (azul → rosa → verde ou cinza). Fechamento é a referência visual.
  */
 const PRODUCT_STATUS: Record<string, StatusVariant> = {
   // success — resultado positivo / saudável
@@ -68,6 +71,8 @@ const PRODUCT_STATUS: Record<string, StatusVariant> = {
   "senha invalida": "danger",
   "não alcançado": "danger",
   "nao alcancado": "danger",
+  "com diferença": "danger",
+  "informado diferente": "danger",
 
   // info — futuro
   "a começar": "info",

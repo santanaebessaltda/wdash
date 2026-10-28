@@ -29,6 +29,7 @@ describe("statusBadgeVariant", () => {
     expect(statusBadgeVariant("Erro")).toBe("danger");
     expect(statusBadgeVariant("Senha inválida")).toBe("danger");
     expect(statusBadgeVariant("Não alcançado")).toBe("danger");
+    expect(statusBadgeVariant("Com diferença")).toBe("danger");
 
     // info — futuro
     expect(statusBadgeVariant("A começar")).toBe("info");
