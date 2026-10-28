@@ -8,7 +8,7 @@ import { AreaLineChart, BarChart, DonutChart } from "@/components/charts";
 import { isOwner } from "@/layout/nav-wedash";
 import { productStores, queryStoreIds, storesForSession } from "@/data/wedash/stores";
 import { scopeFilterKey, useScope } from "@/pages/dashboard/useScope";
-import { buildOverviewView, resolvePeriod, previousPeriod, OVERVIEW_PRODUCTS_TOP, OVERVIEW_TEAM_TOP, overviewDisplayedProductTotal, type OverviewKpi } from "@/data/wedash/dashboard";
+import { buildOverviewView, resolvePeriod, previousPeriod, OVERVIEW_PRODUCTS_TOP, OVERVIEW_TEAM_TOP, overviewDisplayedProductTotal, teamShiftName, type OverviewKpi } from "@/data/wedash/dashboard";
 import {
   fetchSalesDayAggs,
   fetchSalesHourAggs,
@@ -106,6 +106,13 @@ const KPI_ICONS = [IconRevenue, IconCmv, IconSales, IconTicket];
 function storesLabel(storeRows: string[]): string | null {
   if (storeRows.length === 0) return null;
   return storeRows.length > 1 ? `${storeRows[0]} · +${storeRows.length - 1}` : storeRows[0]!;
+}
+
+/** Loja (quando o filtro tem mais de uma) · turno cadastrado. */
+function sellerSubtitle(store: string | null, shift?: string): string | null {
+  const shiftName = shift ? teamShiftName(shift) : "";
+  const text = [store, shiftName].filter(Boolean).join(" · ");
+  return text || null;
 }
 
 /**
@@ -1063,6 +1070,7 @@ export default function OverviewPage() {
                   const key = v.key;
                   const open = key ? () => openPerson(key, v.name) : undefined;
                   const store = showSellerStore ? storesLabel(v.storeRows) : null;
+                  const subtitle = sellerSubtitle(store, v.shift);
                   return (
                     <tr
                       key={key ?? v.name}
@@ -1085,13 +1093,13 @@ export default function OverviewPage() {
                           <Avatar name={v.name} src={v.avatarUrl} size="sm" />
                           <div className="min-w-0">
                             <p className="truncate text-[13px] font-bold text-t0">{v.name}</p>
-                            {store &&
-                              (v.storeRows.length > 1 ? (
+                            {subtitle &&
+                              (showSellerStore && v.storeRows.length > 1 ? (
                                 <Tooltip label={v.storeRows.slice(1).join(" · ")}>
-                                  <p className="truncate text-[11px] text-t2">{store}</p>
+                                  <p className="truncate text-[11px] text-t2">{subtitle}</p>
                                 </Tooltip>
                               ) : (
-                                <p className="truncate text-[11px] text-t2">{store}</p>
+                                <p className="truncate text-[11px] text-t2">{subtitle}</p>
                               ))}
                           </div>
                         </div>
