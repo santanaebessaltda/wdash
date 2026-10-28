@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Accordion, Alert, Badge, Button, Card, Dropdown, Modal, PageHeader, Select, Switch, useToast } from "@/components/ui";
+import { Accordion, Alert, Badge, Button, Card, Checkbox, Dropdown, Modal, PageHeader, Select, useToast } from "@/components/ui";
 import { ColorLegend, type LegendItem } from "@/components/wedash/ColorLegend";
 import { ScheduleCardsSkeleton } from "@/components/wedash/LoadingSkeletons";
 import { PersonAvatar } from "@/components/wedash/PersonAvatar";
@@ -907,19 +907,21 @@ export function SchedulePage() {
                     <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
                       <div className="min-w-0">
                         <h3 className="text-[17px] font-extrabold leading-tight tracking-tight text-t0">
-                          {PATTERN_LABEL[item.schedule.pattern]}
+                          Escala {PATTERN_LABEL[item.schedule.pattern]}
                         </h3>
                         <div className="mt-1 flex min-w-0 flex-wrap items-center gap-2">
-                          <p className="min-w-0 truncate text-[13px] font-semibold text-t1">{storeLabel}</p>
+                          <Badge variant="neutral" className="max-w-full truncate">
+                            {storeLabel}
+                          </Badge>
                           <Badge variant="neutral">{monthLabel(item.monthStart)}</Badge>
                         </div>
                       </div>
                       <div className="flex flex-wrap items-center gap-2">{registeredActions(view, item.monthStart)}</div>
                     </div>
                     <div className="mb-3">
-                      <Switch
+                      <Checkbox
                         checked={showNeighbors}
-                        onChange={setShowNeighbors}
+                        onChange={(event) => setShowNeighbors(event.target.checked)}
                         label="Ver também os dias dos meses vizinhos"
                       />
                     </div>
