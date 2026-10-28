@@ -130,7 +130,7 @@ function CompOffAccordion({ rows }: { rows: CompOffSummaryRow[] }) {
                   <tbody>
                     {rows.map((row) => (
                       <tr key={`${row.personId}|${row.holidayDate}`}>
-                        <td className="py-1.5 pr-3 font-semibold text-t0">{titleName(row.personName)}</td>
+                        <td className="py-1.5 pr-3 font-semibold uppercase tracking-wide text-t0">{row.personName}</td>
                         <td className="py-1.5 pr-3 text-t1">
                           <span className="font-semibold tabular-nums text-t0">{shortDate(row.holidayDate)}</span>
                           {row.holidayName ? <span className="mt-0.5 block text-[11px] text-t2">{row.holidayName}</span> : null}
@@ -1124,7 +1124,7 @@ function ScheduleBoard({
       const role = person ? branchRoleLabel(person.role) : "";
       const offLabel = offDow != null ? `Folga: ${DOW_LABELS[offDow as 0 | 1 | 2 | 3 | 4 | 5 | 6]}` : "";
       const detail = [role, offLabel].filter(Boolean).join("  ·  ");
-      return { id, name: titleName(person?.name ?? "Pessoa"), detail, code: person?.code ?? null };
+      return { id, name: (person?.name ?? "Pessoa").toLocaleUpperCase("pt-BR"), detail, code: person?.code ?? null };
     })
     .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
 
