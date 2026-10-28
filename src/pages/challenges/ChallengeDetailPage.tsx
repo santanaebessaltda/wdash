@@ -31,7 +31,7 @@ import {
   type ChallengeView,
 } from "@/data/wedash/challengeView";
 import { calendarTodayIso } from "@/data/wedash/clock";
-import { storesForSession } from "@/data/wedash/stores";
+import { branchRoleLabel, storesForSession } from "@/data/wedash/stores";
 import { brlCent, fullDate, shortDate, isoToDate, num, dateToIso, presenceDayLabel } from "@/lib/format";
 import { exportPdf } from "@/lib/printMode";
 import { useMinSkeleton } from "@/lib/useMinSkeleton";
@@ -471,7 +471,7 @@ function ParticipantsCard({ challenge: c, view }: { challenge: ChallengeRecord; 
                         name={p.name}
                         employeeId={p.key}
                         storeId={c.storeId}
-                        sub={[p.group, p.periodDays > 0 ? presenceDayLabel(p.eligibleDays, "desafio") : null].filter(Boolean).join(" · ") || null}
+                        sub={participantSubtitle(p)}
                       />
                     </div>
                   </td>
@@ -544,14 +544,18 @@ function ChallengePayoutCard({ challenge: c, view, onExport }: { challenge: Chal
   const endMais1 = isoToDate(c.endsOn);
   endMais1.setDate(endMais1.getDate() + 1);
   const lines = [
-    ...payout.vencedores.map((w) => ({
-      key: w.key,
-      name: w.name,
-      sub: w.group,
-      rank: w.rank,
-      prize: w.prize,
-      employeeId: w.key,
-    })),
+    ...payout.vencedores.map((w) => {
+      const shift = !w.group || w.group === "Sem grupo definido" || w.group === "Sem grupo" ? "" : w.group;
+      const role = branchRoleLabel(w.role).toLocaleUpperCase("pt-BR");
+      return {
+        key: w.key,
+        name: w.name,
+        sub: [shift, role].filter(Boolean).join(" · ") || null,
+        rank: w.rank,
+        prize: w.prize,
+        employeeId: w.key,
+      };
+    }),
     ...(payout.management
       ? [{ key: "gerencia", name: "GERÊNCIA", sub: "Resultado da equipe", rank: "Ganhou", prize: payout.management, employeeId: null as string | null }]
       : []),
@@ -660,6 +664,15 @@ function ChallengePayoutCard({ challenge: c, view, onExport }: { challenge: Chal
       )}
     </Card>
   );
+}
+
+/** Mesmo padrão do card de meta: turno · CARGO · presença. */
+function participantSubtitle(p: ChallengeView["participants"][number]): string | null {
+  const shift = !p.group || p.group === "Sem grupo definido" || p.group === "Sem grupo" ? "" : p.group;
+  const role = branchRoleLabel(p.role).toLocaleUpperCase("pt-BR");
+  const presence = p.periodDays > 0 ? presenceDayLabel(p.eligibleDays, "desafio") : null;
+  const text = [shift, role, presence].filter(Boolean).join(" · ");
+  return text || null;
 }
 
 function PersonName({

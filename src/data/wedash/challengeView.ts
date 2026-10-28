@@ -121,6 +121,8 @@ export interface ChallengeParticipant {
   key: string;
   name: string;
   group: string | null;
+  /** CARGO no Millennium. Null = sem cargo gravado. */
+  role: string | null;
   /** null = a comecar ou P.A. sem itens gravados (" - "). */
   result: number | null;
   sales: number;
@@ -144,7 +146,7 @@ export interface ChallengeCollectiveResult {
   atingiu: boolean;
   prize: ChallengePrize;
   /** Vendedores que dividem o prêmio em R$. */
-  recipients: { key: string; name: string; group: string | null }[];
+  recipients: { key: string; name: string; group: string | null; role: string | null }[];
 }
 
 export interface ChallengeManagerResult {
@@ -228,6 +230,7 @@ interface Acc {
   key: string;
   name: string;
   group: string | null;
+  role: string | null;
   eligibleDays: number;
   /** Itens e R$ dos produtos/categorias escolhidos. */
   items: number;
@@ -297,6 +300,7 @@ export function buildChallengeView(args: {
         key,
         name: collaboratorName(member?.name ?? (sellerName || sellerKey)),
         group: member?.shiftName ?? null,
+        role: member?.role ?? null,
         eligibleDays: member ? (presenceOf.get(member.employeeId)?.size ?? 0) : periodDays,
         items: 0,
         amountCents: 0,
@@ -424,6 +428,7 @@ export function buildChallengeView(args: {
       key: a.key,
       name: a.name,
       group: a.group,
+      role: a.role,
       result,
       sales: a.sales,
       position,
@@ -610,6 +615,7 @@ export function buildChallengeView(args: {
       key: `e:${member.employeeId}`,
       name: collaboratorName(member.name),
       group: member.shiftName ?? null,
+      role: member.role ?? null,
     }))
     .sort((a, b) => a.name.localeCompare(b.name, "pt-BR") || a.key.localeCompare(b.key));
 
@@ -638,6 +644,7 @@ export function buildChallengeView(args: {
       key: person.key,
       name: person.name,
       group: person.group,
+      role: person.role,
       result: null,
       sales: 0,
       position: null,
@@ -676,6 +683,7 @@ export interface ChallengeWinner {
   key: string;
   name: string;
   group: string | null;
+  role: string | null;
   /** "1º lugar" | "Ganhou" */
   rank: string;
   prize: ChallengePrize;
@@ -700,6 +708,7 @@ export function challengePayout(view: ChallengeView): ChallengePayout {
       key: p.key,
       name: p.name,
       group: p.group,
+      role: p.role,
       rank: p.position != null ? `${p.position}º lugar` : "Ganhou",
       prize: p.prize!,
     }));

@@ -3,10 +3,17 @@ import { BranchBadge, DeadlineBadge, PeriodBadge, PrizeBadge, RecordStatusBadge 
 import { PersonAvatar, PersonAvatarGroup } from "@/components/wedash/PersonAvatar";
 import type { ChallengeMetric, ChallengeRecord } from "@/data/wedash/challengesRepo";
 import { CHALLENGE_STATUS_LABEL, metricValueLabel, prizeLabel, type ChallengeParticipant, type ChallengeView } from "@/data/wedash/challengeView";
+import { branchRoleLabel } from "@/data/wedash/stores";
 import { cn } from "@/lib/cn";
 import { num } from "@/lib/format";
 import { challengeCriterion, challengeHeadline, challengeMinimumLabel, challengeWonLabel, HeadlineText, mainPrizeLabel } from "@/pages/challenges/shared";
 import { FlameIcon, TrophyIcon } from "@/pages/dashboards/icons";
+
+/** Mesmo subtítulo do card de meta: turno · CARGO. */
+function personSubtitle(person: Pick<ChallengeParticipant, "group" | "role">): string {
+  const shift = !person.group || person.group === "Sem grupo definido" || person.group === "Sem grupo" ? "" : person.group;
+  return [shift, branchRoleLabel(person.role).toLocaleUpperCase("pt-BR")].filter(Boolean).join(" · ");
+}
 
 /** P.A., ticket e índice só fecham no fim. O percentual substitui a barra. */
 function settlesAtEnd(metric: ChallengeMetric): boolean {
@@ -105,12 +112,14 @@ export function ChallengeMiniCard({
                 const above = floorTarget != null && person.result != null && person.result >= floorTarget;
                 const resultClass = person.result == null ? "text-t2" : late && floorTarget != null ? (above ? "text-acc" : "text-t1") : person.result < 0 ? "text-bad" : late ? "text-t0" : "text-acc";
                 const showTrack = !late || disputa || person.winner || (ended && person.result != null);
+                const subtitle = personSubtitle(person);
                 return (
                   <li key={person.key} className={cn("min-w-0", hotKey === person.key && "rounded-lg bg-acc-soft px-1 py-1")}>
                     <div className="flex items-baseline justify-between gap-3">
                       <span className="min-w-0 truncate text-[13px] font-extrabold uppercase tracking-wide text-t0">{person.name}</span>
                       <span className={`shrink-0 text-[13px] font-bold ${resultClass}`} {...(secret && (c.metric === "VALUE" || c.metric === "TICKET") ? { "data-secret": "" } : {})}>{person.result == null ? "—" : metricValueLabel(c.metric, person.result)}</span>
                     </div>
+                    {subtitle ? <p className="mt-0.5 truncate text-[10.5px] text-t2">{subtitle}</p> : null}
                     {showTrack ? (
                       <div className={cn("mt-1 flex items-center gap-2", late && "justify-end")}>
                         {late ? null : (
@@ -465,21 +474,30 @@ function ChallengePeople({
           const floorTarget = c.target != null && c.target > 0 ? c.target : null;
           const above = floorTarget != null && person.result != null && person.result >= floorTarget;
           const resultClass = person.result == null ? "text-t2" : late && floorTarget != null ? (above ? "text-acc" : "text-t1") : person.result < 0 ? "text-bad" : late ? "text-t0" : "text-t1";
+          const subtitle = personSubtitle(person);
+          const status = (
+            <ChallengePersonStatus person={person} disputa={disputa} ended={view.status === "ended"} pct={pct} announcePrize={announcePrize} late={late} />
+          );
           return (
             <li key={person.key} className={cn("min-w-0", hotKey === person.key && "rounded-lg bg-acc-soft px-1.5 py-1")}>
               <span className="flex items-start gap-2">
                 <PersonAvatar name={person.name} employeeId={person.key} storeId={c.storeId} size="sm" />
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[13px] font-semibold text-t0">{person.name}</span>
-                  <span className="mt-0.5 flex items-baseline justify-between gap-2">
-                    <span className={`font-mono text-[12px] font-bold tabular-nums ${resultClass}`}>
+                  <span className="flex items-baseline justify-between gap-2">
+                    <span className="min-w-0 truncate text-[13px] font-semibold text-t0">{person.name}</span>
+                    <span className={`shrink-0 font-mono text-[12px] font-bold tabular-nums ${resultClass}`}>
                       {person.result == null ? "—" : metricValueLabel(c.metric, person.result)}
                     </span>
-                    <ChallengePersonStatus person={person} disputa={disputa} ended={view.status === "ended"} pct={pct} announcePrize={announcePrize} late={late} />
                   </span>
-                  {late ? null : (
-                    <span className="mt-1.5 block">
-                      <ProgressBar value={pct} height={5} color={person.result == null ? "var(--line)" : undefined} />
+                  {subtitle ? <span className="mt-0.5 block truncate text-[11px] text-t2">{subtitle}</span> : null}
+                  {late ? (
+                    status ? <span className="mt-1.5 flex justify-end">{status}</span> : null
+                  ) : (
+                    <span className="mt-1.5 flex items-center gap-2">
+                      <span className="min-w-0 flex-1">
+                        <ProgressBar value={pct} height={5} color={person.result == null ? "var(--line)" : undefined} />
+                      </span>
+                      {status}
                     </span>
                   )}
                 </span>
