@@ -19,7 +19,7 @@ import { branchRoleLabel, fetchStoreSellers, fetchStoreShifts, isBranchTeamMembe
 import { DOW_LABELS } from "@/data/wedash/storeHours";
 import { applyDayChoices, buildCompOffSummary, dayEditOptions, defaultDayNeeds, generateMonth, inferCompLinks, issueFromUnknown, PREVIOUS_MONTH_EDIT, weekday, type CellChoice, type CompDue, type CompOffSummaryRow, type DayNeed, type DayStatus, type HolidayRule, type ScheduleGenerateIssue, type SchedulePattern, type Sex } from "@/data/wedash/scheduleGenerate";
 import { holidayLabel, holidaysForStore, loadHolidaySeed, loadNationalHolidays, storePlace, type Holiday } from "@/data/wedash/scheduleHolidays";
-import { deleteSchedule, fetchCompDue, fetchPreviousSnapshot, fetchSchedule, saveManualDay, saveSchedule, type StoredDay, type StoredSchedule } from "@/data/wedash/scheduleRepo";
+import { deleteSchedule, fetchCompDue, fetchPreviousSnapshot, fetchSchedule, patchScheduleCompDue, saveManualDay, saveSchedule, type StoredDay, type StoredSchedule } from "@/data/wedash/scheduleRepo";
 import { ScheduleWizard, type ScheduleWizardValue, type WizardBranch } from "./ScheduleWizard";
 
 const MONTHS = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
@@ -200,6 +200,99 @@ function plannedFcDays(rows: CompOffSummaryRow[], due: CompDue[], existing: Stor
   return out;
 }
 
+type DayEditContext = {
+  schedule: StoredSchedule;
+  monthStart: string;
+  monthEnd: string;
+  monthDays: StoredDay[];
+};
+
+/**
+ * Escala dona do dia (feriado → FC): se a FC cai no mês seguinte ainda sem escala,
+ * edita pela escala do mês do feriado — não trava como “mês anterior”.
+ */
+function resolveDayEditContext(
+  view: BranchSchedule,
+  day: string,
+  sellerId: string,
+  hintMonth: string | null,
+): DayEditContext | null {
+  const dayMonth = startOfMonth(day);
+  const prevMonth = addMonths(dayMonth, -1);
+
+  function byCompDue(monthStart: string): (typeof view.months)[number] | null {
+    const item = view.months.find((month) => month.monthStart === monthStart) ?? null;
+    if (!item) return null;
+    return item.schedule.compDue.some((due) => due.personId === sellerId && due.day === day) ? item : null;
+  }
+
+  function byLink(monthStart: string): (typeof view.months)[number] | null {
+    const item = view.months.find((month) => month.monthStart === monthStart) ?? null;
+    if (!item) return null;
+    const monthEnd = endOfMonth(monthStart);
+    const pool = view.days.filter((row) => {
+      const month = startOfMonth(row.day);
+      return month === monthStart || month === addMonths(monthStart, 1);
+    });
+    const planned = plannedFcDays(
+      [],
+      item.schedule.compDue,
+      pool,
+    );
+    const links = inferCompLinks([...pool, ...planned], item.schedule.holidayRules, monthEnd);
+    return links.some((link) => link.personId === sellerId && link.day === day) ? item : null;
+  }
+
+  let owner = byCompDue(prevMonth) ?? byLink(prevMonth);
+  if (!owner && hintMonth && dayMonth !== hintMonth) {
+    owner = view.months.find((month) => month.monthStart === hintMonth) ?? null;
+  }
+  if (!owner && hintMonth) {
+    owner = byCompDue(hintMonth);
+  }
+  if (!owner) {
+    owner = view.months.find((month) => month.monthStart === dayMonth) ?? null;
+  }
+  if (!owner && hintMonth) {
+    owner = view.months.find((month) => month.monthStart === hintMonth) ?? null;
+  }
+
+  if (!owner) return null;
+
+  const monthEnd = endOfMonth(owner.monthStart);
+  const nextStart = addMonths(owner.monthStart, 1);
+  const real = view.days.filter((row) => {
+    const month = startOfMonth(row.day);
+    return month === owner.monthStart || month === nextStart;
+  });
+  const summary = buildCompOffSummary({
+    monthStart: owner.monthStart,
+    monthDays: real.filter((row) => startOfMonth(row.day) === owner.monthStart),
+    allDays: real,
+    rules: owner.schedule.holidayRules,
+    compDue: owner.schedule.compDue,
+    people: view.people.map((person) => ({ id: person.id, name: person.name })),
+  });
+  const monthDays = [...real, ...plannedFcDays(summary, owner.schedule.compDue, real)];
+  if (!monthDays.some((row) => row.sellerId === sellerId && row.day === day)) return null;
+  return { schedule: owner.schedule, monthStart: owner.monthStart, monthEnd, monthDays };
+}
+
+/** Alinha `compDue` com as FC gravadas (mês seguinte editado na grade). */
+function syncCompDue(compDue: CompDue[], days: StoredDay[], rules: HolidayRule[], monthEnd: string): CompDue[] {
+  const links = inferCompLinks(days, rules, monthEnd);
+  return compDue.map((due) => {
+    const link = links.find((item) => item.personId === due.personId && item.holiday === due.holiday);
+    if (link) return { ...due, day: link.day, until: link.deadline };
+    const stillOwed = days.some((row) => row.sellerId === due.personId && row.day === due.holiday && row.status === "holiday_work");
+    if (!stillOwed) return due;
+    if (due.day && !days.some((row) => row.sellerId === due.personId && row.day === due.day && row.status === "comp_off")) {
+      return { ...due, day: null };
+    }
+    return due;
+  });
+}
+
 function statusChip(status: DayStatus, doublePay: boolean): { color: string; label: string } {
   if (status === "holiday_work" && doublePay) return { color: "bg-acc", label: "Pagamento em dobro" };
   if (status === "holiday_work") return { color: "bg-warn", label: "Feriado trabalhado" };
@@ -264,7 +357,7 @@ export function SchedulePage() {
   const [wizardStoreId, setWizardStoreId] = useState<string | null>(null);
   const [wizardMonth, setWizardMonth] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [dayOpen, setDayOpen] = useState<{ storeId: string; day: string; sellerId: string } | null>(null);
+  const [dayOpen, setDayOpen] = useState<{ storeId: string; day: string; sellerId: string; ownerMonth: string } | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{ storeId: string; monthStart: string } | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
   const storeIds = storeRows.map((row) => row.id).join(",");
@@ -335,7 +428,7 @@ export function SchedulePage() {
   }
   const wizardView = views.find((view) => view.store.id === wizardStoreId) ?? null;
   const dayView = dayOpen ? views.find((view) => view.store.id === dayOpen.storeId && view.months.length > 0) ?? null : null;
-  const openSchedule = dayOpen && dayView ? scheduleOn(dayView, dayOpen.day) : null;
+  const dayEdit = dayOpen && dayView ? resolveDayEditContext(dayView, dayOpen.day, dayOpen.sellerId, dayOpen.ownerMonth) : null;
   const deleteView = deleteTarget ? views.find((view) => view.store.id === deleteTarget.storeId) ?? null : null;
   const deleteMonth = deleteView?.months.find((item) => item.monthStart === deleteTarget?.monthStart) ?? null;
 
@@ -807,7 +900,7 @@ export function SchedulePage() {
                         days: boardDays,
                         people: view.people,
                       }}
-                      onOpenDay={(day, sellerId) => setDayOpen({ storeId: view.store.id, day, sellerId })}
+                      onOpenDay={(day, sellerId) => setDayOpen({ storeId: view.store.id, day, sellerId, ownerMonth: item.monthStart })}
                     />
                     <CompOffAccordion rows={compRows} />
                   </Card>
@@ -827,18 +920,41 @@ export function SchedulePage() {
           onSubmit={onGenerate}
         />
       ) : null}
-      {dayOpen && dayView && openSchedule ? (
+      {dayOpen && dayView && dayEdit ? (
         <DayEditor
           day={dayOpen.day}
           sellerId={dayOpen.sellerId}
-          pattern={openSchedule.pattern}
-          rules={openSchedule.holidayRules}
-          dayNeeds={openSchedule.dayNeeds}
-          monthDays={dayView.days.filter((row) => startOfMonth(row.day) === startOfMonth(dayOpen.day))}
+          pattern={dayEdit.schedule.pattern}
+          rules={dayEdit.schedule.holidayRules}
+          dayNeeds={dayEdit.schedule.dayNeeds}
+          monthEnd={dayEdit.monthEnd}
+          monthDays={dayEdit.monthDays}
           names={new Map(dayView.people.map((person) => [person.id, person]))}
           onClose={() => setDayOpen(null)}
           onSave={async (next) => {
+            const editedDays = next.flatMap((group) => group.rows);
+            const merged = [
+              ...dayEdit.monthDays.filter((row) => !editedDays.some((item) => item.sellerId === row.sellerId && item.day === row.day)),
+              ...editedDays,
+            ];
+            const nextDue = syncCompDue(dayEdit.schedule.compDue, merged, dayEdit.schedule.holidayRules, dayEdit.monthEnd);
             await saveDay([{ storeId: dayView.store.id, days: next }]);
+            if (JSON.stringify(nextDue) !== JSON.stringify(dayEdit.schedule.compDue)) {
+              await patchScheduleCompDue(dayView.store.id, dayEdit.monthStart, nextDue);
+              setViews((current) =>
+                current.map((view) => {
+                  if (view.store.id !== dayView.store.id) return view;
+                  return {
+                    ...view,
+                    months: view.months.map((month) =>
+                      month.monthStart === dayEdit.monthStart
+                        ? { ...month, schedule: { ...month.schedule, compDue: nextDue } }
+                        : month,
+                    ),
+                  };
+                }),
+              );
+            }
             setDayOpen(null);
             show("Dia salvo.", "success");
           }}
@@ -1036,8 +1152,8 @@ function ScheduleBoard({
               if (!row || !mark) {
                 return <div key={iso} className={cn(tile, "bg-bg-3", !focused && dimOut)} aria-hidden />;
               }
-              /* FC planejada no mês vizinho ainda sem escala: só exibe, não edita. */
-              if (readOnly || !monthSchedule) {
+              /* Sem escala no mês do tile (FC planejada no vizinho): ainda abre o editor pela escala dona. */
+              if (readOnly) {
                 return (
                   <div key={iso} className={cn(tile, mark.className, !focused && dimOut)} title={status}>
                     {mark.letters}
@@ -1090,6 +1206,7 @@ function DayEditor({
   pattern,
   rules,
   dayNeeds,
+  monthEnd,
   monthDays,
   names,
   onClose,
@@ -1100,12 +1217,13 @@ function DayEditor({
   pattern: SchedulePattern;
   rules: HolidayRule[];
   dayNeeds: DayNeed[];
+  /** Fim do mês da escala dona (feriado), não necessariamente do dia clicado. */
+  monthEnd: string;
   monthDays: StoredDay[];
   names: Map<string, StoreSeller>;
   onClose: () => void;
   onSave: (next: { day: string; rows: StoredDay[] }[]) => Promise<void>;
 }) {
-  const monthEnd = endOfMonth(startOfMonth(day));
   const links = inferCompLinks(monthDays, rules, monthEnd);
   const roster = monthDays.filter((row) => row.day === day && row.sellerId === sellerId);
   const personName = names.get(sellerId)?.name ?? "Pessoa";

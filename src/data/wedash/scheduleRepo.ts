@@ -239,6 +239,17 @@ export async function fetchCompDue(storeId: string, monthStart: string): Promise
   return result.data.comp_due as CompDue[];
 }
 
+/** Atualiza só o `comp_due` da escala (ex.: FC do mês seguinte editada na grade vizinha). */
+export async function patchScheduleCompDue(storeId: string, monthStart: string, compDue: CompDue[]): Promise<void> {
+  const sb = await client();
+  const result = await sb
+    .from("store_schedule")
+    .update({ comp_due: compDue })
+    .eq("store_id", storeId)
+    .eq("month_start", startOfMonth(monthStart));
+  if (result.error) throw new Error(result.error.message);
+}
+
 /** Snapshot do motor do mês anterior (revezamento de domingo / dia-base). */
 export async function fetchPreviousSnapshot(storeId: string, monthStart: string): Promise<GeneratorSnapshot | null> {
   const sb = await client();
