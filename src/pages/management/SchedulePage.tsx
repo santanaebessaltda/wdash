@@ -820,7 +820,7 @@ export function SchedulePage() {
                 void deleteSchedule(deleteView.store.id, deleteMonth.monthStart)
                   .then(() => {
                     setDeleteTarget(null);
-                    show("Escala apagada. O feriado continua no calendário.", "success");
+                    show("Escala apagada.", "success");
                     setReloadKey((value) => value + 1);
                   })
                   .catch((caught) => show(caught instanceof Error ? caught.message : "Não foi possível apagar a escala.", "danger"));
@@ -833,7 +833,7 @@ export function SchedulePage() {
       >
         <p className="text-[13.5px] text-t1">
           Apaga a escala de {deleteMonth ? monthLabel(deleteMonth.monthStart) : ""}
-          {many && deleteView ? ` de ${deleteView.store.tradeName || deleteView.store.name}` : " desta filial"}, inclusive os dias ajustados na mão. O feriado do dia continua no calendário.
+          {many && deleteView ? ` de ${deleteView.store.tradeName || deleteView.store.name}` : " desta filial"}, inclusive os dias ajustados na mão.
           {deleteMonth && endOfMonth(deleteMonth.monthStart) < today ? " Este período já passou." : ""}
         </p>
       </Modal>
