@@ -17,7 +17,6 @@ import { addDays, addMonths, endOfMonth, isoToDate, startOfMonth } from "@/data/
 import { fetchGoals } from "@/data/wedash/goalsRepo";
 import { scheduleStartMonth, type GoalSpan } from "@/data/wedash/goalMonths";
 import { branchRoleLabel, fetchStoreSellers, fetchStoreShifts, isBranchTeamMember, type Store, type StoreSeller, type StoreShift } from "@/data/wedash/stores";
-import { DOW_LABELS } from "@/data/wedash/storeHours";
 import { applyDayChoices, buildCompOffSummary, COMP_OFF_CLEAR_HINT, dayEditOptions, defaultDayNeeds, eligibleCompOffDays, generateMonth, inferCompLinks, issueFromUnknown, weekday, type CellChoice, type CompDue, type CompOffSummaryRow, type DayNeed, type DayStatus, type HolidayRule, type ScheduleGenerateIssue, type SchedulePattern, type Sex } from "@/data/wedash/scheduleGenerate";
 import { holidayLabel, holidaysForStore, loadHolidaySeed, loadNationalHolidays, storePlace, type Holiday } from "@/data/wedash/scheduleHolidays";
 import { deleteSchedule, fetchCompDue, fetchPreviousSnapshot, fetchSchedule, patchScheduleCompDue, replaceSchedulePerson, saveManualDay, saveSchedule, type StoredDay, type StoredSchedule } from "@/data/wedash/scheduleRepo";
@@ -951,6 +950,7 @@ export function SchedulePage() {
                         days: boardDays,
                         people: view.people,
                         directory: view.directory,
+                        shifts: view.shifts,
                       }}
                       onOpenDay={(day, sellerId) => setDayOpen({ storeId: view.store.id, day, sellerId, ownerMonth: item.monthStart })}
                       onReplacePerson={(fromSellerId, fromName) => {
@@ -1110,6 +1110,7 @@ type ScheduleSection = {
   days: StoredDay[];
   people: StoreSeller[];
   directory: StoreSeller[];
+  shifts: StoreShift[];
 };
 
 function ReplacePersonModal({
@@ -1252,43 +1253,25 @@ function ScheduleBoard({
     return schedules.find((item) => item.monthStart === startOfMonth(iso))?.schedule ?? null;
   }
   const ids = new Set<string>([...schedules.flatMap((item) => item.schedule.people.map((person) => person.sellerId)), ...section.days.map((row) => row.sellerId)]);
-  function offDowOf(id: string, fixed: number | null): number | null {
-    if (fixed != null) return fixed;
-    const counts = Array.from({ length: 7 }, () => 0);
-    for (const iso of dates) {
-      const row = (byDay.get(iso) ?? []).find((item) => item.sellerId === id);
-      if (row?.status === "off") counts[weekday(iso)] += 1;
-    }
-    let best = -1;
-    let bestCount = 0;
-    counts.forEach((count, dow) => {
-      if (count > bestCount) {
-        best = dow;
-        bestCount = count;
-      }
-    });
-    return bestCount > 0 ? best : null;
-  }
+  const shiftById = new Map(section.shifts.map((shift) => [shift.id, shift]));
   const roster = [...ids]
     .map((id) => {
       const person = byId.get(id);
       const orphan = !activeIds.has(id);
-      const fixed = schedules.flatMap((item) => item.schedule.people).find((row) => row.sellerId === id)?.fixedOffDow ?? null;
-      const offDow = offDowOf(id, fixed);
       const role = orphan
         ? "DESLIGADA"
         : person
           ? branchRoleLabel(person.role).toLocaleUpperCase("pt-BR")
           : "";
-      const offLabel =
-        offDow != null
-          ? `FOLGA: ${DOW_LABELS[offDow as 0 | 1 | 2 | 3 | 4 | 5 | 6].toLocaleUpperCase("pt-BR")}`
-          : "";
-      const detail = [role, offLabel].filter(Boolean).join("  ·  ");
+      const shift = person?.shiftId ? shiftById.get(person.shiftId) ?? null : null;
+      const groupLabel = shift ? shift.name.toLocaleUpperCase("pt-BR") : "";
+      const detail = [role, groupLabel].filter(Boolean).join("  ·  ");
+      const hoursTitle = shift ? `${shift.name} · ${shift.start}–${shift.end}` : undefined;
       return {
         id,
         name: (person?.name ?? "Pessoa").toLocaleUpperCase("pt-BR"),
         detail,
+        hoursTitle,
         code: person?.code ?? null,
         orphan,
       };
@@ -1352,7 +1335,7 @@ function ScheduleBoard({
         })}
         {roster.map((person) => (
           <div key={person.id} className="contents">
-            <div className={cn(stickyPerson, "flex min-w-0 items-center gap-2 py-0.5")}>
+            <div className={cn(stickyPerson, "flex min-w-0 items-center gap-2 py-0.5")} title={person.hoursTitle}>
               <PersonAvatar name={person.name} employeeId={person.code} storeId={section.storeId} size="sm" />
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-[12px] font-semibold leading-tight text-t0">{person.name}</span>
