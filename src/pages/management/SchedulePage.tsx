@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Accordion, Alert, Button, Card, Modal, PageHeader, Select, useToast } from "@/components/ui";
+import { Alert, Button, Card, Checkbox, Modal, PageHeader, Select, useToast } from "@/components/ui";
 import { ColorLegend, type LegendItem } from "@/components/wedash/ColorLegend";
 import { ScheduleCardsSkeleton } from "@/components/wedash/LoadingSkeletons";
 import { PersonAvatar } from "@/components/wedash/PersonAvatar";
@@ -104,51 +104,71 @@ function shortDate(iso: string): string {
   return `${day}/${month}/${year}`;
 }
 
-/** Lista por pessoa das FC do mês (e as que caem no seguinte) — repasse ao sindicato. */
+/** Folgas pelo feriado: uma linha por pessoa · feriado → folga · prazo. */
 function CompOffAccordion({ rows }: { rows: CompOffSummaryRow[] }) {
+  const [open, setOpen] = useState(true);
   if (rows.length === 0) return null;
-  const byPerson = new Map<string, { name: string; rows: CompOffSummaryRow[] }>();
-  for (const row of rows) {
-    const bucket = byPerson.get(row.personId) ?? { name: row.personName, rows: [] };
-    bucket.rows.push(row);
-    byPerson.set(row.personId, bucket);
-  }
-  const people = [...byPerson.values()].sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
   return (
     <div className="mt-4">
-      <Accordion
-        items={[
-          {
-            key: "comp-offs",
-            title: "Folgas compensatórias",
-            content: (
-              <div className="space-y-4">
-                <p className="text-[12px] text-t2">Para repasse ao sindicato: feriado trabalhado e a data da folga.</p>
-                <ul className="space-y-4">
-                  {people.map((person) => (
-                    <li key={person.rows[0]!.personId}>
-                      <p className="text-[13px] font-bold uppercase tracking-wide text-t0">{person.name}</p>
-                      <ul className="mt-1.5 space-y-1">
-                        {person.rows.map((row) => (
-                          <li key={`${row.personId}|${row.holidayDate}`} className="text-[12.5px] leading-snug text-t1">
-                            Feriado {shortDate(row.holidayDate)} · {row.holidayName}
-                            {" — "}
-                            <span className={cn("font-semibold", row.offDate ? "text-info" : "text-warn")}>
-                              {row.offDate ? `Folga em ${shortDate(row.offDate)}` : `Folga até ${shortDate(row.until)}`}
-                            </span>
-                          </li>
-                        ))}
-                      </ul>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ),
-          },
-        ]}
-      />
+      <button
+        type="button"
+        onClick={() => setOpen((prev) => !prev)}
+        className="flex w-full items-center gap-2 text-left text-[13.5px] font-bold text-t0"
+      >
+        <span
+          aria-hidden
+          className={cn(
+            "inline-block h-0 w-0 shrink-0 border-x-[5px] border-x-transparent border-t-[6px] border-t-t0 transition-transform",
+            !open && "-rotate-90",
+          )}
+        />
+        Ver as folgas pelos feriados trabalhados
+      </button>
+      {open ? (
+        <ul className="mt-2 space-y-1.5">
+          {rows.map((row) => (
+            <li key={`${row.personId}|${row.holidayDate}`} className="text-[12.5px] leading-snug text-t1">
+              <span className="font-bold uppercase tracking-wide text-t0">{row.personName}</span>
+              {" · feriado "}
+              {shortDate(row.holidayDate)}
+              {" → folga pelo feriado "}
+              {row.offDate ? shortDate(row.offDate) : "—"}
+              {" · prazo "}
+              {shortDate(row.until)}
+            </li>
+          ))}
+        </ul>
+      ) : null}
     </div>
   );
+}
+
+/** Dias do mês + vizinhos até cobrir a última FC (feriado → folga). */
+function boardDatesWithNeighbors(
+  monthStart: string,
+  rows: CompOffSummaryRow[],
+  prevHolidayDates: string[],
+  showNeighbors: boolean,
+): string[] {
+  const monthEnd = endOfMonth(monthStart);
+  let from = monthStart;
+  let to = monthEnd;
+  if (showNeighbors) {
+    for (const row of rows) {
+      if (row.offDate && row.offDate > to) to = row.offDate;
+      if (row.offDate && row.offDate < from) from = row.offDate;
+    }
+    for (const holiday of prevHolidayDates) {
+      if (holiday < from) from = holiday;
+    }
+    const floor = addMonths(monthStart, -1);
+    const ceil = endOfMonth(addMonths(monthStart, 1));
+    if (from < floor) from = floor;
+    if (to > ceil) to = ceil;
+  }
+  const list: string[] = [];
+  for (let day = from; day <= to; day = addDays(day, 1)) list.push(day);
+  return list;
 }
 
 function statusChip(status: DayStatus, doublePay: boolean): { color: string; label: string } {
@@ -204,6 +224,8 @@ export function SchedulePage() {
   const [monthStart, setMonthStart] = useState(() => startOfMonth(today));
   const [focusDay, setFocusDay] = useState(() => today);
   const [viewMode, setViewMode] = useState<ScheduleViewMode>("month");
+  /** Mostra dias dos meses vizinhos até a última FC do mês. */
+  const [showNeighbors, setShowNeighbors] = useState(true);
   const monthStartRef = useRef(monthStart);
   monthStartRef.current = monthStart;
   const rangeFrom = monthStart;
@@ -686,19 +708,50 @@ export function SchedulePage() {
           </Card>
         ) : (
           <>
+            <div className="mb-3 border-b border-line pb-3">
+              <Checkbox
+                checked={showNeighbors}
+                onChange={(event) => setShowNeighbors(event.target.checked)}
+                label="Ver também os dias dos meses vizinhos"
+              />
+            </div>
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
               {scheduleCards.map(({ view, item }) => {
-                const dates = boardDates.filter((iso) => startOfMonth(iso) === item.monthStart);
-                const active = new Set(focusDates.filter((iso) => startOfMonth(iso) === item.monthStart));
-                const boardDays = view.days.filter((row) => dates.includes(row.day));
+                const monthDays = view.days.filter((row) => startOfMonth(row.day) === item.monthStart);
                 const compRows = buildCompOffSummary({
                   monthStart: item.monthStart,
-                  monthDays: view.days.filter((row) => startOfMonth(row.day) === item.monthStart),
+                  monthDays,
                   allDays: view.days,
                   rules: item.schedule.holidayRules,
                   compDue: item.schedule.compDue,
                   people: view.people.map((person) => ({ id: person.id, name: person.name })),
                 });
+                const prevMonth = addMonths(item.monthStart, -1);
+                const prevItem = view.months.find((month) => month.monthStart === prevMonth);
+                const prevCompRows = prevItem
+                  ? buildCompOffSummary({
+                      monthStart: prevMonth,
+                      monthDays: view.days.filter((row) => startOfMonth(row.day) === prevMonth),
+                      allDays: view.days,
+                      rules: prevItem.schedule.holidayRules,
+                      compDue: prevItem.schedule.compDue,
+                      people: view.people.map((person) => ({ id: person.id, name: person.name })),
+                    })
+                  : [];
+                const prevHolidayDates = prevCompRows
+                  .filter((row) => row.offDate != null && row.offDate >= item.monthStart && row.offDate <= endOfMonth(item.monthStart))
+                  .map((row) => row.holidayDate);
+                const dates = showNeighbors
+                  ? boardDatesWithNeighbors(item.monthStart, compRows, prevHolidayDates, true)
+                  : boardDates.filter((iso) => startOfMonth(iso) === item.monthStart);
+                const active =
+                  viewMode === "month"
+                    ? undefined
+                    : new Set(focusDates.filter((iso) => dates.includes(iso)));
+                const boardDays = view.days.filter((row) => dates.includes(row.day));
+                const boardSchedules = view.months.filter((month) =>
+                  dates.some((iso) => startOfMonth(iso) === month.monthStart),
+                );
                 const storeLabel = view.store.tradeName || view.store.name;
                 return (
                   <Card key={`${view.store.id}-${item.monthStart}`}>
@@ -713,7 +766,7 @@ export function SchedulePage() {
                       section={{
                         storeId: view.store.id,
                         holidays: view.holidays,
-                        schedules: [item],
+                        schedules: boardSchedules.length > 0 ? boardSchedules : [item],
                         days: boardDays,
                         people: view.people,
                       }}
