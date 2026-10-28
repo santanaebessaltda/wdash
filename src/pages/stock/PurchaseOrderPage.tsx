@@ -528,7 +528,7 @@ export function PurchaseOrderPage() {
 
       <div className="mt-8">
       {(showSkeleton || anyRows) && storeRows.length > 0 && (
-        <div className="mb-3 flex justify-end">
+        <div className="mb-3">
           <ToneLegend />
         </div>
       )}

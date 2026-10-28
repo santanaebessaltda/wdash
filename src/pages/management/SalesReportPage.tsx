@@ -403,7 +403,12 @@ export function SalesReportPage() {
         {error ? <Alert className="mb-4" variant="danger" title="Não foi possível carregar o informe de vendas. Tente novamente." /> : null}
         {!manyStores && shoppingSendsSales(account?.administrator) && account?.lastError ? <Alert className="mb-4" variant="danger" title={account.lastError} /> : null}
         {showSkeleton || (storeRows.length > 0 && (manyStores ? groupLoaded !== band : store != null && !pronto)) ? (
-          <FinanceMonthSkeleton cells={cells} today={today} marked={storeRows.length === 1} legends={REPORT_LEGEND.length} />
+          <FinanceMonthSkeleton
+            cells={cells}
+            today={today}
+            marked={storeRows.length === 1}
+            legend={storeRows.length > 0 ? <ColorLegend mark="square" items={REPORT_LEGEND} /> : undefined}
+          />
         ) : storeRows.length === 0 ? (
           <Card className="flex min-h-[280px] flex-col">
             <EmptyBlock icon="🧾" title="Nenhuma filial disponível" description="Não há filiais disponíveis para este acesso." />
@@ -453,7 +458,7 @@ export function SalesReportPage() {
                 tooltip="Informado − vendido. Valor a mais pode aumentar o aluguel percentual; valor a menos pode gerar divergência na auditoria."
               />
             </div>
-            <div className="mb-3 flex justify-end">
+            <div className="mb-3">
               <ColorLegend mark="square" items={REPORT_LEGEND} />
             </div>
             <MonthCalendar>
@@ -552,7 +557,7 @@ function GroupCalendar({
           tooltip="Informado − vendido, somando as filiais. Dia sem informe entra como zero."
         />
       </div>
-      <div className="mb-3 flex justify-end">
+      <div className="mb-3">
         <ColorLegend mark="square" items={REPORT_LEGEND} />
       </div>
       <MonthCalendar>

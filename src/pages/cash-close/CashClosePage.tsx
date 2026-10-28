@@ -660,7 +660,11 @@ export function CashClosePage() {
       <div className="mt-6 pb-6">
         {error ? <Alert className="mb-4" variant="danger" title="Não foi possível carregar o fechamento. Tente novamente." /> : null}
         {showSkeleton ? (
-          <FinanceMonthSkeleton cells={cells} today={today} legends={CLOSE_LEGEND_ONE.length} />
+          <FinanceMonthSkeleton
+            cells={cells}
+            today={today}
+            legend={storeRows.length > 0 ? <ColorLegend mark="square" items={CLOSE_LEGEND_ONE} /> : undefined}
+          />
         ) : storeRows.length === 0 ? (
           <Card className="flex min-h-[280px] flex-col">
             <EmptyBlock icon="📒" title="Nenhuma filial disponível" description="Não há filiais disponíveis para este acesso." />
@@ -668,13 +672,17 @@ export function CashClosePage() {
         ) : analysis ? (
           <>
             <MonthSummary summary={analysis.summary} many={manyStores} diffDays={analysis.diffDays} closedRealCents={analysis.closedRealCents} />
-            <div className="mb-3 flex justify-end">
+            <div className="mb-3">
               <ColorLegend mark="square" items={CLOSE_LEGEND_ONE} />
             </div>
             <Month today={today} cells={cells} dayFace={dayFace} onOpen={openDay} many={manyStores} />
           </>
         ) : (
-          <FinanceMonthSkeleton cells={cells} today={today} legends={CLOSE_LEGEND_ONE.length} />
+          <FinanceMonthSkeleton
+            cells={cells}
+            today={today}
+            legend={<ColorLegend mark="square" items={CLOSE_LEGEND_ONE} />}
+          />
         )}
       </div>
       <DayModal

@@ -507,7 +507,15 @@ export function CashDropPage() {
       <div className="mt-6 pb-8">
         {error ? <Alert className="mb-4" variant="danger" title="Não foi possível carregar as sangrias. Tente novamente." /> : null}
         {showSkeleton || (storeRows.length > 0 && !pronto) ? (
-          <FinanceMonthSkeleton cells={cells} today={today} kpis={4} columns="sm:grid-cols-2 lg:grid-cols-4" hint marked={storeRows.length === 1} legends={DROP_LEGEND.length} />
+          <FinanceMonthSkeleton
+            cells={cells}
+            today={today}
+            kpis={4}
+            columns="sm:grid-cols-2 lg:grid-cols-4"
+            hint
+            marked={storeRows.length === 1}
+            legend={storeRows.length > 0 ? <ColorLegend mark="square" items={DROP_LEGEND} /> : undefined}
+          />
         ) : storeRows.length === 0 || !store ? (
           <Card className="flex min-h-[280px] flex-col">
             <EmptyBlock icon="💵" title="Nenhuma filial disponível" description="Não há filiais disponíveis para este acesso." />
@@ -515,7 +523,7 @@ export function CashDropPage() {
         ) : (
           <>
             <MonthSummary aCobrar={open} recebido={depositado} excluded={monthCards.excluded} gap={monthCards.gap} />
-            <div className="mb-3 flex justify-end">
+            <div className="mb-3">
               <ColorLegend mark="square" items={DROP_LEGEND} />
             </div>
             <MonthCalendar>
