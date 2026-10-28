@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Alert, Button, Card, Checkbox, Modal, PageHeader, Select, useToast } from "@/components/ui";
+import { Accordion, Alert, Button, Card, Checkbox, Modal, PageHeader, Select, useToast } from "@/components/ui";
 import { ColorLegend, type LegendItem } from "@/components/wedash/ColorLegend";
 import { ScheduleCardsSkeleton } from "@/components/wedash/LoadingSkeletons";
 import { PersonAvatar } from "@/components/wedash/PersonAvatar";
@@ -104,41 +104,49 @@ function shortDate(iso: string): string {
   return `${day}/${month}/${year}`;
 }
 
-/** Folgas pelo feriado: uma linha por pessoa · feriado → folga · prazo. */
+/** Folgas pelo feriado: accordion + tabela (pessoa · feriado · folga · prazo). */
 function CompOffAccordion({ rows }: { rows: CompOffSummaryRow[] }) {
-  const [open, setOpen] = useState(true);
   if (rows.length === 0) return null;
   return (
     <div className="mt-4">
-      <button
-        type="button"
-        onClick={() => setOpen((prev) => !prev)}
-        className="flex w-full items-center gap-2 text-left text-[13.5px] font-bold text-t0"
-      >
-        <span
-          aria-hidden
-          className={cn(
-            "inline-block h-0 w-0 shrink-0 border-x-[5px] border-x-transparent border-t-[6px] border-t-t0 transition-transform",
-            !open && "-rotate-90",
-          )}
-        />
-        Ver as folgas pelos feriados trabalhados
-      </button>
-      {open ? (
-        <ul className="mt-2 space-y-1.5">
-          {rows.map((row) => (
-            <li key={`${row.personId}|${row.holidayDate}`} className="text-[12.5px] leading-snug text-t1">
-              <span className="font-bold uppercase tracking-wide text-t0">{row.personName}</span>
-              {" · feriado "}
-              {shortDate(row.holidayDate)}
-              {" → folga pelo feriado "}
-              {row.offDate ? shortDate(row.offDate) : "—"}
-              {" · prazo "}
-              {shortDate(row.until)}
-            </li>
-          ))}
-        </ul>
-      ) : null}
+      <Accordion
+        defaultOpen="comp-offs"
+        items={[
+          {
+            key: "comp-offs",
+            title: "Ver as folgas pelos feriados trabalhados",
+            content: (
+              <div className="min-w-0 overflow-x-auto">
+                <table className="w-full min-w-[36rem] border-collapse text-[12.5px]">
+                  <thead>
+                    <tr className="text-[11px] font-bold uppercase tracking-wide text-t2">
+                      <th className="pb-2.5 pr-3 text-left font-bold">Pessoa</th>
+                      <th className="pb-2.5 pr-3 text-left font-bold">Feriado</th>
+                      <th className="pb-2.5 pr-3 text-left font-bold">Folga pelo feriado</th>
+                      <th className="pb-2.5 text-left font-bold">Prazo</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map((row) => (
+                      <tr key={`${row.personId}|${row.holidayDate}`} className="border-t border-line">
+                        <td className="py-2.5 pr-3 font-bold uppercase tracking-wide text-t0">{row.personName}</td>
+                        <td className="py-2.5 pr-3 text-t1">
+                          <span className="font-semibold tabular-nums text-t0">{shortDate(row.holidayDate)}</span>
+                          {row.holidayName ? <span className="mt-0.5 block text-[11px] text-t2">{row.holidayName}</span> : null}
+                        </td>
+                        <td className={cn("py-2.5 pr-3 font-semibold tabular-nums", row.offDate ? "text-info" : "text-t2")}>
+                          {row.offDate ? shortDate(row.offDate) : "—"}
+                        </td>
+                        <td className="py-2.5 font-semibold tabular-nums text-t1">{shortDate(row.until)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ),
+          },
+        ]}
+      />
     </div>
   );
 }
