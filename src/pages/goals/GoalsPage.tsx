@@ -79,6 +79,13 @@ export default function GoalsPage() {
     if (storesLoading) return;
     const gen = ++reloadGen.current;
     const key = filterKey;
+    // storeKey (string) nas deps — nao o array storeIds (referencia nova a cada wedash:stores).
+    const ids = storeKey ? storeKey.split(",") : [];
+    if (ids.length === 0) {
+      setData({ goals: [], dayAggs: [], team: [] });
+      settle(key);
+      return;
+    }
     const cached = filterCacheGet<Loaded>(key);
     if (cached && Array.isArray(cached.goals) && Array.isArray(cached.dayAggs) && Array.isArray(cached.team)) {
       setData(cached);
@@ -87,7 +94,13 @@ export default function GoalsPage() {
     let cancelled = false;
     void (async () => {
       try {
-        const goals = await fetchGoals({ tenantId: session.tenantId, storeIds, from: janela.from, to: janela.to, includeDrafts: true });
+        const goals = await fetchGoals({
+          tenantId: session.tenantId,
+          storeIds: ids,
+          from: janela.from,
+          to: janela.to,
+          includeDrafts: true,
+        });
         let dayAggs: SalesDayAgg[] = [];
         let team: GoalTeamMember[] = [];
         if (goals.length > 0) {
@@ -120,7 +133,7 @@ export default function GoalsPage() {
     return () => {
       cancelled = true;
     };
-  }, [session.tenantId, storeKey, janela.from, janela.to, storesLoading, reload, filterKey, settle, storeIds, today]);
+  }, [session.tenantId, storeKey, janela.from, janela.to, storesLoading, reload, filterKey, settle, today]);
 
   const showSkeleton = storesLoading || filterSkeleton;
 
@@ -242,7 +255,7 @@ export default function GoalsPage() {
 
       <div className="mt-6">
         {showSkeleton ? (
-          <GoalCardsSkeleton count={3} />
+          <GoalCardsSkeleton count={2} />
         ) : cards.length === 0 ? (
           <Card className="flex min-h-[280px] flex-col">
             <EmptyBlock

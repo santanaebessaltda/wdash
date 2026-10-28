@@ -138,6 +138,14 @@ export function ChallengesPage() {
     if (storesLoading) return;
     const gen = ++reloadGen.current;
     const key = filterKey;
+    // storeKey (string) nas deps — nao o array storeIds, senao cada wedash:stores
+    // troca a referencia, cancela o fetchChallengeInput e a tela fica no skeleton.
+    const ids = storeKey ? storeKey.split(",") : [];
+    if (ids.length === 0) {
+      setData({ challenges: [], aggs: emptyChallengeAggInput() });
+      settle(key);
+      return;
+    }
     const cached = filterCacheGet<ChallengesCache>(key);
     if (cacheReady(cached)) {
       setData(fromCache(cached));
@@ -146,7 +154,13 @@ export function ChallengesPage() {
     let cancelled = false;
     void (async () => {
       try {
-        const challenges = await fetchChallenges({ tenantId: session.tenantId, storeIds, from: janela.from, to: janela.to, includeDrafts: true });
+        const challenges = await fetchChallenges({
+          tenantId: session.tenantId,
+          storeIds: ids,
+          from: janela.from,
+          to: janela.to,
+          includeDrafts: true,
+        });
         const aggs =
           challenges.length > 0
             ? await fetchChallengeInput({ tenantId: session.tenantId, challenges, today })
@@ -168,7 +182,7 @@ export function ChallengesPage() {
     return () => {
       cancelled = true;
     };
-  }, [session.tenantId, storeKey, janela.from, janela.to, storesLoading, reload, filterKey, settle, storeIds, today]);
+  }, [session.tenantId, storeKey, janela.from, janela.to, storesLoading, reload, filterKey, settle, today]);
 
   const showSkeleton = storesLoading || filterSkeleton;
 
@@ -295,7 +309,7 @@ export function ChallengesPage() {
 
       <div className="mt-6">
         {showSkeleton ? (
-          <ChallengeCardsSkeleton count={3} />
+          <ChallengeCardsSkeleton count={2} />
         ) : cards.length === 0 ? (
           <Card className="flex min-h-[280px] flex-col">
             <EmptyBlock

@@ -748,35 +748,38 @@ export function TeamTableSkeleton({ withShift = true, rows = 3 }: { withShift?: 
   );
 }
 
-/** Metas: card da listagem (icone + nome/periodo + status  |  meta  |  barra  |  chips  |  avatares + botoes). */
+/** Metas: card da listagem (icone + nome/status/periodo + acoes  |  realizado/%  |  barra  |  rodape  |  equipe). */
 export function GoalCardsSkeleton({ count = 2 }: { count?: number }) {
   return (
     <Busy className="grid grid-cols-1 gap-4 lg:grid-cols-2">
       {Array.from({ length: count }, (_, i) => (
-        <div key={i} className="rounded-2xl border border-line bg-bg-2 p-5 shadow-[var(--shadow-vela)]">
-          <div className="mb-3.5 flex items-center gap-3.5">
+        <div key={i} className="flex flex-col rounded-2xl border border-line bg-bg-2 p-5 shadow-[var(--shadow-vela)]">
+          <div className="mb-3.5 flex items-start gap-3.5">
             <Skeleton className="h-[50px] w-[50px] shrink-0 rounded-[14px]" />
             <div className="min-w-0 flex-1">
-              <Skeleton className="h-4 w-3/5" />
-              <Skeleton className="mt-2 h-3 w-2/5" />
+              <div className="flex items-start justify-between gap-2">
+                <Skeleton className="h-4 w-3/5" />
+                <Pill className="w-20 shrink-0" />
+              </div>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                <Pill className="w-28" />
+                <Pill className="w-16" />
+              </div>
             </div>
             <div className="flex shrink-0 gap-1.5 self-start">
-              <Skeleton className="h-7 w-7 rounded-lg" />
-              <Skeleton className="h-7 w-7 rounded-lg" />
+              <Skeleton className="h-8 w-8 rounded-[9px]" />
+              <Skeleton className="h-8 w-8 rounded-[9px]" />
             </div>
           </div>
-          <div className="flex items-center justify-between">
+          <div className="flex items-baseline justify-between gap-2">
             <Skeleton className="h-3.5 w-28" />
-            <Skeleton className="h-3 w-24" />
+            <Skeleton className="h-3 w-32" />
           </div>
           <Skeleton className="mt-2 h-[5px] w-full rounded-full" />
-          <Skeleton className="mt-2 h-3 w-36" />
+          <Skeleton className="mt-2 h-3 w-40" />
+          <div className="flex-1" />
           <div className="mt-4 flex items-center justify-between gap-3">
-            <div className="flex gap-1.5">
-              <Pill className="w-24" />
-              <Pill className="w-16" />
-              <Pill className="w-16" />
-            </div>
+            <Skeleton className="h-3 w-36" />
             <div className="flex -space-x-2">
               {Array.from({ length: 3 }, (_, j) => (
                 <Skeleton key={j} className="h-8 w-8 rounded-full border-2 border-bg-2" />
@@ -858,13 +861,7 @@ export function ScheduleCardsSkeleton({ count = 2, people = 5, days = 7 }: { cou
       {Array.from({ length: count }, (_, c) => (
         <Card key={c} className="min-w-0 overflow-hidden">
           <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-            <div className="min-w-0">
-              <Skeleton className="h-4 w-48" />
-              <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                <Pill className="w-24" />
-                <Pill className="w-28" />
-              </div>
-            </div>
+            <Skeleton className="h-4 w-56 max-w-full" />
             <div className="flex flex-wrap items-center gap-2">
               <Skeleton className="h-8 w-20 rounded-[var(--radius-vela-sm)]" />
               <Skeleton className="h-8 w-20 rounded-[var(--radius-vela-sm)]" />
@@ -872,8 +869,8 @@ export function ScheduleCardsSkeleton({ count = 2, people = 5, days = 7 }: { cou
           </div>
           <div className="min-w-0 overflow-x-auto overscroll-x-contain">
             <div
-              className="inline-grid w-max min-w-full gap-0.5"
-              style={{ gridTemplateColumns: `minmax(9.5rem, 11rem) repeat(${days}, minmax(1.75rem, 1fr))` }}
+              className="inline-grid w-max min-w-full gap-0.5 [--person-col:minmax(11rem,14rem)] lg:[--person-col:minmax(14rem,18rem)]"
+              style={{ gridTemplateColumns: `var(--person-col) repeat(${days}, minmax(1.75rem, 1fr))` }}
             >
               <div className="flex items-end pb-1">
                 <Skeleton className="h-3 w-14" />
@@ -889,9 +886,8 @@ export function ScheduleCardsSkeleton({ count = 2, people = 5, days = 7 }: { cou
                   <div className="flex items-center gap-2 py-0.5 pr-2">
                     <Skeleton className="h-8 w-8 shrink-0 rounded-full" />
                     <div className="min-w-0 flex-1">
-                      <Skeleton className="h-3.5 w-24" />
-                      <Skeleton className="mt-1 h-2.5 w-28 max-w-full" />
-                      <Skeleton className="mt-1 h-2.5 w-20 max-w-full" />
+                      <Skeleton className="h-3.5 w-28" />
+                      <Skeleton className="mt-1 h-2.5 w-40 max-w-full" />
                     </div>
                   </div>
                   {Array.from({ length: days }, (_, d) => (
@@ -907,32 +903,46 @@ export function ScheduleCardsSkeleton({ count = 2, people = 5, days = 7 }: { cou
   );
 }
 
-/** Desafios: card da listagem (icone + nome/periodo + botoes  |  lider  |  premio  |  prazo  |  chips). */
+/** Desafios: card da listagem (icone + nome/status/periodo + acoes  |  progresso  |  regra + avatares). */
 export function ChallengeCardsSkeleton({ count = 2 }: { count?: number }) {
   return (
     <Busy className="grid grid-cols-1 gap-4 lg:grid-cols-2">
       {Array.from({ length: count }, (_, i) => (
-        <div key={i} className="rounded-2xl border border-line bg-bg-2 p-5 shadow-[var(--shadow-vela)]">
-          <div className="mb-3.5 flex items-center gap-3.5">
+        <div key={i} className="flex flex-col rounded-2xl border border-line bg-bg-2 p-5 shadow-[var(--shadow-vela)]">
+          <div className="mb-3.5 flex items-start gap-3.5">
             <Skeleton className="h-[50px] w-[50px] shrink-0 rounded-[14px]" />
             <div className="min-w-0 flex-1">
-              <Skeleton className="h-4 w-3/5" />
-              <Skeleton className="mt-2 h-3 w-2/5" />
+              <div className="flex items-start justify-between gap-2">
+                <Skeleton className="h-4 w-3/5" />
+                <Pill className="w-20 shrink-0" />
+              </div>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                <Pill className="w-28" />
+                <Pill className="w-16" />
+                <Pill className="w-20" />
+              </div>
             </div>
             <div className="flex shrink-0 gap-1.5 self-start">
-              <Skeleton className="h-7 w-7 rounded-lg" />
-              <Skeleton className="h-7 w-7 rounded-lg" />
+              <Skeleton className="h-8 w-8 rounded-[9px]" />
+              <Skeleton className="h-8 w-8 rounded-[9px]" />
             </div>
           </div>
-          <div className="flex items-center justify-between gap-3">
-            <Skeleton className="h-3.5 w-36" />
-            <Skeleton className="h-3.5 w-20" />
+          <div className="mt-3.5">
+            <div className="flex items-baseline justify-between gap-2">
+              <Skeleton className="h-3.5 w-28" />
+              <Skeleton className="h-3 w-24" />
+            </div>
+            <Skeleton className="mt-2 h-[5px] w-full rounded-full" />
+            <Skeleton className="mt-2 h-3 w-36" />
           </div>
-          <Skeleton className="mt-2 h-3 w-28" />
-          <div className="mt-4 flex gap-1.5">
-            <Pill className="w-24" />
-            <Pill className="w-20" />
-            <Pill className="w-16" />
+          <div className="flex-1" />
+          <div className="mt-4 flex items-center justify-between gap-3">
+            <Skeleton className="h-3 w-44" />
+            <div className="flex -space-x-2">
+              {Array.from({ length: 3 }, (_, j) => (
+                <Skeleton key={j} className="h-8 w-8 rounded-full border-2 border-bg-2" />
+              ))}
+            </div>
           </div>
         </div>
       ))}
