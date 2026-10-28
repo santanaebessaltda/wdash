@@ -800,9 +800,7 @@ export function SchedulePage() {
           </HeaderFilters>
         }
       />
-      {(showSkeleton || registered.length > 0) && storeRows.length > 0 ? (
-        <ColorLegend className="mb-4" mark="square" items={SCHEDULE_LEGEND} />
-      ) : null}
+      {storeRows.length > 0 ? <ColorLegend className="mb-4" mark="square" items={SCHEDULE_LEGEND} /> : null}
       {viewMode !== "month" && registered.length > 0 ? (
         <p className="mb-4 text-[13px] font-semibold text-t1">{rangeHeading}</p>
       ) : null}
