@@ -419,7 +419,7 @@ export default function ProductsPage() {
                   <div className="mx-auto my-2">
                     <DonutChart
                       segments={classes.map((r) => ({
-                        label: `Classe ${r.productClass}`,
+                        label: `CLASSE ${r.productClass}`,
                         value: r.revenue,
                         color: COLORS_ABC[r.productClass],
                       }))}
@@ -441,7 +441,7 @@ export default function ProductsPage() {
                           <span className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-[3px]" style={{ background: COLORS_ABC[r.productClass] }} />
                           <div className="min-w-0 flex-1">
                             <div className="flex items-baseline gap-2">
-                              <span className="text-[12.5px] font-semibold text-t1">Classe {r.productClass}</span>
+                              <span className="text-[12.5px] font-semibold text-t1">CLASSE {r.productClass}</span>
                               <span className="ml-auto shrink-0 font-mono text-[12.5px] font-bold text-t0">{brlCent(r.revenue)}</span>
                               <span className="min-w-[32px] shrink-0 text-right text-[11.5px] font-semibold text-t2">{pct}%</span>
                             </div>
