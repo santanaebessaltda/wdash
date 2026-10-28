@@ -17,7 +17,7 @@ import { fetchGoals } from "@/data/wedash/goalsRepo";
 import { scheduleStartMonth, type GoalSpan } from "@/data/wedash/goalMonths";
 import { branchRoleLabel, fetchStoreSellers, fetchStoreShifts, isBranchTeamMember, type Store, type StoreSeller, type StoreShift } from "@/data/wedash/stores";
 import { DOW_LABELS } from "@/data/wedash/storeHours";
-import { applyDayChoices, buildCompOffSummary, dayEditOptions, defaultDayNeeds, generateMonth, inferCompLinks, issueFromUnknown, PREVIOUS_MONTH_EDIT, weekday, type CellChoice, type CompOffSummaryRow, type DayNeed, type DayStatus, type HolidayRule, type ScheduleGenerateIssue, type SchedulePattern, type Sex } from "@/data/wedash/scheduleGenerate";
+import { applyDayChoices, buildCompOffSummary, dayEditOptions, defaultDayNeeds, generateMonth, inferCompLinks, issueFromUnknown, PREVIOUS_MONTH_EDIT, weekday, type CellChoice, type CompDue, type CompOffSummaryRow, type DayNeed, type DayStatus, type HolidayRule, type ScheduleGenerateIssue, type SchedulePattern, type Sex } from "@/data/wedash/scheduleGenerate";
 import { holidayLabel, holidaysForStore, loadHolidaySeed, loadNationalHolidays, storePlace, type Holiday } from "@/data/wedash/scheduleHolidays";
 import { deleteSchedule, fetchCompDue, fetchPreviousSnapshot, fetchSchedule, saveManualDay, saveSchedule, type StoredDay, type StoredSchedule } from "@/data/wedash/scheduleRepo";
 import { ScheduleWizard, type ScheduleWizardValue, type WizardBranch } from "./ScheduleWizard";
@@ -169,6 +169,28 @@ function boardDatesWithNeighbors(
   const list: string[] = [];
   for (let day = from; day <= to; day = addDays(day, 1)) list.push(day);
   return list;
+}
+
+/**
+ * FC planejada em `compDue` (ex.: mês seguinte ainda sem escala) —
+ * pinta o tile mesmo sem linha em `store_schedule_day`.
+ */
+function plannedFcDays(rows: CompOffSummaryRow[], due: CompDue[], existing: StoredDay[]): StoredDay[] {
+  const have = new Set(existing.map((row) => `${row.sellerId}|${row.day}`));
+  const out: StoredDay[] = [];
+  function add(personId: string, day: string) {
+    const key = `${personId}|${day}`;
+    if (have.has(key)) return;
+    have.add(key);
+    out.push({ sellerId: personId, day, status: "comp_off", origin: "generated" });
+  }
+  for (const row of rows) {
+    if (row.offDate) add(row.personId, row.offDate);
+  }
+  for (const item of due) {
+    if (item.day) add(item.personId, item.day);
+  }
+  return out;
 }
 
 function statusChip(status: DayStatus, doublePay: boolean): { color: string; label: string } {
@@ -708,13 +730,6 @@ export function SchedulePage() {
           </Card>
         ) : (
           <>
-            <div className="mb-3 border-b border-line pb-3">
-              <Checkbox
-                checked={showNeighbors}
-                onChange={(event) => setShowNeighbors(event.target.checked)}
-                label="Ver também os dias dos meses vizinhos"
-              />
-            </div>
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
               {scheduleCards.map(({ view, item }) => {
                 const monthDays = view.days.filter((row) => startOfMonth(row.day) === item.monthStart);
@@ -742,13 +757,21 @@ export function SchedulePage() {
                   .filter((row) => row.offDate != null && row.offDate >= item.monthStart && row.offDate <= endOfMonth(item.monthStart))
                   .map((row) => row.holidayDate);
                 const dates = showNeighbors
-                  ? boardDatesWithNeighbors(item.monthStart, compRows, prevHolidayDates, true)
+                  ? boardDatesWithNeighbors(item.monthStart, [...compRows, ...prevCompRows], prevHolidayDates, true)
                   : boardDates.filter((iso) => startOfMonth(iso) === item.monthStart);
                 const active =
                   viewMode === "month"
                     ? undefined
                     : new Set(focusDates.filter((iso) => dates.includes(iso)));
-                const boardDays = view.days.filter((row) => dates.includes(row.day));
+                const realDays = view.days.filter((row) => dates.includes(row.day));
+                const dueList = [
+                  ...item.schedule.compDue,
+                  ...(prevItem?.schedule.compDue ?? []),
+                ];
+                const boardDays = [
+                  ...realDays,
+                  ...plannedFcDays([...compRows, ...prevCompRows], dueList, realDays).filter((row) => dates.includes(row.day)),
+                ];
                 const boardSchedules = view.months.filter((month) =>
                   dates.some((iso) => startOfMonth(iso) === month.monthStart),
                 );
@@ -758,6 +781,13 @@ export function SchedulePage() {
                     <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
                       <h3 className="min-w-0 truncate text-[15px] font-bold text-t0">{scheduleTitle(item.schedule.pattern, storeLabel)}</h3>
                       <div className="flex flex-wrap items-center gap-2">{registeredActions(view, item.monthStart)}</div>
+                    </div>
+                    <div className="mb-3 border-b border-line pb-3">
+                      <Checkbox
+                        checked={showNeighbors}
+                        onChange={(event) => setShowNeighbors(event.target.checked)}
+                        label="Ver também os dias dos meses vizinhos"
+                      />
                     </div>
                     <ScheduleBoard
                       dates={dates}
@@ -991,14 +1021,16 @@ function ScheduleBoard({
             </div>
             {dates.map((iso) => {
               const row = (byDay.get(iso) ?? []).find((item) => item.sellerId === person.id);
-              const doublePay = scheduleFor(iso)?.holidayRules.some((rule) => rule.date === iso && rule.pay === "double") ?? false;
+              const monthSchedule = scheduleFor(iso);
+              const doublePay = monthSchedule?.holidayRules.some((rule) => rule.date === iso && rule.pay === "double") ?? false;
               const mark = row ? cellMark(row.status, doublePay) : null;
               const status = row ? statusChip(row.status, doublePay).label : "sem escala";
               const focused = inFocus(iso);
               if (!row || !mark) {
                 return <div key={iso} className={cn(tile, "bg-bg-3", !focused && dimOut)} aria-hidden />;
               }
-              if (readOnly) {
+              /* FC planejada no mês vizinho ainda sem escala: só exibe, não edita. */
+              if (readOnly || !monthSchedule) {
                 return (
                   <div key={iso} className={cn(tile, mark.className, !focused && dimOut)} title={status}>
                     {mark.letters}
