@@ -4,7 +4,8 @@ import {
   deleteStoreShift,
   fetchStoreSellers,
   fetchStoreShifts,
-  isBranchSalesPerson,
+  isBranchTeamMember,
+  isResolvedBranchUser,
   saveStoreShift,
   type StoreShift,
 } from "@/data/wedash/stores";
@@ -18,10 +19,10 @@ export function nextGroupWindow(shifts: StoreShift[]): { start: string; end: str
   return start < end ? { start, end } : { start: "08:00", end: "14:00" };
 }
 
-function sellerCountLabel(count: number): string {
-  if (count === 0) return "Nenhum vendedor";
-  if (count === 1) return "1 vendedor";
-  return `${count} vendedores`;
+function memberCountLabel(count: number): string {
+  if (count === 0) return "Nenhuma pessoa";
+  if (count === 1) return "1 pessoa";
+  return `${count} pessoas`;
 }
 
 /** Horário válido e nome único na filial. `null` quando pode salvar. */
@@ -150,7 +151,13 @@ export function ManageGroupsModal({
       if (cancelled) return;
       const count = new Map<string, number>();
       for (const seller of sellers.get(storeId) ?? []) {
-        if (seller.shiftId && isBranchSalesPerson(seller, branch)) count.set(seller.shiftId, (count.get(seller.shiftId) ?? 0) + 1);
+        if (
+          seller.shiftId &&
+          isBranchTeamMember(seller, branch) &&
+          !isResolvedBranchUser(seller, branch)
+        ) {
+          count.set(seller.shiftId, (count.get(seller.shiftId) ?? 0) + 1);
+        }
       }
       setCounts(count);
       setShifts(list);
@@ -246,7 +253,7 @@ export function ManageGroupsModal({
             className="py-2!"
             icon="👥"
             title="Nenhum grupo cadastrado"
-            description="Crie um grupo para organizar os vendedores desta filial."
+            description="Crie um grupo para organizar a equipe desta filial."
           />
         ) : (
           <ul className="flex flex-col gap-2">
@@ -255,7 +262,7 @@ export function ManageGroupsModal({
                 <div className="min-w-0">
                   <p className="truncate text-[13.5px] font-bold text-t0">{shiftName(shift.name)}</p>
                   <p className="text-[12.5px] text-t2">
-                    {shift.start}–{shift.end} · {sellerCountLabel(counts.get(shift.id) ?? 0)}
+                    {shift.start}–{shift.end} · {memberCountLabel(counts.get(shift.id) ?? 0)}
                   </p>
                 </div>
                 <div className="flex shrink-0 items-center gap-1.5">
@@ -325,7 +332,7 @@ export function ManageGroupsModal({
         }
       >
         <p className="text-[13.5px] leading-relaxed text-t1">
-          {removingCount === 1 ? "1 vendedor ficará sem grupo definido." : `${removingCount} vendedores ficarão sem grupo definido.`}
+          {removingCount === 1 ? "1 pessoa ficará sem grupo definido." : `${removingCount} pessoas ficarão sem grupo definido.`}
         </p>
       </Modal>
     </>

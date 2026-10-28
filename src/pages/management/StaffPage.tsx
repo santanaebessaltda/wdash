@@ -8,6 +8,7 @@ import {
   fetchStoreShifts,
   isBranchSalesPerson,
   isBranchTeamMember,
+  isResolvedBranchUser,
   teamRoleLabel,
   saveStoreShift,
   setSellerShift,
@@ -63,7 +64,7 @@ function StaffContentSkeleton() {
   );
 }
 
-/** Equipe. Pessoas da filial no Millennium; grupo e acesso à WDash só do vendedor. */
+/** Equipe. Pessoas da filial no Millennium; acesso à WDash só do vendedor; grupo também para caixa/gerência (escala). */
 export function StaffPage() {
   const { session, storeRows, loading: storesLoading } = useScopedStores();
   const { show } = useToast();
@@ -271,6 +272,9 @@ function StaffList({
   }, [storeKey, tick, reloadKey]);
 
   const salesPerson = (person: StaffPerson) => isBranchSalesPerson(person.seller, person.store);
+  /** Grupo/turno na escala: vendedor, caixa e gerência — não o usuário da filial. */
+  const canAssignGroup = (person: StaffPerson) =>
+    isBranchTeamMember(person.seller, person.store) && !isResolvedBranchUser(person.seller, person.store);
   const ativos = useMemo(() => team.filter((person) => isBranchTeamMember(person.seller, person.store)), [team]);
   const desligados = useMemo(() => team.filter((person) => !person.seller.active), [team]);
   const rows = tab === "ativos" ? ativos : desligados;
@@ -358,7 +362,7 @@ function StaffList({
 
   async function saveProfile(seller: StoreSeller, draft: SellerDraft): Promise<boolean> {
     const currentShift = seller.id in shiftOf ? shiftOf[seller.id] : seller.shiftId;
-    if (draft.sales && draft.shiftId !== (currentShift ?? null)) {
+    if (draft.canGroup && draft.shiftId !== (currentShift ?? null)) {
       const shifted = await changeShift(seller.id, draft.shiftId);
       if (!shifted) return false;
       setTeam((list) => list.map((person) => (person.seller.id === seller.id ? { ...person, seller: { ...person.seller, shiftId: draft.shiftId } } : person)));
@@ -386,9 +390,9 @@ function StaffList({
         key: "shift",
         header: "Grupo",
         sortable: true,
-        sortValue: (v) => (salesPerson(v) ? groupLabel(v.seller.id in shiftOf ? shiftOf[v.seller.id] : v.seller.shiftId, shifts.get(v.store.id) ?? []) : null),
+        sortValue: (v) => (canAssignGroup(v) ? groupLabel(v.seller.id in shiftOf ? shiftOf[v.seller.id] : v.seller.shiftId, shifts.get(v.store.id) ?? []) : null),
         render: (v) => {
-          if (!salesPerson(v)) return <span className="text-[12.5px] font-semibold text-t2">—</span>;
+          if (!canAssignGroup(v)) return <span className="text-[12.5px] font-semibold text-t2">—</span>;
           const current = v.seller.id in shiftOf ? shiftOf[v.seller.id] : v.seller.shiftId;
           const shift = (shifts.get(v.store.id) ?? []).find((item) => item.id === current);
           if (!shift) return <p className="text-[12.5px] font-semibold text-t2">Sem grupo</p>;
@@ -412,6 +416,7 @@ function StaffList({
           const current = v.seller.id in shiftOf ? shiftOf[v.seller.id] : v.seller.shiftId;
           const items = rowActions({
             sales: salesPerson(v),
+            canGroup: canAssignGroup(v),
             state: salesPerson(v) ? (access == null ? null : (access.get(v.seller.id) ?? "NONE")) : null,
             grouped: hasSalesGroup(current),
             onEdit: () => setEditing({ seller: { ...v.seller, shiftId: current ?? null }, store: v.store }),
@@ -591,6 +596,7 @@ function AccessBadge({ state }: { state: AccessState | "loading" }) {
 
 function rowActions(input: {
   sales: boolean;
+  canGroup: boolean;
   state: AccessState | null;
   grouped: boolean;
   onEdit: () => void;
@@ -602,8 +608,9 @@ function rowActions(input: {
   onReactivate: () => void;
   onRemove: () => void;
 }): DropdownItem[] {
-  if (!input.sales) return [];
   const edit: DropdownItem = { label: "Editar cadastro", onClick: input.onEdit };
+  // Caixa/gerência: só editar grupo. Convite/acesso WDash continua só no vendedor.
+  if (!input.sales) return input.canGroup ? [edit] : [];
   if (!input.state) return [edit];
   const exclude: DropdownItem = { label: "Excluir acesso", onClick: input.onRemove, danger: true };
   const access: DropdownItem[] =
@@ -636,7 +643,7 @@ function RowMenu({ items }: { items: DropdownItem[] }) {
   );
 }
 
-type SellerDraft = { shiftId: string | null; sales: boolean };
+type SellerDraft = { shiftId: string | null; canGroup: boolean };
 
 function SellerEditor({
   seller,
@@ -655,7 +662,8 @@ function SellerEditor({
   onCreateGroup: () => void;
   onSave: (seller: StoreSeller, draft: SellerDraft) => Promise<boolean>;
 }) {
-  const sales = seller ? isBranchSalesPerson(seller, store) : false;
+  const canGroup =
+    seller != null && isBranchTeamMember(seller, store) && !isResolvedBranchUser(seller, store);
   const [shiftId, setShiftId] = useState<string | null>(seller?.shiftId ?? null);
   const [saving, setSaving] = useState(false);
 
@@ -671,7 +679,7 @@ function SellerEditor({
   async function save() {
     if (!seller) return;
     setSaving(true);
-    const ok = await onSave(seller, { shiftId, sales });
+    const ok = await onSave(seller, { shiftId, canGroup });
     setSaving(false);
     if (ok) onClose();
   }
@@ -695,7 +703,7 @@ function SellerEditor({
       {seller && (
         <div className="flex flex-col gap-3">
           <p className="text-[12.5px] text-t2">O grupo é salvo na WDash. A atualização do Millennium não altera esse dado.</p>
-          {sales && (
+          {canGroup && (
             <FormField label="Grupo">
               <select className="h-[42px] w-full rounded-[var(--radius-vela-md)] border border-line bg-bg-inset px-3.5 text-[13px] text-t0 outline-none focus:border-acc" value={shiftId ?? ""} onChange={(event) => setShiftId(event.target.value || null)}>
                 <option value="">Sem grupo</option>
