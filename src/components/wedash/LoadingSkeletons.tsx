@@ -392,23 +392,15 @@ export function StockProductsSkeleton() {
   );
 }
 
-/** Pedido de compra: legenda à direita acima do card, tabela larga e rodapé. */
+/**
+ * Pedido de compra: card Produtos (título + resumo), tabela larga e rodapé.
+ * A legenda Sem estoque / Abaixo do alvo fica na página (igual Escala), não aqui.
+ */
 export function PurchaseOrderSkeleton({ rows = 10 }: { rows?: number } = {}) {
-  const nums = ["w-12", "w-10", "w-14", "w-10", "w-16", "w-12", "w-14", "w-10", "w-12"] as const;
+  /** Após Produto: Mínimo, Saldo, Pedidos, Total, Vendidos, Múltiplo, Bloqueado, Novo, A pedir. */
+  const cols = ["w-14", "w-12", "w-16", "w-12", "w-20", "w-14", "w-16", "w-10", "w-14"] as const;
   return (
     <Busy>
-      <div className="mb-3 flex justify-end">
-        <ul className="flex flex-col gap-y-1.5 sm:flex-row sm:items-center sm:gap-x-3.5">
-          <li className="inline-flex items-center gap-1.5">
-            <Skeleton className="h-2.5 w-2.5 rounded-[3px]" />
-            <Skeleton className="h-3 w-20" />
-          </li>
-          <li className="inline-flex items-center gap-1.5">
-            <Skeleton className="h-2.5 w-2.5 rounded-[3px]" />
-            <Skeleton className="h-3 w-24" />
-          </li>
-        </ul>
-      </div>
       <Card className="flex min-w-0 flex-col overflow-hidden">
         <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
           <span className="inline-flex items-center gap-1.5">
@@ -420,40 +412,40 @@ export function PurchaseOrderSkeleton({ rows = 10 }: { rows?: number } = {}) {
         <div className="min-w-0 overflow-x-auto">
           <div className="min-w-[1340px]">
             <div className="flex items-center gap-3 border-b border-line px-1 pb-3">
-              <Skeleton className="h-2.5 w-3" />
-              <Skeleton className="h-2.5 w-16" />
-              <span className="flex-1" />
-              {nums.map((w, i) => (
-                <Skeleton key={i} className={cn("h-2.5", w)} />
+              <Skeleton className="h-2.5 w-3 shrink-0" />
+              <Skeleton className="h-2.5 w-16 shrink-0" />
+              <span className="min-w-0 flex-1" />
+              {cols.map((w, i) => (
+                <Skeleton key={i} className={cn("h-2.5 shrink-0", w)} />
               ))}
             </div>
             {Array.from({ length: rows }, (_, i) => (
               <div key={i} className="flex items-center gap-3 border-b border-line px-1 py-3">
-                <Skeleton className="h-3 w-3" />
+                <Skeleton className="h-3 w-3 shrink-0" />
                 <Skeleton className="h-9 w-9 shrink-0 rounded-[11px]" />
                 <div className="min-w-0 flex-1">
                   <Skeleton className="h-3.5 w-3/5" />
-                  <Skeleton className="mt-1.5 h-2.5 w-24" />
+                  <Skeleton className="mt-1.5 h-2.5 w-28" />
                 </div>
-                {nums.map((w, j) => (
-                  <Skeleton key={j} className={cn("h-3.5", w)} />
+                {cols.map((w, j) => (
+                  <Skeleton key={j} className={cn("h-3.5 shrink-0", w, (j === 6 || j === 7) && "mx-auto")} />
                 ))}
               </div>
             ))}
             <div className="flex items-center gap-3 bg-bg-inset px-1 py-3">
-              <span className="w-3" />
+              <span className="w-3 shrink-0" />
               <div className="min-w-0 flex-1">
                 <Skeleton className="h-3.5 w-28" />
                 <Skeleton className="mt-1.5 h-2.5 w-16" />
               </div>
-              <span className="w-12" />
-              {nums.slice(0, 4).map((w, i) => (
-                <Skeleton key={i} className={cn("h-3.5", w)} />
+              <span className="w-14 shrink-0" />
+              {cols.slice(1, 5).map((w, i) => (
+                <Skeleton key={i} className={cn("h-3.5 shrink-0", w)} />
               ))}
-              <span className="w-12" />
-              <span className="w-14" />
-              <span className="w-10" />
-              <Skeleton className="h-3.5 w-12" />
+              <span className="w-14 shrink-0" />
+              <span className="w-16 shrink-0" />
+              <span className="w-10 shrink-0" />
+              <Skeleton className="h-3.5 w-14 shrink-0" />
             </div>
           </div>
         </div>
