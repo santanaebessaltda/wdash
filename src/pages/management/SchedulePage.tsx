@@ -104,13 +104,12 @@ function shortDate(iso: string): string {
   return `${day}/${month}/${year}`;
 }
 
-/** Folgas pelo feriado: accordion + tabela (pessoa · feriado · folga · prazo). */
+/** Folgas pelo feriado: mesmo Accordion do wizard (“Folgas aos domingos”) + tabela. */
 function CompOffAccordion({ rows }: { rows: CompOffSummaryRow[] }) {
   if (rows.length === 0) return null;
   return (
     <div className="mt-4">
       <Accordion
-        defaultOpen="comp-offs"
         items={[
           {
             key: "comp-offs",
@@ -120,24 +119,24 @@ function CompOffAccordion({ rows }: { rows: CompOffSummaryRow[] }) {
                 <table className="w-full min-w-[36rem] border-collapse text-[12.5px]">
                   <thead>
                     <tr className="text-[11px] font-bold uppercase tracking-wide text-t2">
-                      <th className="pb-2.5 pr-3 text-left font-bold">Pessoa</th>
-                      <th className="pb-2.5 pr-3 text-left font-bold">Feriado</th>
-                      <th className="pb-2.5 pr-3 text-left font-bold">Folga pelo feriado</th>
-                      <th className="pb-2.5 text-left font-bold">Prazo</th>
+                      <th className="pb-2 pr-3 text-left font-bold">Pessoa</th>
+                      <th className="pb-2 pr-3 text-left font-bold">Feriado</th>
+                      <th className="pb-2 pr-3 text-left font-bold">Folga pelo feriado</th>
+                      <th className="pb-2 text-left font-bold">Prazo</th>
                     </tr>
                   </thead>
                   <tbody>
                     {rows.map((row) => (
-                      <tr key={`${row.personId}|${row.holidayDate}`} className="border-t border-line">
-                        <td className="py-2.5 pr-3 font-bold uppercase tracking-wide text-t0">{row.personName}</td>
-                        <td className="py-2.5 pr-3 text-t1">
+                      <tr key={`${row.personId}|${row.holidayDate}`}>
+                        <td className="py-1.5 pr-3 font-bold uppercase tracking-wide text-t0">{row.personName}</td>
+                        <td className="py-1.5 pr-3 text-t1">
                           <span className="font-semibold tabular-nums text-t0">{shortDate(row.holidayDate)}</span>
                           {row.holidayName ? <span className="mt-0.5 block text-[11px] text-t2">{row.holidayName}</span> : null}
                         </td>
-                        <td className={cn("py-2.5 pr-3 font-semibold tabular-nums", row.offDate ? "text-info" : "text-t2")}>
+                        <td className={cn("py-1.5 pr-3 font-semibold tabular-nums", row.offDate ? "text-info" : "text-t2")}>
                           {row.offDate ? shortDate(row.offDate) : "—"}
                         </td>
-                        <td className="py-2.5 font-semibold tabular-nums text-t1">{shortDate(row.until)}</td>
+                        <td className="py-1.5 font-semibold tabular-nums text-t1">{shortDate(row.until)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -790,7 +789,7 @@ export function SchedulePage() {
                       <h3 className="min-w-0 truncate text-[15px] font-bold text-t0">{scheduleTitle(item.schedule.pattern, storeLabel)}</h3>
                       <div className="flex flex-wrap items-center gap-2">{registeredActions(view, item.monthStart)}</div>
                     </div>
-                    <div className="mb-3 border-b border-line pb-3">
+                    <div className="mb-3">
                       <Checkbox
                         checked={showNeighbors}
                         onChange={(event) => setShowNeighbors(event.target.checked)}
