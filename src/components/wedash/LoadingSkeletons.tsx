@@ -846,18 +846,28 @@ export function GoalDetailSkeleton() {
   );
 }
 
-/** Escala: 2 cards por linha no desktop; grade heatmap compacta (legenda no cabeçalho). */
-export function ScheduleCardsSkeleton({ count = 2, people = 5, days = 7 }: { count?: number; people?: number; days?: number }) {
+/** Escala: card atual — Escala 6×1 + badges, Editar/…, check vizinhos, grade do mês, rodapé. */
+export function ScheduleCardsSkeleton({ count = 2, people = 5, days = 31 }: { count?: number; people?: number; days?: number }) {
   return (
     <Busy className="grid grid-cols-1 gap-4 lg:grid-cols-2">
       {Array.from({ length: count }, (_, c) => (
         <Card key={c} className="min-w-0 overflow-hidden">
           <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-            <Skeleton className="h-4 w-56 max-w-full" />
-            <div className="flex flex-wrap items-center gap-2">
-              <Skeleton className="h-8 w-20 rounded-[var(--radius-vela-sm)]" />
-              <Skeleton className="h-8 w-20 rounded-[var(--radius-vela-sm)]" />
+            <div className="min-w-0">
+              <Skeleton className="h-[17px] w-28" />
+              <div className="mt-1.5 flex min-w-0 flex-wrap items-center gap-2">
+                <Pill className="h-[22px] w-44 max-w-full" />
+                <Pill className="h-[22px] w-36" />
+              </div>
             </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Skeleton className="h-8 w-[118px] rounded-[var(--radius-vela-sm)]" />
+              <Skeleton className="h-8 w-8 rounded-[10px]" />
+            </div>
+          </div>
+          <div className="mb-3 flex items-center gap-2.5">
+            <Skeleton className="h-4 w-4 shrink-0 rounded-[3px]" />
+            <Skeleton className="h-3.5 w-56 max-w-full" />
           </div>
           <div className="min-w-0 overflow-x-auto overscroll-x-contain">
             <div
@@ -887,6 +897,21 @@ export function ScheduleCardsSkeleton({ count = 2, people = 5, days = 7 }: { cou
                   ))}
                 </Fragment>
               ))}
+              <div className="flex items-center py-1">
+                <Skeleton className="h-3 w-24" />
+              </div>
+              {Array.from({ length: days }, (_, d) => (
+                <div key={`p-${d}`} className="px-0.5 py-1">
+                  <Skeleton className="mx-auto h-3 w-4" />
+                  <Skeleton className="mx-auto mt-1 h-2 w-8" />
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="mt-4 overflow-hidden rounded-[var(--radius-vela-lg)] border border-line bg-bg-2">
+            <div className="flex items-center justify-between gap-3 px-5 py-4">
+              <Skeleton className="h-3.5 w-48 max-w-[70%]" />
+              <Skeleton className="h-3.5 w-3.5 shrink-0 rounded-sm" />
             </div>
           </div>
         </Card>
