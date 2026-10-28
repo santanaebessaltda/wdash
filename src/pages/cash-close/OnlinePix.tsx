@@ -18,6 +18,7 @@ export function OnlinePix({
   acquirerText,
   acquirerCents,
   pixPending,
+  showAcquirer = true,
   onRows,
   onAcquirer,
   toCents,
@@ -27,6 +28,8 @@ export function OnlinePix({
   acquirerText: string;
   acquirerCents: number | null;
   pixPending: boolean;
+  /** Dia fechado: mostra o campo da adquirente. Dia em aberto: só o PIX online. */
+  showAcquirer?: boolean;
   onRows: (rows: OnlinePixDraftRow[]) => void;
   onAcquirer: (value: string) => void;
   toCents: (raw: string) => number | null;
@@ -39,34 +42,52 @@ export function OnlinePix({
         <Button type="button" variant="outline" size="sm" onClick={() => onRows([blankOnlinePixRow()])}>
           Adicionar PIX online
         </Button>
-        <p className="mt-1.5 text-[12.5px] leading-relaxed text-t2">Transferência que só aparece no extrato. Soma com o valor da adquirente.</p>
+        <p className="mt-1.5 text-[12.5px] leading-relaxed text-t2">
+          {showAcquirer
+            ? "Transferência que só aparece no extrato. Soma com o valor da adquirente."
+            : "Transferência que só aparece no extrato. Entra no total real do Pix após o fechamento."}
+        </p>
       </div>
     );
   }
 
+  const summary = !showAcquirer
+    ? `PIX online ${money(online)}. Entra no total real do Pix após o fechamento.`
+    : acquirerCents == null
+      ? pixPending
+        ? `PIX online ${money(online)}. Soma com a adquirente quando o arquivo chegar.`
+        : `PIX online ${money(online)}. Informe a adquirente, ou 0,00 se o Pix deste dia veio só do extrato.`
+      : `Adquirente ${money(acquirerCents)} · PIX online ${money(online)} · Total real ${money(acquirerCents + online)}`;
+
   return (
     <section className="mt-4 rounded-[var(--radius-vela-lg)] border border-line bg-bg-2 p-3">
       <p className="text-[12.5px] font-bold text-t0">PIX online</p>
-      <p className="mt-1 text-[12.5px] leading-relaxed text-t2">Transferência que só aparece no extrato. Soma com o valor da adquirente.</p>
+      <p className="mt-1 text-[12.5px] leading-relaxed text-t2">
+        {showAcquirer
+          ? "Transferência que só aparece no extrato. Soma com o valor da adquirente."
+          : "Transferência que só aparece no extrato. Entra no total real do Pix após o fechamento."}
+      </p>
       <div className="mt-3 flex flex-col gap-2">
-        {owner && !(pixPending && acquirerCents == null) ? (
-          <label className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-3">
-            <span className="text-[12.5px] text-t2 sm:w-28">Adquirente</span>
-            <NumberInput
-              className="sm:w-36"
-              compact
-              unit="R$"
-              value={acquirerText}
-              onChange={onAcquirer}
-              aria-label="Valor da adquirente no Pix"
-            />
-          </label>
-        ) : (
-          <p className="flex items-baseline justify-between gap-3 text-[13px]">
-            <span className="text-t2">Adquirente</span>
-            <span className="font-mono font-bold text-t0">{money(acquirerCents)}</span>
-          </p>
-        )}
+        {showAcquirer ? (
+          owner && !(pixPending && acquirerCents == null) ? (
+            <label className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-3">
+              <span className="text-[12.5px] text-t2 sm:w-28">Adquirente</span>
+              <NumberInput
+                className="sm:w-36"
+                compact
+                unit="R$"
+                value={acquirerText}
+                onChange={onAcquirer}
+                aria-label="Valor da adquirente no Pix"
+              />
+            </label>
+          ) : (
+            <p className="flex items-baseline justify-between gap-3 text-[13px]">
+              <span className="text-t2">Adquirente</span>
+              <span className="font-mono font-bold text-t0">{money(acquirerCents)}</span>
+            </p>
+          )
+        ) : null}
         {owner
           ? rows.map((row) => (
               <div key={row.id} className="flex flex-col gap-2 sm:flex-row sm:items-end">
@@ -116,13 +137,7 @@ export function OnlinePix({
             Adicionar PIX online
           </Button>
         )}
-        <p className="text-[12.5px] text-t2">
-          {acquirerCents == null
-            ? pixPending
-              ? `PIX online ${money(online)}. Soma com a adquirente quando o arquivo chegar.`
-              : `PIX online ${money(online)}. Informe a adquirente, ou 0,00 se o Pix deste dia veio só do extrato.`
-            : `Adquirente ${money(acquirerCents)} · PIX online ${money(online)} · Total real ${money(acquirerCents + online)}`}
-        </p>
+        <p className="text-[12.5px] text-t2">{summary}</p>
       </div>
     </section>
   );

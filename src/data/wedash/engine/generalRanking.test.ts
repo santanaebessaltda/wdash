@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { rankingOutsideGeneralGoal, TEAM_UNATTRIBUTED_SALE, teamViewWithGoalShare } from "./generalRanking";
+import { rankingOutsideGeneralGoal, TEAM_UNATTRIBUTED_SALE, teamViewWithGoalShare, withActiveRoster } from "./generalRanking";
 import type { GoalRecord, GoalTeamMember, SalesDayAgg, SalesSellerDayAgg } from "./goalTypes";
+import type { TeamMemberRow } from "../dashboard";
 
 const period = { kind: "custom" as const, start: "2026-10-01", end: "2026-10-31" };
 
@@ -138,9 +139,29 @@ describe("teamViewWithGoalShare", () => {
       team,
       "2026-10-20",
     );
-    expect(out.people.map((person) => person.name)).toEqual(["Ana"]);
-    expect(out.people[0]?.revenue).toBe(100);
+    // Bia ativa sem venda entra a R$ 0 no fim; o KPI continua só com quem vendeu.
+    expect(out.people.map((person) => [person.name, person.revenue])).toEqual([
+      ["Ana", 100],
+      ["Bia", 0],
+    ]);
     expect(out.kpis[0]?.amount).toBe("R$\u00a0100,00");
+    expect(out.kpis[0]?.sub).toBe("1 pessoa · média de R$\u00a0100,00");
+  });
+
+  it("pessoa admitida sem venda aparece no ranking a R$ 0", () => {
+    const ana = seller("Ana", 1, 10_000);
+    const out = teamViewWithGoalShare(
+      scope,
+      { dayAggs: [storeDay(10_000, 1, 1)], sellerDayAggs: [ana], namedSellerDayAggs: [ana] },
+      [{ ...group, spreadUnidentified: false }],
+      [member(1, "Ana"), member(3, "Patricia")],
+      "2026-10-20",
+    );
+    expect(out.people.map((person) => [person.name, person.revenue, person.sales])).toEqual([
+      ["Ana", 100, 1],
+      ["Patricia", 0, 0],
+    ]);
+    expect(out.kpis[0]?.sub).toBe("1 pessoa · média de R$\u00a0100,00");
   });
 
   it("na meta Geral o ranking divide o total da filial e a média conta a equipe", () => {
@@ -176,5 +197,41 @@ describe("teamViewWithGoalShare", () => {
       ["BIA", 75],
     ]);
     expect(out.kpis[0]?.amount).toBe("R$\u00a0250,00");
+  });
+});
+
+describe("withActiveRoster", () => {
+  const row = (name: string, revenue: number, key = `e:${name}`): TeamMemberRow => ({
+    key,
+    name,
+    storeIds: ["f1"],
+    storeRows: ["Loja"],
+    revenue,
+    sales: revenue > 0 ? 1 : 0,
+    items: revenue > 0 ? 1 : 0,
+    averageTicket: revenue,
+    pa: revenue > 0 ? 1 : null,
+    participationPct: 0,
+    variationPct: null,
+    revenueCmp: 0,
+    revenuePrev: 0,
+  });
+
+  it("coloca a pessoa ativa sem venda no fim e ignora desligada", () => {
+    const out = withActiveRoster(
+      [row("Ana", 100, "e:1")],
+      [
+        member(1, "Ana"),
+        member(2, "Patricia"),
+        { ...member(3, "Janiely"), salesPerson: false, active: false },
+      ],
+      ["f1"],
+      new Map([["f1", "Loja"]]),
+      "2026-10-31",
+    );
+    expect(out.map((person) => [person.name, person.revenue])).toEqual([
+      ["Ana", 100],
+      ["Patricia", 0],
+    ]);
   });
 });

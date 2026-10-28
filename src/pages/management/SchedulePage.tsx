@@ -19,7 +19,7 @@ import { branchRoleLabel, fetchStoreSellers, fetchStoreShifts, isBranchTeamMembe
 import { DOW_LABELS } from "@/data/wedash/storeHours";
 import { applyDayChoices, buildCompOffSummary, dayEditOptions, defaultDayNeeds, generateMonth, inferCompLinks, issueFromUnknown, PREVIOUS_MONTH_EDIT, weekday, type CellChoice, type CompDue, type CompOffSummaryRow, type DayNeed, type DayStatus, type HolidayRule, type ScheduleGenerateIssue, type SchedulePattern, type Sex } from "@/data/wedash/scheduleGenerate";
 import { holidayLabel, holidaysForStore, loadHolidaySeed, loadNationalHolidays, storePlace, type Holiday } from "@/data/wedash/scheduleHolidays";
-import { deleteSchedule, fetchCompDue, fetchPreviousSnapshot, fetchSchedule, patchScheduleCompDue, saveManualDay, saveSchedule, type StoredDay, type StoredSchedule } from "@/data/wedash/scheduleRepo";
+import { deleteSchedule, fetchCompDue, fetchPreviousSnapshot, fetchSchedule, patchScheduleCompDue, replaceSchedulePerson, saveManualDay, saveSchedule, type StoredDay, type StoredSchedule } from "@/data/wedash/scheduleRepo";
 import { ScheduleWizard, type ScheduleWizardValue, type WizardBranch } from "./ScheduleWizard";
 
 const MONTHS = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
@@ -272,7 +272,7 @@ function resolveDayEditContext(
     allDays: real,
     rules: owner.schedule.holidayRules,
     compDue: owner.schedule.compDue,
-    people: view.people.map((person) => ({ id: person.id, name: person.name })),
+    people: (view.directory ?? view.people).map((person) => ({ id: person.id, name: person.name })),
   });
   const monthDays = [...real, ...plannedFcDays(summary, owner.schedule.compDue, real)];
   if (!monthDays.some((row) => row.sellerId === sellerId && row.day === day)) return null;
@@ -306,11 +306,20 @@ type SelectedPerson = { id: string; name: string; fixedOffDow: number | null; se
 
 type BranchSchedule = {
   store: Store;
+  /** Equipe ativa (wizard e candidatos a herdar a vaga). */
   people: StoreSeller[];
+  /** Ativos + desligados ainda no ERP (nome na grade quando a vaga ficou órfã). */
+  directory: StoreSeller[];
   shifts: StoreShift[];
   holidays: Holiday[];
   months: { monthStart: string; schedule: StoredSchedule }[];
   days: StoredDay[];
+};
+
+type ReplaceTarget = {
+  storeId: string;
+  fromSellerId: string;
+  fromName: string;
 };
 
 function monthStarts(from: string, to: string): string[] {
@@ -336,7 +345,7 @@ function monthsBetween(from: string, to: string): string[] {
 }
 
 function scheduleCacheReady(c: BranchSchedule[] | null): c is BranchSchedule[] {
-  return Array.isArray(c);
+  return Array.isArray(c) && c.every((view) => Array.isArray(view.people) && Array.isArray(view.directory) && Array.isArray(view.months) && Array.isArray(view.days));
 }
 
 export function SchedulePage() {
@@ -360,6 +369,10 @@ export function SchedulePage() {
   const [saving, setSaving] = useState(false);
   const [dayOpen, setDayOpen] = useState<{ storeId: string; day: string; sellerId: string; ownerMonth: string } | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{ storeId: string; monthStart: string } | null>(null);
+  const [replaceTarget, setReplaceTarget] = useState<ReplaceTarget | null>(null);
+  const [replaceWithId, setReplaceWithId] = useState("");
+  const [replaceBusy, setReplaceBusy] = useState(false);
+  const [replaceError, setReplaceError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
   const storeIds = storeRows.map((row) => row.id).join(",");
   const filterKey = `schedule:${session.tenantId}:${storeIds}:${monthStart}`;
@@ -467,7 +480,8 @@ export function SchedulePage() {
             const shiftPromise = fetchStoreShifts(session.tenantId, store.id);
             const stored = await Promise.all(covered.map((month) => fetchSchedule(store.id, month)));
             const [team, storeShifts] = await Promise.all([teamPromise, shiftPromise]);
-            const active = (team.get(store.id) ?? []).filter((person) => isBranchTeamMember(person));
+            const directory = team.get(store.id) ?? [];
+            const active = directory.filter((person) => isBranchTeamMember(person));
             const place = storePlace(store);
             const months = covered.flatMap((month, index) => {
               const schedule = stored[index]?.schedule;
@@ -488,7 +502,7 @@ export function SchedulePage() {
             });
             const holidays = [...national, ...local];
             const days = stored.flatMap((item) => item.days);
-            return { store, people: active, shifts: storeShifts, holidays, months, days };
+            return { store, people: active, directory, shifts: storeShifts, holidays, months, days };
           }),
         );
         if (stop || gen !== reloadGen.current) return;
@@ -826,13 +840,14 @@ export function SchedulePage() {
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
               {scheduleCards.map(({ view, item }) => {
                 const monthDays = view.days.filter((row) => startOfMonth(row.day) === item.monthStart);
+                const nameList = (view.directory ?? view.people).map((person) => ({ id: person.id, name: person.name }));
                 const compRows = buildCompOffSummary({
                   monthStart: item.monthStart,
                   monthDays,
                   allDays: view.days,
                   rules: item.schedule.holidayRules,
                   compDue: item.schedule.compDue,
-                  people: view.people.map((person) => ({ id: person.id, name: person.name })),
+                  people: nameList,
                 });
                 const prevMonth = addMonths(item.monthStart, -1);
                 const prevItem = view.months.find((month) => month.monthStart === prevMonth);
@@ -843,7 +858,7 @@ export function SchedulePage() {
                       allDays: view.days,
                       rules: prevItem.schedule.holidayRules,
                       compDue: prevItem.schedule.compDue,
-                      people: view.people.map((person) => ({ id: person.id, name: person.name })),
+                      people: nameList,
                     })
                   : [];
                 const prevHolidayDates = prevCompRows
@@ -902,8 +917,14 @@ export function SchedulePage() {
                         schedules: boardSchedules.length > 0 ? boardSchedules : [item],
                         days: boardDays,
                         people: view.people,
+                        directory: view.directory,
                       }}
                       onOpenDay={(day, sellerId) => setDayOpen({ storeId: view.store.id, day, sellerId, ownerMonth: item.monthStart })}
+                      onReplacePerson={(fromSellerId, fromName) => {
+                        setReplaceError(null);
+                        setReplaceWithId("");
+                        setReplaceTarget({ storeId: view.store.id, fromSellerId, fromName });
+                      }}
                     />
                     <CompOffAccordion rows={compRows} />
                   </Card>
@@ -932,7 +953,7 @@ export function SchedulePage() {
           dayNeeds={dayEdit.schedule.dayNeeds}
           monthEnd={dayEdit.monthEnd}
           monthDays={dayEdit.monthDays}
-          names={new Map(dayView.people.map((person) => [person.id, person]))}
+          names={new Map((dayView.directory ?? dayView.people).map((person) => [person.id, person]))}
           onClose={() => setDayOpen(null)}
           onSave={async (next) => {
             const editedDays = next.flatMap((group) => group.rows);
@@ -993,6 +1014,51 @@ export function SchedulePage() {
           {deleteMonth && endOfMonth(deleteMonth.monthStart) < today ? " Este período já passou." : ""}
         </p>
       </Modal>
+      {replaceTarget ? (
+        <ReplacePersonModal
+          open
+          fromName={replaceTarget.fromName}
+          candidates={(views.find((view) => view.store.id === replaceTarget.storeId)?.people ?? []).filter(
+            (person) => person.id !== replaceTarget.fromSellerId,
+          )}
+          selectedId={replaceWithId}
+          busy={replaceBusy}
+          error={replaceError}
+          onSelect={setReplaceWithId}
+          onClose={() => {
+            if (replaceBusy) return;
+            setReplaceTarget(null);
+            setReplaceWithId("");
+            setReplaceError(null);
+          }}
+          onConfirm={() => {
+            const view = views.find((item) => item.store.id === replaceTarget.storeId);
+            const next = view?.people.find((person) => person.id === replaceWithId);
+            if (!view || !next) {
+              setReplaceError("Escolha quem herda a escala.");
+              return;
+            }
+            setReplaceBusy(true);
+            setReplaceError(null);
+            void replaceSchedulePerson({
+              storeId: replaceTarget.storeId,
+              fromSellerId: replaceTarget.fromSellerId,
+              toSellerId: next.id,
+              toName: next.name,
+            })
+              .then(() => {
+                setReplaceTarget(null);
+                setReplaceWithId("");
+                show(`${next.name.toLocaleUpperCase("pt-BR")} herdou a escala.`, "success");
+                setReloadKey((value) => value + 1);
+              })
+              .catch((caught) => {
+                setReplaceError(caught instanceof Error && caught.message ? caught.message : "Não foi possível substituir a pessoa.");
+              })
+              .finally(() => setReplaceBusy(false));
+          }}
+        />
+      ) : null}
     </div>
   );
 }
@@ -1003,7 +1069,83 @@ type ScheduleSection = {
   schedules: { monthStart: string; schedule: StoredSchedule }[];
   days: StoredDay[];
   people: StoreSeller[];
+  directory: StoreSeller[];
 };
+
+function ReplacePersonModal({
+  open,
+  fromName,
+  candidates,
+  selectedId,
+  busy,
+  error,
+  onSelect,
+  onClose,
+  onConfirm,
+}: {
+  open: boolean;
+  fromName: string;
+  candidates: StoreSeller[];
+  selectedId: string;
+  busy: boolean;
+  error: string | null;
+  onSelect: (id: string) => void;
+  onClose: () => void;
+  onConfirm: () => void;
+}) {
+  const selected = candidates.find((person) => person.id === selectedId) ?? null;
+  return (
+    <Modal
+      open={open}
+      onClose={busy ? () => {} : onClose}
+      title="Substituir na escala"
+      footer={
+        <div className="flex w-full min-w-0 flex-col gap-3">
+          {error ? <Alert variant="danger" title={error} /> : null}
+          <div className="flex justify-end gap-2.5">
+            <Button variant="outline" onClick={onClose} disabled={busy}>
+              Cancelar
+            </Button>
+            <Button disabled={busy || !selected} onClick={onConfirm}>
+              {busy ? "Substituindo…" : "Substituir"}
+            </Button>
+          </div>
+        </div>
+      }
+    >
+      <div className="flex flex-col gap-3">
+        <p className="text-[13.5px] leading-relaxed text-t1">
+          {fromName.toLocaleUpperCase("pt-BR")} saiu da equipe. Quem herda a folga, os dias e as compensatórias desta vaga?
+        </p>
+        {candidates.length === 0 ? (
+          <p className="text-[13px] text-t2">Nenhuma pessoa ativa nesta filial para herdar a escala.</p>
+        ) : (
+          <label className="flex flex-col gap-1.5 text-[13px] font-semibold text-t0">
+            Nova pessoa
+            <Select
+              value={selectedId}
+              onChange={(event) => onSelect(event.target.value)}
+              aria-label="Pessoa que herda a escala"
+            >
+              <option value="">Escolher</option>
+              {candidates.map((person) => (
+                <option key={person.id} value={person.id}>
+                  {person.name.toLocaleUpperCase("pt-BR")}
+                </option>
+              ))}
+            </Select>
+          </label>
+        )}
+        {selected ? (
+          <p className="text-[12.5px] leading-relaxed text-t2">
+            Se {selected.name.toLocaleUpperCase("pt-BR")} já tiver linha nesta escala, essa linha sai e ela fica com a vaga de{" "}
+            {fromName.toLocaleUpperCase("pt-BR")}.
+          </p>
+        ) : null}
+      </div>
+    </Modal>
+  );
+}
 
 /** Tile leve: fundo soft + letra na cor do status (a grade não compete com o topo). */
 function cellMark(status: DayStatus, doublePay: boolean): { letters: string; className: string; tight: boolean } {
@@ -1045,6 +1187,7 @@ function ScheduleBoard({
   today,
   section,
   onOpenDay,
+  onReplacePerson,
   readOnly = false,
 }: {
   dates: string[];
@@ -1053,10 +1196,13 @@ function ScheduleBoard({
   today: string;
   section: ScheduleSection;
   onOpenDay: (day: string, sellerId: string) => void;
+  onReplacePerson?: (sellerId: string, name: string) => void;
   readOnly?: boolean;
 }) {
   const { schedules, people, holidays } = section;
-  const byId = new Map(people.map((person) => [person.id, person]));
+  const directory = section.directory ?? people;
+  const byId = new Map(directory.map((person) => [person.id, person]));
+  const activeIds = new Set(people.map((person) => person.id));
   const byDay = daysByDate(section.days);
   const focusAll = !activeDates || activeDates.size === 0 || activeDates.size === dates.length;
   function inFocus(iso: string) {
@@ -1086,17 +1232,31 @@ function ScheduleBoard({
   const roster = [...ids]
     .map((id) => {
       const person = byId.get(id);
+      const orphan = !activeIds.has(id);
       const fixed = schedules.flatMap((item) => item.schedule.people).find((row) => row.sellerId === id)?.fixedOffDow ?? null;
       const offDow = offDowOf(id, fixed);
-      const role = person ? branchRoleLabel(person.role).toLocaleUpperCase("pt-BR") : "";
+      const role = orphan
+        ? "DESLIGADA"
+        : person
+          ? branchRoleLabel(person.role).toLocaleUpperCase("pt-BR")
+          : "";
       const offLabel =
         offDow != null
           ? `FOLGA: ${DOW_LABELS[offDow as 0 | 1 | 2 | 3 | 4 | 5 | 6].toLocaleUpperCase("pt-BR")}`
           : "";
       const detail = [role, offLabel].filter(Boolean).join("  ·  ");
-      return { id, name: (person?.name ?? "Pessoa").toLocaleUpperCase("pt-BR"), detail, code: person?.code ?? null };
+      return {
+        id,
+        name: (person?.name ?? "Pessoa").toLocaleUpperCase("pt-BR"),
+        detail,
+        code: person?.code ?? null,
+        orphan,
+      };
     })
-    .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+    .sort((a, b) => {
+      if (a.orphan !== b.orphan) return a.orphan ? 1 : -1;
+      return a.name.localeCompare(b.name, "pt-BR");
+    });
 
   function presence(iso: string): { working: number; closed: boolean; min: number; exact: boolean } {
     const rows = byDay.get(iso) ?? [];
@@ -1154,9 +1314,18 @@ function ScheduleBoard({
           <div key={person.id} className="contents">
             <div className={cn(stickyPerson, "flex min-w-0 items-center gap-2 py-0.5")}>
               <PersonAvatar name={person.name} employeeId={person.code} storeId={section.storeId} size="sm" />
-              <span className="min-w-0">
+              <span className="min-w-0 flex-1">
                 <span className="block truncate text-[12px] font-semibold leading-tight text-t0">{person.name}</span>
                 {person.detail ? <span className="mt-0.5 block truncate text-[11px] leading-snug text-t2">{person.detail}</span> : null}
+                {person.orphan && onReplacePerson && !readOnly ? (
+                  <button
+                    type="button"
+                    className="mt-1 text-[11px] font-bold text-acc hover:underline"
+                    onClick={() => onReplacePerson(person.id, person.name)}
+                  >
+                    Substituir por…
+                  </button>
+                ) : null}
               </span>
             </div>
             {dates.map((iso) => {

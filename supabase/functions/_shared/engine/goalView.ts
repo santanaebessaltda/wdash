@@ -14,6 +14,22 @@ import type {
 
 export type GoalStatus = "active" | "upcoming" | "ended";
 
+/** A barra fecha no último nível. Sem nível, ou com o nível em 0%, fecha na meta da filial. */
+export function goalBarScale(levels: readonly number[]): number {
+  const last = levels.reduce((max, level) => Math.max(max, level), 0);
+  return last > 0 ? last : 100;
+}
+
+/** Percentual em que o último nível vale 100. `branchPct` é o % da meta da filial. */
+export function goalLevelPct(branchPct: number, levels: readonly number[]): number {
+  return (branchPct / goalBarScale(levels)) * 100;
+}
+
+/** Valor em reais do último nível. Sem nível, ou com o nível em 0%, fica a meta cadastrada. */
+export function goalLevelAmount(target: number, levels: readonly number[]): number {
+  return (target * goalBarScale(levels)) / 100;
+}
+
 export function goalStatus(g: Pick<GoalRecord, "startsOn" | "endsOn">, today: string): GoalStatus {
   if (today < g.startsOn) return "upcoming";
   if (today > g.endsOn) return "ended";
@@ -129,7 +145,7 @@ export interface GoalSummary {
   status: GoalStatus;
   achieved: number;
   pct: number;
-  /** Projecao de fechamento (% da meta). null ate metade do peso da meta ter passado. A mesma conta do card Atingimento. */
+  /** Projecao de fechamento. O ultimo nivel vale 100%. null ate metade do peso da meta ter passado. */
   projectedPct: number | null;
   daysRemaining: number;
   /** Nivel da loja na escada pelo realizado (null = nenhum ainda). */
@@ -155,7 +171,7 @@ export function buildGoalSummary(g: GoalRecord, dayAggs: SalesDayAgg[], today: s
     status,
     achieved,
     pct,
-    projectedPct: closing?.pct ?? null,
+    projectedPct: closing ? goalLevelPct(closing.pct, g.tiers.map((t) => t.minAttainmentPct)) : null,
     daysRemaining: daysRemaining(g, today),
     currentLevel: level,
     levelNumber,
@@ -551,7 +567,7 @@ export function buildGoalCardView(input: {
   const general = g.tierMode === "GENERAL";
   const individual = g.tierMode === "INDIVIDUAL";
   const branchSales = status === "upcoming" ? { sales: 0, items: 0 as number | null } : storeSales(g, input.dayAggs);
-  const scale = Math.max(100, ...g.tiers.map((t) => t.minAttainmentPct));
+  const scale = goalBarScale(g.tiers.map((t) => t.minAttainmentPct));
   const marcos = g.tiers.map((t) => ({ name: t.name, pct: t.minAttainmentPct, prizePct: t.commissionPct, bonus: t.bonus }));
   const periodDays = period.length;
   const teamTotal = people.reduce((s, p) => s + p.revenue, 0);
@@ -642,6 +658,7 @@ export function buildGoalCardView(input: {
       storeId: g.storeId,
       storeName: storeNameValue,
       group: member?.shiftName ?? "Sem grupo definido",
+      role: member?.role ?? null,
       revenueAmount: revenueToShow,
       revenue: brlCent(revenueToShow),
       salesCount: salesToShow,
@@ -673,7 +690,7 @@ export function buildGoalCardView(input: {
       accruedPrize: prizeAmount,
       commissionPct: tier?.commissionPct ?? 0,
       projectedIndividualPrize: null,
-      projectedAttainmentPct: status === "active" && frac > 0 ? ating / frac : null,
+      projectedAttainmentPct: status === "active" && frac > 0 ? goalLevelPct(ating / frac, g.tiers.map((t) => t.minAttainmentPct)) : null,
       bonusReached: bonus,
       attention: null,
       noGoal: individualGoal <= 0,
@@ -696,7 +713,7 @@ export function buildGoalCardView(input: {
       : {}),
     total: g.target,
     pct,
-    projectedPct: status === "upcoming" ? 0 : (closing?.pct ?? pct),
+    projectedPct: status === "upcoming" ? 0 : goalLevelPct(closing?.pct ?? pct, g.tiers.map((t) => t.minAttainmentPct)),
     projectionAmount: status === "ended" ? achieved : (closing?.amount ?? null),
     daysRemaining: status === "upcoming" ? daysBetween(g.startsOn, g.endsOn) : daysRemaining(g, today),
     start: g.startsOn,
@@ -710,7 +727,7 @@ export function buildGoalCardView(input: {
     storeNameValue,
     brands: [],
     qtyGroups: groups.length,
-    qtySellers: n,
+    qtySellers: sellers.length,
     qtyLevels: g.tiers.length,
     spreadsUnidentified: goalSpreadsUnidentified(g),
     tiers: g.tiers,

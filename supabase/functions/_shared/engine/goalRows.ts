@@ -3,6 +3,7 @@ import { collaboratorName, shiftName } from "./format.ts";
 import type { GoalGroup, GoalRecord, GoalTeamMember, SalesBrand, SalesSellerDayAgg, Tier } from "./goalTypes.ts";
 
 export const SELLER_ROLE = "VENDEDOR";
+export const CASHIER_ROLE = "OPERADOR DE CAIXA";
 
 type TierJson = {
   name?: string;
@@ -47,6 +48,7 @@ export type GoalRow = {
   tiers: unknown;
   groups: unknown;
   spread_unidentified?: boolean | null;
+  published_at?: string | null;
 };
 
 export function goalFromRow(r: GoalRow): GoalRecord {
@@ -61,6 +63,7 @@ export function goalFromRow(r: GoalRow): GoalRecord {
     tiers: parseTiers(r.tiers),
     groups: parseGroups(r.groups),
     spreadUnidentified: r.spread_unidentified === true,
+    published: !("published_at" in r) || r.published_at != null,
   };
 }
 
@@ -87,6 +90,8 @@ export function teamMemberFromRow(r: GoalTeamRow): GoalTeamMember {
     name: collaboratorName(r.name),
     nameKeys: r.name_keys ?? [],
     salesPerson: r.active && (r.erp_role == null || r.erp_role === SELLER_ROLE),
+    role: r.erp_role,
+    active: r.active,
     admittedOn: r.admitted_on ?? null,
     departedOn: r.departed_on ?? null,
     shiftId: r.shift_id,

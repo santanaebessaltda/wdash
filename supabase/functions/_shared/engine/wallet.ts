@@ -1,6 +1,6 @@
 /** Carteira do mês: premiação, bônus, desafio, retirada e quebra. Valores em centavos. */
 
-export type WalletLineKind = "prize" | "bonus" | "management" | "managementBonus" | "challenge" | "withdrawal" | "shortage";
+export type WalletLineKind = "prize" | "bonus" | "management" | "managementBonus" | "cashier" | "challenge" | "withdrawal" | "shortage";
 
 export type WalletLine = {
   kind: WalletLineKind;
@@ -59,8 +59,17 @@ export type WalletChallengeInput = {
   name: string;
   endsOn: string;
   open: boolean;
-  people: { personId: string; moneyCents: number; itemLabel: string | null; management?: boolean }[];
+  people: { personId: string; moneyCents: number; itemLabel: string | null; management?: boolean; cashier?: boolean }[];
 };
+
+export type WalletManager = { id: string; name: string; storeIds: string[] };
+
+/** Gerentes da filial. Quem tem filiais marcadas fica só nelas. Quem não tem marca entra nas filiais que ninguém reivindicou. */
+export function managersForStore(managers: WalletManager[], storeId: string): WalletManager[] {
+  const named = managers.filter((manager) => manager.storeIds.includes(storeId));
+  const picked = named.length > 0 ? named : managers.filter((manager) => manager.storeIds.length === 0);
+  return picked.sort((a, b) => a.name.localeCompare(b.name, "pt-BR") || a.id.localeCompare(b.id));
+}
 
 /** Divide centavos em partes iguais. O resto fica nas primeiras partes. */
 export function splitEqualCents(total: number, count: number): number[] {
@@ -181,12 +190,29 @@ export function buildWalletMonth(input: {
       const row = bucket(person.personId);
       if (!row) continue;
       if (challenge.open) {
-        if (!person.management) {
+        if (!person.management && !person.cashier) {
           row.lines.push({ kind: "challenge", title: challenge.name, day: challenge.endsOn, cents: 0, open: true, note: "Em andamento" });
         }
         continue;
       }
+      if (person.cashier) {
+        const item = person.itemLabel?.trim() ?? "";
+        if (item) {
+          row.lines.push({ kind: "cashier", title: challenge.name, day: challenge.endsOn, cents: 0, open: false, note: item });
+          continue;
+        }
+        const share = cents(person.moneyCents);
+        if (share <= 0) continue;
+        row.challengeCents += share;
+        row.lines.push({ kind: "cashier", title: challenge.name, day: challenge.endsOn, cents: share, open: false, note: null });
+        continue;
+      }
       if (person.management) {
+        const item = person.itemLabel?.trim() ?? "";
+        if (item) {
+          row.lines.push({ kind: "management", title: challenge.name, day: challenge.endsOn, cents: 0, open: false, note: item });
+          continue;
+        }
         const share = cents(person.moneyCents);
         if (share <= 0) continue;
         row.managementCents += share;
@@ -280,7 +306,7 @@ function recount(person: WalletPersonMonth, lines: WalletLine[]): WalletPersonMo
     if (line.kind === "prize") prizeCents += line.cents;
     else if (line.kind === "bonus") bonusCents += line.cents;
     else if (line.kind === "management" || line.kind === "managementBonus") managementCents += line.cents;
-    else if (line.kind === "challenge") challengeCents += line.cents;
+    else if (line.kind === "cashier" || line.kind === "challenge") challengeCents += line.cents;
     else if (line.kind === "withdrawal") withdrawalCents += line.cents;
     else shortageCents += line.cents;
     if (line.open && line.kind !== "challenge") openPrize = true;
@@ -299,6 +325,15 @@ function recount(person: WalletPersonMonth, lines: WalletLine[]): WalletPersonMo
   };
 }
 
+/** Junta os meses do intervalo e fica só com o que cai entre `from` e `to`. Meta ainda aberta entra no mês em que termina, mesmo quando o período para antes do último dia. */
+function lineInRange(line: WalletLine, start: string, end: string): boolean {
+  if (line.day == null) return false;
+  if (line.day >= start && line.day <= end) return true;
+  if (!line.open || line.day < start) return false;
+  const month = line.day.slice(0, 7);
+  return start.slice(0, 7) <= month && end.slice(0, 7) >= month;
+}
+
 /** Junta os meses do intervalo e fica só com o que cai entre `from` e `to`. */
 export function walletInRange(parts: WalletMonth[], from: string, to: string, keepPersonId?: string | null): WalletMonth {
   const start = from <= to ? from : to;
@@ -315,7 +350,7 @@ export function walletInRange(parts: WalletMonth[], from: string, to: string, ke
     }
   }
   const people = [...byId.values()]
-    .map((person) => recount(person, person.lines.filter((line) => line.day != null && line.day >= start && line.day <= end)))
+    .map((person) => recount(person, person.lines.filter((line) => lineInRange(line, start, end))))
     .filter((person) => person.lines.length > 0 || person.personId === keepPersonId)
     .sort((a, b) => a.name.localeCompare(b.name, "pt-BR") || a.personId.localeCompare(b.personId));
   if (keepPersonId && !people.some((person) => person.personId === keepPersonId)) {
@@ -353,4 +388,62 @@ export function walletInRange(parts: WalletMonth[], from: string, to: string, ke
     unassignedShortageCents: unassignedShortageDays.reduce((total, day) => total + day.cents, 0),
     unassignedShortageDays,
   };
+}
+
+export type WalletPersonBranch = {
+  storeId: string;
+  storeName: string;
+  person: WalletPersonMonth;
+};
+
+/** Pessoa na lista do gestor. Várias filiais quando o mesmo usuário entra em mais de uma. */
+export type WalletGroupedPerson = WalletPersonMonth & {
+  storeId: string;
+  storeName: string;
+  branches: WalletPersonBranch[];
+};
+
+/** Junta a mesma pessoa quando ela entra em mais de uma filial. Quem aparece numa só fica como está. */
+export function groupWalletPeople(rows: (WalletPersonMonth & { storeId: string; storeName: string })[]): WalletGroupedPerson[] {
+  const order: string[] = [];
+  const groups = new Map<string, (WalletPersonMonth & { storeId: string; storeName: string })[]>();
+  for (const row of rows) {
+    const current = groups.get(row.personId);
+    if (current) current.push(row);
+    else {
+      order.push(row.personId);
+      groups.set(row.personId, [row]);
+    }
+  }
+  return order.map((personId) => {
+    const sorted = [...(groups.get(personId) ?? [])].sort(
+      (a, b) => a.storeName.localeCompare(b.storeName, "pt-BR") || a.storeId.localeCompare(b.storeId),
+    );
+    const branches: WalletPersonBranch[] = sorted.map((part) => ({
+      storeId: part.storeId,
+      storeName: part.storeName,
+      person: part,
+    }));
+    const first = sorted[0];
+    if (!first || sorted.length === 1) {
+      return { ...first!, branches };
+    }
+    const sum = (pick: (row: WalletPersonMonth) => number) => sorted.reduce((total, row) => total + pick(row), 0);
+    return {
+      personId,
+      name: first.name,
+      prizeCents: sum((row) => row.prizeCents),
+      bonusCents: sum((row) => row.bonusCents),
+      managementCents: sum((row) => row.managementCents),
+      challengeCents: sum((row) => row.challengeCents),
+      withdrawalCents: sum((row) => row.withdrawalCents),
+      shortageCents: sum((row) => row.shortageCents),
+      balanceCents: sum((row) => row.balanceCents),
+      openPrize: sorted.some((row) => row.openPrize),
+      lines: sorted.flatMap((row) => [...row.lines]),
+      storeId: first.storeId,
+      storeName: `${sorted.length} filiais`,
+      branches,
+    };
+  });
 }

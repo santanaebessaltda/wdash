@@ -48,6 +48,65 @@ const TEAM_REVENUE_TIP =
 /** Fatia do gráfico de grupos: venda que não saiu no nome de ninguém. */
 export const TEAM_UNATTRIBUTED_SALE = "SEM GRUPO IDENTIFICADO";
 
+/**
+ * Inclui a equipe de vendas ativa que ainda não vendeu no período (R$ 0 no fim do ranking).
+ * Placar e tela Equipe mostram a pessoa admitida antes da primeira venda.
+ */
+export function withActiveRoster(
+  people: TeamMemberRow[],
+  team: GoalTeamMember[],
+  storeIds: string[],
+  storeNames: Map<string, string>,
+  periodEnd: string,
+): TeamMemberRow[] {
+  if (team.length === 0) return people;
+  const known = new Set(people.map((person) => person.key));
+  const knownNames = new Set(
+    people.map((person) =>
+      person.name
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .trim()
+        .toLocaleUpperCase("pt-BR"),
+    ),
+  );
+  const next = [...people];
+  for (const member of team) {
+    if (!member.salesPerson || member.active === false || member.branchUser) continue;
+    if (!storeIds.includes(member.storeId)) continue;
+    if (member.admittedOn && member.admittedOn > periodEnd) continue;
+    if (member.departedOn && member.departedOn <= periodEnd) continue;
+    const key = `e:${member.employeeId}`;
+    if (known.has(key)) continue;
+    const folded = member.name
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .trim()
+      .toLocaleUpperCase("pt-BR");
+    // Venda ainda só pelo nome (sem código): evita duplicar a linha.
+    if (folded && knownNames.has(folded)) continue;
+    known.add(key);
+    if (folded) knownNames.add(folded);
+    next.push({
+      key,
+      name: member.name,
+      storeIds: [member.storeId],
+      storeRows: [storeNames.get(member.storeId) ?? "Filial"],
+      ...(member.shiftName ? { shift: member.shiftName } : {}),
+      revenue: 0,
+      sales: 0,
+      items: 0,
+      averageTicket: 0,
+      pa: null,
+      participationPct: 0,
+      variationPct: null,
+      revenueCmp: 0,
+      revenuePrev: 0,
+    });
+  }
+  return next.sort((a, b) => b.revenue - a.revenue || a.name.localeCompare(b.name, "pt-BR"));
+}
+
 type Money = { revenue: number; sales: number; items: number; missing: boolean };
 
 function emptyMoney(): Money {
@@ -156,6 +215,19 @@ function withUnattributedSale(view: TeamDashboardView): TeamDashboardView {
  * Individual ou Grupo com rateio: a venda sem vendedor. Geral: o total da filial.
  * O faturamento por grupo continua com a venda no nome e ganha a fatia sem vendedor.
  */
+function finishTeamView(
+  view: TeamDashboardView,
+  team: GoalTeamMember[],
+  storeIds: string[],
+  storeNames: Map<string, string>,
+): TeamDashboardView {
+  // KPI (média / N pessoas) continua só com quem vendeu; a lista do ranking ganha a equipe a R$ 0.
+  return withUnattributedSale({
+    ...view,
+    people: withActiveRoster(view.people, team, storeIds, storeNames, view.period.end),
+  });
+}
+
 export function teamViewWithGoalShare(
   scope: Scope,
   input: TeamAggInput,
@@ -165,7 +237,8 @@ export function teamViewWithGoalShare(
   storeNames: Map<string, string> = new Map(),
 ): TeamDashboardView {
   const ranked = rankingOutsideGeneralGoal(scope, input, goals, today);
-  if (goals.length === 0) return withUnattributedSale(ranked);
+  const storeIds = scope.storeIds;
+  if (goals.length === 0) return finishTeamView(ranked, team, storeIds, storeNames);
   const period = ranked.period;
   const prev = previousPeriod(period, calendarCurrentHour());
   const cuts = prev.hourMax != null;
@@ -178,14 +251,13 @@ export function teamViewWithGoalShare(
     dayAggs: input.dayAggs,
     namedSellerDayAggs: input.namedSellerDayAggs,
     sellerDayAggs: input.sellerDayAggs,
-    storeIds: scope.storeIds,
+    storeIds,
     from,
     to: period.end,
     today,
   };
   const shares = unidentifiedShares(shareInput);
   const collective = generalShares(shareInput);
-  const storeIds = scope.storeIds;
   const current = plus(
     plus(namedTeamMoney(input.sellerDayAggs, storeIds, goals, today, period.start, period.end), generalStoreMoney(input.dayAggs, storeIds, goals, today, period.start, period.end)),
     shareMoney(shares, period.start, period.end),
@@ -200,7 +272,7 @@ export function teamViewWithGoalShare(
   );
   const baseCurrent = namedTeamMoney(input.sellerDayAggs, storeIds, goals, today, period.start, period.end);
   const unchanged = shares.size === 0 && collective.size === 0 && current.revenue === baseCurrent.revenue && current.sales === baseCurrent.sales;
-  if (unchanged) return withUnattributedSale(ranked);
+  if (unchanged) return finishTeamView(ranked, team, storeIds, storeNames);
 
   const people = ranked.people.map((person) => ({ ...person, storeIds: [...person.storeIds], storeRows: [...person.storeRows] }));
   const byKey = new Map(people.map((person) => [person.key, person]));
@@ -251,11 +323,16 @@ export function teamViewWithGoalShare(
     person.variationPct = person.revenueCmp > 0 && person.revenuePrev > 0 ? ((person.revenueCmp - person.revenuePrev) / person.revenuePrev) * 100 : null;
   }
   visible.sort((a, b) => b.revenue - a.revenue || a.name.localeCompare(b.name, "pt-BR"));
-  return withUnattributedSale({
-    ...ranked,
-    people: visible,
-    kpis: teamKpis(current, cmp, previous, visible.length, ranked.vsVariation),
-  });
+  return finishTeamView(
+    {
+      ...ranked,
+      people: visible,
+      kpis: teamKpis(current, cmp, previous, visible.length, ranked.vsVariation),
+    },
+    team,
+    storeIds,
+    storeNames,
+  );
 }
 
 /** Parte de um vendedor, por dia, para o detalhe bater com a linha do ranking. */

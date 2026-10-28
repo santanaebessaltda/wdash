@@ -7,7 +7,7 @@ import { brlCent, eachDay, num } from "./format.ts";
 import type { GoalTeamMember, SalesSellerDayAgg } from "./goalTypes.ts";
 import { goalStatus } from "./goalView.ts";
 import { presenceDays, scaledMinimum } from "./presence.ts";
-import { productInLines } from "./productLines.ts";
+import { productInLines } from "../productLines.ts";
 
 export type SellerChallengeMetric = "QUANTITY" | "VALUE" | "PA" | "TICKET" | "INDEX";
 export type SellerChallengeScope = "PRODUCTS" | "CATEGORIES" | "LINES" | "ALL";
@@ -50,7 +50,7 @@ interface ChallengeShape {
   storeId: string;
   startsOn: string;
   endsOn: string;
-  mode: "CONTEST" | "MINIMUM";
+  mode: "CONTEST" | "MINIMUM" | "COLLECTIVE";
   metric?: SellerChallengeMetric;
   scope?: SellerChallengeScope;
   productCodes?: string[];
@@ -103,7 +103,10 @@ export function sellerChallengeRules(challenge: ChallengeShape): string[] {
   const prizes = challenge.prizes?.length ? challenge.prizes : challenge.prize ? [challenge.prize] : [];
   const rules: string[] = [];
 
-  if (challenge.mode === "MINIMUM") {
+  if (challenge.mode === "COLLECTIVE") {
+    rules.push("A filial inteira concorre junta. A venda sem vendedor identificado entra na conta.");
+    rules.push("O prêmio em R$ divide igual entre os vendedores.");
+  } else if (challenge.mode === "MINIMUM") {
     rules.push("Todas as pessoas que atingirem o mínimo ganham o prêmio.");
   } else {
     rules.push(
@@ -111,7 +114,7 @@ export function sellerChallengeRules(challenge: ChallengeShape): string[] {
     );
   }
 
-  rules.push(METRIC_HOW[metric]);
+  if (challenge.mode !== "COLLECTIVE") rules.push(METRIC_HOW[metric]);
 
   if (usesScope(metric)) {
     if (scope === "PRODUCTS") {
@@ -130,7 +133,7 @@ export function sellerChallengeRules(challenge: ChallengeShape): string[] {
             : "Contam as agregações escolhidas, inclusive lançamento com o mesmo nome.",
       );
     } else {
-      rules.push("Conta tudo o que você vender na loja.");
+      rules.push(challenge.mode === "COLLECTIVE" ? "Conta tudo o que a filial vender." : "Conta tudo o que você vender na loja.");
     }
   }
 
@@ -142,9 +145,11 @@ export function sellerChallengeRules(challenge: ChallengeShape): string[] {
   if (target != null && target > 0) {
     const floor = metricFloorLabel(metric, target);
     rules.push(
-      challenge.mode === "MINIMUM"
-        ? `Mínimo para ganhar: ${floor}.`
-        : `Para receber prêmio na disputa, precisa de pelo menos ${floor}.`,
+      challenge.mode === "COLLECTIVE"
+        ? `Mínimo da filial: ${floor}.`
+        : challenge.mode === "MINIMUM"
+          ? `Mínimo para ganhar: ${floor}.`
+          : `Para receber prêmio na disputa, precisa de pelo menos ${floor}.`,
     );
   }
 
@@ -222,6 +227,7 @@ export function challengeStanding(
     products?: SellerProductDay[];
     productTypes?: { code: string; typeId: number }[];
     productNames?: { code: string; name: string }[];
+    storeDays?: { storeId: string; day: string; brand: string; revenueCents: number; salesCount: number; itemCount: number }[];
   },
 ): SellerChallengeStanding {
   const metric = challenge.metric ?? "QUANTITY";
@@ -239,6 +245,40 @@ export function challengeStanding(
     progressPct: null,
   };
   if (status === "upcoming") return empty;
+  if (challenge.mode === "COLLECTIVE") {
+    const metricUsesProducts = (metric === "QUANTITY" || metric === "VALUE") && (challenge.scope ?? "ALL") !== "ALL";
+    if (metricUsesProducts || metric === "INDEX") return { ...empty, unavailable: true };
+    const untilDay = challenge.endsOn < input.today ? challenge.endsOn : input.today;
+    let revenueCents = 0;
+    let sales = 0;
+    let items = 0;
+    let withoutItems = false;
+    for (const day of input.storeDays ?? []) {
+      if (day.storeId !== challenge.storeId || day.brand !== "ALL" || day.day < challenge.startsOn || day.day > untilDay) continue;
+      revenueCents += day.revenueCents;
+      sales += day.salesCount;
+      items += day.itemCount;
+      if (day.salesCount > 0 && day.itemCount <= 0) withoutItems = true;
+    }
+    const result = metric === "QUANTITY" ? (withoutItems ? null : items) : metric === "VALUE" ? round2(revenueCents / 100) : sales <= 0 ? 0 : metric === "PA" ? (withoutItems ? null : round2(items / sales)) : round2(revenueCents / 100 / sales);
+    const floor = target ?? 0;
+    const min = challenge.minSales != null && challenge.minSales >= 1 ? challenge.minSales : 0;
+    const reached = result != null && result > 0 && sales >= min && floor > 0 && result >= floor - 1e-9;
+    const won = (status === "ended" || !settlesAtEnd(metric)) && reached;
+    return {
+      ...empty,
+      result: result == null ? null : resultLabel(metric, result),
+      unavailable: result == null,
+      won,
+      gap:
+        status === "active" && settlesAtEnd(metric) && reached
+          ? pendingAtEnd(metric)
+          : status === "active" && result != null && !reached && floor > result
+            ? gapAmount(metric, floor - result)
+            : null,
+      progressPct: result == null || floor <= 0 ? null : bar(result, floor),
+    };
+  }
 
   const until = challenge.endsOn < input.today ? challenge.endsOn : input.today;
   const inPeriod = (r: { storeId: string; day: string }) =>
@@ -417,6 +457,12 @@ export function challengeStanding(
         progressPct = bar(result, above.result);
       }
     }
+  }
+  // P.A., ticket e índice não têm barra. O percentual mede só o mínimo, para a cor do número.
+  if (settlesAtEnd(metric)) {
+    if (minSales > 0 && mine.sales < minSales) progressPct = bar(mine.sales, minSales);
+    else if (personalTarget != null && personalTarget > 0) progressPct = bar(result, personalTarget);
+    else progressPct = null;
   }
 
   return {

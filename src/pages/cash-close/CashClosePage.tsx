@@ -145,6 +145,18 @@ type CloseDraft = {
   onlinePix: OnlinePixDraftRow[];
 };
 
+/** Ajuste do fechamento (totais reais / quebra). PIX online e retirada sozinhos não fecham o dia. */
+function hasCloseAdjustment(review: CashCloseReview | undefined): boolean {
+  if (!review) return false;
+  if (review.cashTypedCents != null) return true;
+  if (Object.keys(review.typedCents).length > 0) return true;
+  if (Object.keys(review.acquirerCents).length > 0) return true;
+  if (review.shortageScope) return true;
+  if (review.waive) return true;
+  if (review.justification.trim()) return true;
+  return false;
+}
+
 function CloseTable({
   lines,
   pixPending,
@@ -612,7 +624,19 @@ export function CashClosePage() {
       pendingCents: info?.pendingCents ?? 0,
       closedStores: info?.closedStores ?? 0,
     };
-    if (day === today) return { kind: "today", totalCents: soldToday?.cents ?? 0, diffCents: 0, withdrawalCents: 0, awaiting: soldToday == null, ...counts };
+    if (day === today) {
+      const todayWithdrawal = reviews
+        .filter((r) => r.day.slice(0, 10) === today)
+        .reduce((sum, r) => sum + r.withdrawals.reduce((inner, line) => inner + line.cents, 0), 0);
+      return {
+        kind: "today",
+        totalCents: soldToday?.cents ?? 0,
+        diffCents: 0,
+        withdrawalCents: todayWithdrawal,
+        awaiting: soldToday == null,
+        ...counts,
+      };
+    }
     if (!info || (info.systemCents === 0 && info.realCents === 0 && !info.pending)) return { kind: "zero", totalCents: 0, diffCents: 0, withdrawalCents: 0, ...counts };
     if (!info.hasMillennium && !info.hasLines && !info.pending) return { kind: "empty", totalCents: 0, diffCents: 0, withdrawalCents: 0, ...counts };
     if (manyStores) {
@@ -702,7 +726,10 @@ export function CashClosePage() {
         onSaved={(next) => {
           setReviews((current) => {
             const without = current.filter((r) => !(r.storeId === next.storeId && r.day === next.day));
-            return [...without, next];
+            const reviewsNext = [...without, next];
+            const cached = filterCacheGet<CashCloseMonthCache>(filterKey);
+            if (cashCloseCacheReady(cached)) filterCacheSet(filterKey, { marks: cached.marks, reviews: reviewsNext });
+            return reviewsNext;
           });
         }}
       />
@@ -961,7 +988,9 @@ function manyBadges(face: CalendarFace): Array<{ color: string; text: string }> 
   if (face.shortageStores > 0) chips.push({ color: "bg-bad", text: groupedClose(face.shortageStores, "fechada", `Quebra ${brlCent(face.shortageCents / 100)}`) });
   if (face.pendingStores > 0) chips.push({ color: "bg-warn", text: groupedClose(face.pendingStores, "pendente", brlCent(face.pendingCents / 100)) });
   if (face.kind === "today") chips.push({ color: "bg-acc", text: "Em aberto" });
-  if (face.kind === "total" && face.withdrawalCents > 0) chips.push({ color: "bg-info", text: `Retirada ${brlCent(face.withdrawalCents / 100)}` });
+  if ((face.kind === "today" || face.kind === "total") && face.withdrawalCents > 0) {
+    chips.push({ color: "bg-info", text: `Retirada ${brlCent(face.withdrawalCents / 100)}` });
+  }
   return chips;
 }
 
@@ -975,6 +1004,9 @@ function dayHint(face: CalendarFace, many: boolean): string | undefined {
   if (many) {
     const partes = manyBadges(face).map((chip) => chip.text);
     return partes.length > 0 ? partes.join(" · ") : undefined;
+  }
+  if (face.kind === "today") {
+    return face.withdrawalCents > 0 ? `Retirada ${brlCent(face.withdrawalCents / 100)}` : undefined;
   }
   if (face.kind !== "total") return undefined;
   const partes: string[] = [];
@@ -1027,6 +1059,9 @@ function Month({
                   <>
                     {face.kind === "pending" && <DayChip color="bg-warn">{`Pendente ${brlCent(face.totalCents / 100)}`}</DayChip>}
                     {face.kind === "today" && <DayChip color="bg-acc">Em aberto</DayChip>}
+                    {face.kind === "today" && face.withdrawalCents > 0 && (
+                      <DayChip color="bg-info">{`Retirada ${brlCent(face.withdrawalCents / 100)}`}</DayChip>
+                    )}
                     {face.kind === "total" && (face.diffCents !== 0 || face.withdrawalCents === 0) && (
                       <DayChip color={differenceChip(face.diffCents).color}>{differenceChip(face.diffCents).text}</DayChip>
                     )}
@@ -1106,7 +1141,11 @@ function DayModal({
   function canEditStore(storeId: string) {
     if (!day) return false;
     if (gestor) return true;
-    return !reviews.some((item) => item.storeId === storeId && item.day.slice(0, 10) === day);
+    // Dia em aberto: gerente pode ir lançando PIX online e retirada ao longo do dia.
+    if (!closed) return true;
+    const review = reviews.find((item) => item.storeId === storeId && item.day.slice(0, 10) === day);
+    // Só PIX/retirada lançados antes do fechamento não contam como ajuste — o gerente ainda completa o dia.
+    return !hasCloseAdjustment(review);
   }
   const [withdrawalDrafts, setWithdrawalDrafts] = useState<Record<string, WithdrawalDraft>>({});
   const [busy, setBusy] = useState(false);
@@ -1168,20 +1207,68 @@ function DayModal({
   async function save() {
     if (!day) return;
     setBusy(true);
-    for (const store of withDados) {
+    const targets = closed ? withDados : storeRows;
+    let wrote = 0;
+    for (const store of targets) {
       if (!canEditStore(store.id)) continue;
       const snap = snaps[store.id];
-      const draft = drafts[store.id];
-      if (!snap || !draft) continue;
-      const lines = buildCashCloseView(snap).lines;
-      const typedCents: CashCloseReview["typedCents"] = {};
-      const acquirerCents: CashCloseReview["acquirerCents"] = {};
+      const draft = drafts[store.id] ?? { typed: {}, acquirer: {}, onlinePix: [] };
+      const review = reviews.find((item) => item.storeId === store.id && item.day === day);
       const onlineSaved = onlinePixSave({ rows: draft.onlinePix ?? [], parseCents: fieldToCents });
       if (!onlineSaved.ok) {
         setBusy(false);
         show(onlineSaved.message, "danger");
         return;
       }
+      const people = withdrawalChoices(
+        sellersByStore,
+        branches,
+        withdrawalStaff,
+        store.id,
+        (withdrawalDrafts[store.id]?.rows ?? []).map((row) => row.sellerId),
+      );
+      const lines = snap ? buildCashCloseView(snap).lines : [];
+      const retiro = withdrawalSave({
+        shortageCents: closed ? dayShortageCents(closeDayGap(linesWithDraft(lines, draft)).diffCents) : 0,
+        enabled: withdrawalDrafts[store.id]?.enabled ?? false,
+        rows: withdrawalDrafts[store.id]?.rows ?? [],
+        parseCents: fieldToCents,
+        names: people.names,
+      });
+      if (!retiro.ok) {
+        setBusy(false);
+        show(retiro.message, "danger");
+        return;
+      }
+      if (!closed) {
+        if (onlineSaved.lines.length === 0 && retiro.lines.length === 0 && !review) continue;
+        const saved: CashCloseReview = {
+          storeId: store.id,
+          day,
+          cashTypedCents: review?.cashTypedCents ?? null,
+          justification: review?.justification ?? "",
+          waive: review?.waive ?? false,
+          typedCents: review?.typedCents ?? {},
+          acquirerCents: review?.acquirerCents ?? {},
+          shortageScope: review?.shortageScope ?? "",
+          shortageSellers: review?.shortageSellers ?? [],
+          shortageGroup: review?.shortageGroup ?? "",
+          withdrawals: retiro.lines,
+          onlinePix: onlineSaved.lines,
+        };
+        const r = await saveCashCloseReview({ tenantId, ...saved });
+        if (!r.ok) {
+          setBusy(false);
+          show(r.message, "danger");
+          return;
+        }
+        onSaved(saved);
+        wrote += 1;
+        continue;
+      }
+      if (!snap) continue;
+      const typedCents: CashCloseReview["typedCents"] = {};
+      const acquirerCents: CashCloseReview["acquirerCents"] = {};
       const onlineCents = onlinePixTotal(onlineSaved.lines);
       let invalid = false;
       for (const line of lines) {
@@ -1223,26 +1310,6 @@ function DayModal({
         setBusy(false);
         return;
       }
-      const review = reviews.find((item) => item.storeId === store.id && item.day === day);
-      const people = withdrawalChoices(
-        sellersByStore,
-        branches,
-        withdrawalStaff,
-        store.id,
-        (withdrawalDrafts[store.id]?.rows ?? []).map((row) => row.sellerId),
-      );
-      const retiro = withdrawalSave({
-        shortageCents: dayShortageCents(closeDayGap(linesWithDraft(lines, draft)).diffCents),
-        enabled: withdrawalDrafts[store.id]?.enabled ?? false,
-        rows: withdrawalDrafts[store.id]?.rows ?? [],
-        parseCents: fieldToCents,
-        names: people.names,
-      });
-      if (!retiro.ok) {
-        setBusy(false);
-        show(retiro.message, "danger");
-        return;
-      }
       const saved: CashCloseReview = {
         storeId: store.id,
         day,
@@ -1264,11 +1331,15 @@ function DayModal({
         return;
       }
       onSaved(saved);
+      wrote += 1;
     }
     setBusy(false);
-    show("Fechamento atualizado.", "success");
+    if (wrote > 0) show(closed ? "Fechamento atualizado." : "Lançamentos do dia salvos.", "success");
     onClose();
   }
+
+  const canSaveOpen = !closed && storeRows.some((store) => canEditStore(store.id));
+  const canSaveClosed = closed && withDados.some((store) => canEditStore(store.id));
 
   return (
     <Modal
@@ -1294,9 +1365,9 @@ function DayModal({
       footer={
         <>
           <Button variant="outline" onClick={onClose} disabled={busy}>
-            {withDados.some((store) => canEditStore(store.id)) ? "Cancelar" : "Voltar"}
+            {canSaveOpen || canSaveClosed ? "Cancelar" : "Voltar"}
           </Button>
-          {closed && withDados.some((store) => canEditStore(store.id)) && (
+          {(canSaveOpen || canSaveClosed) && (
             <Button onClick={() => void save()} disabled={busy || !pronto}>
               {busy ? "Salvando…" : "Salvar"}
             </Button>
@@ -1310,11 +1381,46 @@ function DayModal({
         <div className="flex flex-col">
           {storeRows.map((store) => {
             const cents = soldByStore && store.id in soldByStore ? soldByStore[store.id] : null;
+            const draft = drafts[store.id] ?? { typed: {}, acquirer: {}, onlinePix: [] };
+            const people = withdrawalChoices(
+              sellersByStore,
+              branches,
+              withdrawalStaff,
+              store.id,
+              (withdrawalDrafts[store.id]?.rows ?? []).map((row) => row.sellerId),
+            );
             return (
               <div key={store.id} className={storeRows.length > 1 ? "border-t border-line pb-6 pt-5 first:border-t-0 first:pt-0 last:pb-0" : undefined}>
                 {storeRows.length > 1 ? <StoreDivisionTitle className="mb-2">{store.tradeName}</StoreDivisionTitle> : null}
                 <DayMetrics items={[{ label: "Vendido hoje", value: cents == null ? "—" : brlCent(cents / 100) }]} />
                 <p className="text-[13px] leading-relaxed text-t2">Este dia ainda está em aberto. A diferença será calculada após o fechamento.</p>
+                <OnlinePix
+                  owner={canEditStore(store.id)}
+                  rows={draft.onlinePix}
+                  acquirerText=""
+                  acquirerCents={null}
+                  pixPending={false}
+                  showAcquirer={false}
+                  onRows={(rows) =>
+                    setDrafts((current) => ({
+                      ...current,
+                      [store.id]: { ...(current[store.id] ?? draft), onlinePix: rows },
+                    }))
+                  }
+                  onAcquirer={() => {}}
+                  toCents={fieldToCents}
+                />
+                <EmployeeWithdrawal
+                  owner={canEditStore(store.id)}
+                  typedCents={0}
+                  people={people.people}
+                  names={people.names}
+                  canonicalId={people.canonicalId}
+                  draft={withdrawalDrafts[store.id] ?? { enabled: false, rows: [] }}
+                  onChange={(next) => setWithdrawalDrafts((current) => ({ ...current, [store.id]: next }))}
+                  toCents={fieldToCents}
+                  showCashTotal={false}
+                />
               </div>
             );
           })}

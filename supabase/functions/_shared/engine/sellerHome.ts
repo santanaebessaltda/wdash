@@ -104,7 +104,7 @@ export interface SellerChallenge {
   startsOn: string;
   endsOn: string;
   status: "active" | "upcoming" | "ended";
-  mode: "CONTEST" | "MINIMUM";
+  mode: "CONTEST" | "MINIMUM" | "COLLECTIVE";
   prize: string | null;
   /** Regras em linguagem da vendedora (como ganha, o que conta, piso, premios). */
   rules: string[];
@@ -125,7 +125,7 @@ export interface SellerChallengeInput {
   name: string;
   startsOn: string;
   endsOn: string;
-  mode: "CONTEST" | "MINIMUM";
+  mode: "CONTEST" | "MINIMUM" | "COLLECTIVE";
   prize: SellerChallengePrize | null;
   /** Ausente = itens de tudo o que a pessoa vendeu (desafios antigos do teste). */
   metric?: SellerChallengeMetric;
@@ -195,6 +195,7 @@ function storeWeights(input: SellerHomeInput, goal: GoalRecord, week: StoreWeekH
 function prizeLabel(prize: SellerChallengePrize | null, mode: SellerChallengeInput["mode"]): string | null {
   if (!prize) return null;
   const value = prize.kind === "MONEY" ? brlCent(prize.amount) : prize.label;
+  if (mode === "COLLECTIVE") return `${value} para a equipe`;
   return mode === "MINIMUM" ? `${value} por pessoa` : `1º lugar: ${value}`;
 }
 
@@ -327,6 +328,7 @@ function storeChallenges(input: SellerHomeInput, s: SellerHomeInput["stores"][nu
         products: input.sellerProducts,
         productTypes: input.productTypes,
         productNames: input.productNames,
+        storeDays: input.dayAggs,
       });
       return {
         id: c.id,

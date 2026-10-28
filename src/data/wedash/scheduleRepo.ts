@@ -308,3 +308,186 @@ export async function deleteSchedule(storeId: string, monthStart: string): Promi
   const removed = await sb.from("store_schedule").delete().eq("store_id", storeId).eq("month_start", start);
   if (removed.error) throw new Error(removed.error.message);
 }
+
+/** Troca o dono da vaga na lista de compensatórias: a nova pessoa herda; a antiga some. */
+export function remapCompDue(compDue: CompDue[], fromSellerId: string, toSellerId: string): CompDue[] {
+  return compDue
+    .filter((due) => due.personId !== toSellerId)
+    .map((due) => (due.personId === fromSellerId ? { ...due, personId: toSellerId } : due));
+}
+
+/**
+ * Snapshot do motor: se a nova pessoa já estava na equipe, zera (continuidade quebrada).
+ * Senão, só troca o id (e o nome) na mesma vaga.
+ */
+export function remapGeneratorSnapshot(
+  snapshot: GeneratorSnapshot | null,
+  fromSellerId: string,
+  toSellerId: string,
+  toName: string,
+  toWasOnTeam: boolean,
+): GeneratorSnapshot | null {
+  if (!snapshot || snapshot.version !== 1) return null;
+  if (!snapshot.personIds.includes(fromSellerId)) return snapshot;
+  if (toWasOnTeam) return null;
+  const personIds = snapshot.personIds.map((id) => (id === fromSellerId ? toSellerId : id));
+  const label = toName.trim().toLocaleUpperCase("pt-BR") || "PESSOA";
+  const employees = snapshot.employees.map((employee, index) =>
+    snapshot.personIds[index] === fromSellerId ? { ...employee, name: label } : employee,
+  );
+  return { ...snapshot, personIds, employees };
+}
+
+/**
+ * A nova pessoa herda a vaga da desligada em todos os meses da filial:
+ * pessoa, dias, compensatórias e snapshot. Se ela já tinha linha na escala, essa linha sai.
+ */
+export async function replaceSchedulePerson(input: {
+  storeId: string;
+  fromSellerId: string;
+  toSellerId: string;
+  toName: string;
+}): Promise<{ months: number }> {
+  if (input.fromSellerId === input.toSellerId) return { months: 0 };
+  const sb = await client();
+  const listed = await sb
+    .from("store_schedule")
+    .select("id, month_start, comp_due, generator_snapshot, store_schedule_person(seller_id, fixed_off_dow, sex)")
+    .eq("store_id", input.storeId);
+  if (listed.error) throw new Error(listed.error.message);
+
+  const months = (listed.data ?? []).filter((row) => {
+    const people = (row.store_schedule_person as { seller_id: string }[] | null) ?? [];
+    return people.some((person) => person.seller_id === input.fromSellerId);
+  });
+  if (months.length === 0) {
+    const orphanDays = await sb
+      .from("store_schedule_day")
+      .select("day")
+      .eq("store_id", input.storeId)
+      .eq("seller_id", input.fromSellerId)
+      .limit(1);
+    if (orphanDays.error) throw new Error(orphanDays.error.message);
+    if ((orphanDays.data ?? []).length === 0) return { months: 0 };
+  }
+
+  const targets =
+    months.length > 0
+      ? months
+      : (listed.data ?? []).filter((row) => {
+          const start = String(row.month_start).slice(0, 10);
+          return start.length === 10;
+        });
+
+  let touched = 0;
+  for (const row of targets) {
+    const scheduleId = String(row.id);
+    const monthStart = startOfMonth(String(row.month_start).slice(0, 10));
+    const monthEnd = endOfMonth(monthStart);
+    const people = ((row.store_schedule_person as { seller_id: string; fixed_off_dow: number | null; sex?: Sex | null }[] | null) ?? []);
+    const fromPerson = people.find((person) => person.seller_id === input.fromSellerId);
+    const toWasOnTeam = people.some((person) => person.seller_id === input.toSellerId);
+    if (!fromPerson && !toWasOnTeam) {
+      // Só dias órfãos neste mês: ainda remapeia os dias.
+      const hasFromDays = await sb
+        .from("store_schedule_day")
+        .select("day")
+        .eq("store_id", input.storeId)
+        .eq("seller_id", input.fromSellerId)
+        .gte("day", monthStart)
+        .lte("day", monthEnd)
+        .limit(1);
+      if (hasFromDays.error) throw new Error(hasFromDays.error.message);
+      if ((hasFromDays.data ?? []).length === 0) continue;
+    }
+
+  if (toWasOnTeam) {
+      const dropPerson = await sb
+        .from("store_schedule_person")
+        .delete()
+        .eq("schedule_id", scheduleId)
+        .eq("seller_id", input.toSellerId);
+      if (dropPerson.error) throw new Error(dropPerson.error.message);
+    }
+
+    // Sempre limpa os dias da nova pessoa no mês antes de herdar (evita choque de PK).
+    const dropDays = await sb
+      .from("store_schedule_day")
+      .delete()
+      .eq("store_id", input.storeId)
+      .eq("seller_id", input.toSellerId)
+      .gte("day", monthStart)
+      .lte("day", monthEnd);
+    if (dropDays.error) throw new Error(dropDays.error.message);
+
+    if (fromPerson) {
+      const moved = await sb
+        .from("store_schedule_person")
+        .update({ seller_id: input.toSellerId })
+        .eq("schedule_id", scheduleId)
+        .eq("seller_id", input.fromSellerId);
+      if (moved.error) throw new Error(moved.error.message);
+    }
+
+    const movedDays = await sb
+      .from("store_schedule_day")
+      .update({ seller_id: input.toSellerId })
+      .eq("store_id", input.storeId)
+      .eq("seller_id", input.fromSellerId)
+      .gte("day", monthStart)
+      .lte("day", monthEnd);
+    if (movedDays.error) throw new Error(movedDays.error.message);
+
+    const compDue = remapCompDue(Array.isArray(row.comp_due) ? (row.comp_due as CompDue[]) : [], input.fromSellerId, input.toSellerId);
+    const extraDays = [...new Set(compDue.filter((due) => due.personId === input.toSellerId && due.day).map((due) => String(due.day)))].filter(
+      (day) => day < monthStart || day > monthEnd,
+    );
+    for (const day of extraDays) {
+      const clash = await sb
+        .from("store_schedule_day")
+        .delete()
+        .eq("store_id", input.storeId)
+        .eq("seller_id", input.toSellerId)
+        .eq("day", day);
+      if (clash.error) throw new Error(clash.error.message);
+      const movedExtra = await sb
+        .from("store_schedule_day")
+        .update({ seller_id: input.toSellerId })
+        .eq("store_id", input.storeId)
+        .eq("seller_id", input.fromSellerId)
+        .eq("day", day);
+      if (movedExtra.error) throw new Error(movedExtra.error.message);
+    }
+
+    const snap = row.generator_snapshot as GeneratorSnapshot | null;
+    const nextSnap = remapGeneratorSnapshot(snap, input.fromSellerId, input.toSellerId, input.toName, toWasOnTeam);
+    const patched = await sb
+      .from("store_schedule")
+      .update({ comp_due: compDue, generator_snapshot: nextSnap })
+      .eq("id", scheduleId);
+    if (patched.error) throw new Error(patched.error.message);
+    touched += 1;
+  }
+
+  // Dias da desligada que sobraram fora dos meses com pessoa (ex.: FC sem linha no mês).
+  const leftover = await sb
+    .from("store_schedule_day")
+    .select("day")
+    .eq("store_id", input.storeId)
+    .eq("seller_id", input.fromSellerId);
+  if (leftover.error) throw new Error(leftover.error.message);
+  for (const row of leftover.data ?? []) {
+    const day = String(row.day).slice(0, 10);
+    const clash = await sb.from("store_schedule_day").delete().eq("store_id", input.storeId).eq("seller_id", input.toSellerId).eq("day", day);
+    if (clash.error) throw new Error(clash.error.message);
+    const moved = await sb
+      .from("store_schedule_day")
+      .update({ seller_id: input.toSellerId })
+      .eq("store_id", input.storeId)
+      .eq("seller_id", input.fromSellerId)
+      .eq("day", day);
+    if (moved.error) throw new Error(moved.error.message);
+  }
+
+  return { months: touched };
+}

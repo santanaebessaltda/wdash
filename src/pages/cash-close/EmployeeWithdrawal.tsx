@@ -129,6 +129,7 @@ export function EmployeeWithdrawal({
   draft,
   onChange,
   toCents,
+  showCashTotal = true,
 }: {
   owner: boolean;
   typedCents: number;
@@ -138,6 +139,8 @@ export function EmployeeWithdrawal({
   draft: WithdrawalDraft;
   onChange: (next: WithdrawalDraft) => void;
   toCents: (raw: string) => number | null;
+  /** Dia fechado: mostra digitado + retirada + total. Dia em aberto: só a retirada. */
+  showCashTotal?: boolean;
 }) {
   const named = names;
   const retirada = draft.rows.reduce((sum, row) => {
@@ -156,7 +159,11 @@ export function EmployeeWithdrawal({
         >
           Adicionar retirada de funcionário
         </Button>
-        <p className="mt-1.5 text-[12.5px] leading-relaxed text-t2">Venda para colaborador lançada em dinheiro. Soma no total real do dinheiro.</p>
+        <p className="mt-1.5 text-[12.5px] leading-relaxed text-t2">
+          {showCashTotal
+            ? "Venda para colaborador lançada em dinheiro. Soma no total real do dinheiro."
+            : "Venda para colaborador lançada em dinheiro. Entra no total real do dinheiro após o fechamento."}
+        </p>
       </div>
     );
   }
@@ -167,7 +174,11 @@ export function EmployeeWithdrawal({
   return (
     <section className="mt-4 rounded-[var(--radius-vela-lg)] border border-line bg-bg-2 p-3">
       <p className="text-[12.5px] font-bold text-t0">Retirada de funcionário</p>
-      <p className="mt-1 text-[12.5px] leading-relaxed text-t2">Venda para colaborador lançada em dinheiro. Soma no total real do dinheiro.</p>
+      <p className="mt-1 text-[12.5px] leading-relaxed text-t2">
+        {showCashTotal
+          ? "Venda para colaborador lançada em dinheiro. Soma no total real do dinheiro."
+          : "Venda para colaborador lançada em dinheiro. Entra no total real do dinheiro após o fechamento."}
+      </p>
       <div className="mt-3 flex flex-col gap-2">
         {owner ? (
           people.length === 0 ? (
@@ -249,7 +260,9 @@ export function EmployeeWithdrawal({
           </Button>
         )}
         <p className="text-[12.5px] text-t2">
-          Digitado {money(typedCents)} · Retirada {money(retirada)} · Total real {money(typedCents + retirada)}
+          {showCashTotal
+            ? `Digitado ${money(typedCents)} · Retirada ${money(retirada)} · Total real ${money(typedCents + retirada)}`
+            : `Retirada ${money(retirada)}. Entra no total real do dinheiro após o fechamento.`}
         </p>
       </div>
     </section>
