@@ -9,7 +9,6 @@ import { HeaderFilters } from "@/pages/stock/shared";
 import { useScopedStores } from "@/pages/operation/shared";
 import { Icon, icons } from "@/pages/users/Icons";
 import { cn } from "@/lib/cn";
-import { titleName } from "@/lib/format";
 import { filterCacheGet, filterCacheSet } from "@/lib/filterCache";
 import { useFilterSkeleton } from "@/lib/useFilterSkeleton";
 import { calendarTodayIso } from "@/data/wedash/clock";
@@ -1295,7 +1294,7 @@ function DayEditor({
 }) {
   const links = inferCompLinks(monthDays, rules, monthEnd);
   const roster = monthDays.filter((row) => row.day === day && row.sellerId === sellerId);
-  const personName = titleName(names.get(sellerId)?.name ?? "Pessoa");
+  const personName = (names.get(sellerId)?.name ?? "Pessoa").toLocaleUpperCase("pt-BR");
   const [drafts, setDrafts] = useState<Record<string, { value: CellChoice; holiday: string }>>(() =>
     Object.fromEntries(
       roster.map((row) => {
