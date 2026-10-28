@@ -50,7 +50,7 @@ export function CommissionLadder({
               <div className="flex items-center gap-2">
                 <span className={cn("text-[13px] font-bold", atingido ? "text-ok" : "text-t0")}>{tier.label}</span>
                 {isCurrent && !atingido && (
-                  <Badge variant="info" dot>
+                  <Badge variant="accent" dot>
                     Em andamento
                   </Badge>
                 )}

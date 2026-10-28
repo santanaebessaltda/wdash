@@ -16,10 +16,21 @@ export function statusVariant(status: string): StatusVariant {
   return "neutral";
 }
 
-/** Mesma palavra de status, mesma cor, em qualquer tela do produto. */
+/**
+ * Semântica fixa do produto (uma cor = um significado):
+ * - success (mint): resultado positivo, confirmado, saudável
+ * - warning (âmbar): pendência / atenção — ainda não é erro
+ * - danger (vermelho): erro, bloqueio, resultado negativo
+ * - info (azul): futuro / ainda não iniciado
+ * - accent (rosa): estado atual / aberto / “agora”
+ * - neutral (cinza): encerrado, desligado, sem configuração
+ *
+ * Sequência típica de ciclo: A começar → Em andamento → Concluído/Encerrado
+ * (azul → rosa → verde ou cinza).
+ */
 const PRODUCT_STATUS: Record<string, StatusVariant> = {
+  // success — resultado positivo / saudável
   ativo: "success",
-  "em andamento": "success",
   regular: "success",
   fechado: "success",
   recebido: "success",
@@ -30,7 +41,12 @@ const PRODUCT_STATUS: Record<string, StatusVariant> = {
   configurada: "success",
   concluído: "success",
   concluido: "success",
+  alcançado: "success",
+  alcancado: "success",
+  atingido: "success",
+  ganhou: "success",
 
+  // warning — pendência / atenção
   pendente: "warning",
   "convite pendente": "warning",
   "a receber": "warning",
@@ -41,12 +57,27 @@ const PRODUCT_STATUS: Record<string, StatusVariant> = {
   aviso: "warning",
   "não informado": "warning",
   "nao informado": "warning",
+  oculto: "warning",
 
+  // danger — problema ou resultado negativo
   suspenso: "danger",
   recusado: "danger",
   negativo: "danger",
   erro: "danger",
+  "senha inválida": "danger",
+  "senha invalida": "danger",
+  "não alcançado": "danger",
+  "nao alcancado": "danger",
 
+  // info — futuro
+  "a começar": "info",
+  "a comecar": "info",
+
+  // accent — estado atual / aberto
+  "em andamento": "accent",
+  "em aberto": "accent",
+
+  // neutral — sem ação / encerrado / sem config
   desligado: "neutral",
   desativada: "neutral",
   "sem acesso": "neutral",
@@ -56,13 +87,6 @@ const PRODUCT_STATUS: Record<string, StatusVariant> = {
   "não configurado": "neutral",
   "nao configurado": "neutral",
   desconectado: "neutral",
-  "senha inválida": "danger",
-  "senha invalida": "danger",
-
-  "a começar": "info",
-  "a comecar": "info",
-
-  "em aberto": "accent",
 };
 
 /** Cor do badge de status do produto. Rótulo desconhecido cai no mapa em inglês. */

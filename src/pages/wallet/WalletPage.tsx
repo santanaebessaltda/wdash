@@ -16,6 +16,7 @@ import { cn } from "@/lib/cn";
 import { brlCent, dateToIso, endOfMonth, fullDate, isoToDate, num } from "@/lib/format";
 import { exportPdf, usePrintMode } from "@/lib/printMode";
 import { filterCacheGet, filterCacheSet } from "@/lib/filterCache";
+import { statusBadgeVariant } from "@/lib/status";
 import { useFilterSkeleton } from "@/lib/useFilterSkeleton";
 import { useMinSkeleton } from "@/lib/useMinSkeleton";
 import { usePagedRows } from "@/lib/usePagedRows";
@@ -27,6 +28,11 @@ import { fetchStoreSellers, type Store } from "@/data/wedash/stores";
 import { matchesCodeOrName } from "@/lib/personSearch";
 import { buildXlsx, type XlsxCell } from "@/lib/xlsx";
 import { HeaderFilters } from "@/pages/stock/shared";
+
+function opportunityBadge(state: "guaranteed" | "missed" | "open") {
+  const label = state === "guaranteed" ? "Alcançado" : state === "missed" ? "Não alcançado" : "Em andamento";
+  return { label, variant: statusBadgeVariant(label) };
+}
 
 type WalletBranchCache = Array<{ store: Store; wallet: WalletMonth }>;
 
@@ -576,7 +582,7 @@ function Tile({ label, value, sub, tip, mono = true, valueClass = "text-t0" }: {
 
 function GoalOpportunityCard({ item }: { item: WalletGoalOpportunity }) {
   const ended = item.state === "missed";
-  const badge = item.state === "guaranteed" ? { label: "Alcançado", variant: "success" as const } : item.state === "missed" ? { label: "Não alcançado", variant: "danger" as const } : { label: "Em andamento", variant: "warning" as const };
+  const badge = opportunityBadge(item.state);
   const showMoney = item.state === "guaranteed" || item.prizeCents > 0 || item.bonusCents > 0;
   return (
     <div className={cn("flex items-start gap-3.5 rounded-xl border border-line p-4", ended ? "bg-bg-inset" : "bg-bg-2")}>
@@ -623,7 +629,7 @@ function GoalOpportunityCard({ item }: { item: WalletGoalOpportunity }) {
 
 function ChallengeOpportunityCard({ item }: { item: WalletChallengeOpportunity }) {
   const ended = item.state === "missed";
-  const badge = item.state === "guaranteed" ? { label: "Alcançado", variant: "success" as const } : item.state === "missed" ? { label: "Não alcançado", variant: "danger" as const } : { label: "Em andamento", variant: "warning" as const };
+  const badge = opportunityBadge(item.state);
   const won = item.state === "guaranteed";
   return (
     <div className={cn("flex items-start gap-3.5 rounded-xl border border-line p-4", ended ? "bg-bg-inset" : "bg-bg-2")}>

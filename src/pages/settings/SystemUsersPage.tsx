@@ -171,7 +171,7 @@ export function SystemUsersPage() {
           </Badge>
         </Tooltip>
       ) : (
-        <Badge variant={u.role === "OWNER" ? "accent" : "info"}>{roleLabel[u.role]}</Badge>
+        <Badge variant={u.role === "OWNER" ? "accent" : "neutral"}>{roleLabel[u.role]}</Badge>
       ),
   };
   const emailColumn: DataTableColumn<SystemUser> = {
