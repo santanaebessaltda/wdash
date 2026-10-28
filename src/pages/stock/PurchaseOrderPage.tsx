@@ -11,12 +11,14 @@ import {
   filterPurchaseRows,
   purchaseMinsToCopy,
   purchaseLineCents,
+  purchaseOrderByBrand,
   purchaseOrderFileName,
   purchaseOrderFileRows,
   purchaseOrderGroupTone,
   purchaseOrderTone,
   purchaseOrderTotalCents,
   type PurchaseFilter,
+  type PurchaseOrderBrand,
   type PurchaseOrderRow,
   type PurchaseOrderTone,
 } from "@/data/wedash/purchaseOrder";
@@ -54,6 +56,8 @@ type OrderGroup = {
   storeId: string;
   branchCode: string;
   storeName: string;
+  /** null = loja sem WPINK (um arquivo só). */
+  brand: PurchaseOrderBrand | null;
   rows: PurchaseOrderRow[];
 };
 
@@ -194,6 +198,8 @@ export function PurchaseOrderPage() {
   const activeBrand: BrandFilter = showBrand ? brand : "";
   const [summaryGroups, setSummaryGroups] = useState<OrderGroup[] | null>(null);
   const [summarySkipped, setSummarySkipped] = useState(0);
+  /** Marcas marcadas no resumo (só quando a geração separa WEPINK/WPINK). */
+  const [summaryBrands, setSummaryBrands] = useState<PurchaseOrderBrand[]>([]);
   const [exportPick, setExportPick] = useState<string[] | null>(null);
   const [copyOpen, setCopyOpen] = useState(false);
   const [destinationId, setDestinationId] = useState("");
@@ -294,14 +300,24 @@ export function PurchaseOrderPage() {
     for (const rowStore of storeRows) {
       if (!ids.includes(rowStore.id)) continue;
       const part = po.parts.find((p) => p.storeId === rowStore.id);
-      const rows = (part?.view.rows ?? [])
-        .filter((r) => r.onOrder && (!activeBrand || productBrand(r.code) === activeBrand))
-        .sort((a, b) => a.position - b.position);
-      if (rows.length === 0) {
+      const onOrder = (part?.view.rows ?? []).filter((r) => r.onOrder).sort((a, b) => a.position - b.position);
+      if (onOrder.length === 0) {
         skipped += 1;
         continue;
       }
-      ready.push({ storeId: rowStore.id, branchCode: rowStore.branchCode, storeName: rowStore.tradeName || rowStore.name, rows });
+      const storeName = rowStore.tradeName || rowStore.name;
+      if (showBrand) {
+        const byBrand = purchaseOrderByBrand(onOrder);
+        if (byBrand.length === 0) {
+          skipped += 1;
+          continue;
+        }
+        for (const { brand, rows } of byBrand) {
+          ready.push({ storeId: rowStore.id, branchCode: rowStore.branchCode, storeName, brand, rows });
+        }
+      } else {
+        ready.push({ storeId: rowStore.id, branchCode: rowStore.branchCode, storeName, brand: null, rows: onOrder });
+      }
     }
     return { ready, skipped };
   };
@@ -312,6 +328,10 @@ export function PurchaseOrderPage() {
       show("Nenhum produto precisa ser incluído no pedido.", "warning");
       return;
     }
+    const brandsInOrder = [...new Set(ready.map((g) => g.brand).filter((b): b is PurchaseOrderBrand => b != null))];
+    const picked =
+      activeBrand && brandsInOrder.includes(activeBrand) ? [activeBrand] : brandsInOrder.length > 0 ? brandsInOrder : [];
+    setSummaryBrands(picked);
     setSummarySkipped(skipped);
     setSummaryGroups(ready);
     setExportPick(null);
@@ -326,30 +346,53 @@ export function PurchaseOrderPage() {
     openSummary(storeRows.map((s) => s.id));
   };
 
+  const selectedSummary = useMemo(() => {
+    if (!summaryGroups) return [];
+    return summaryGroups.filter((g) => g.brand == null || summaryBrands.includes(g.brand));
+  }, [summaryGroups, summaryBrands]);
+
+  const summaryBrandOptions = useMemo(() => {
+    if (!summaryGroups) return [] as PurchaseOrderBrand[];
+    return [...new Set(summaryGroups.map((g) => g.brand).filter((b): b is PurchaseOrderBrand => b != null))];
+  }, [summaryGroups]);
+
+  const toggleSummaryBrand = (brand: PurchaseOrderBrand) => {
+    setSummaryBrands((current) => (current.includes(brand) ? current.filter((b) => b !== brand) : [...current, brand]));
+  };
+
+  const closeSummary = () => {
+    setSummaryGroups(null);
+    setSummarySkipped(0);
+    setSummaryBrands([]);
+  };
+
   const generateOrder = () => {
-    if (!summaryGroups || summaryGroups.length === 0) return;
+    if (selectedSummary.length === 0) return;
     const now = new Date();
-    const files = summaryGroups.flatMap((group) => {
+    const files = selectedSummary.flatMap((group) => {
       const part = po.parts.find((p) => p.storeId === group.storeId);
       if (!part) return [];
       const rows = purchaseOrderFileRows({ ...part.view, rows: group.rows });
       if (rows.length === 0) return [];
       const bytes = buildXlsx([[...PURCHASE_FILE_HEADER], ...rows], { textColumns: PURCHASE_FILE_TEXT_COLUMNS });
-      return [{ bytes, name: purchaseOrderFileName(now, manyStores ? group.branchCode : undefined) }];
+      return [{ bytes, name: purchaseOrderFileName(now, manyStores ? group.branchCode : undefined, group.brand ?? undefined) }];
     });
     if (files.length === 0) {
       show("Nenhum produto precisa ser incluído no pedido.", "warning");
-      setSummaryGroups(null);
+      closeSummary();
       return;
     }
     files.forEach((file, i) => window.setTimeout(() => downloadFile(file.bytes, file.name), i * 400));
-    const products = files.length === 1 ? summaryGroups[0].rows.length : summaryGroups.reduce((n, group) => n + group.rows.length, 0);
-    const partes = [files.length === 1 ? `Pedido gerado com ${products} produto${products === 1 ? "" : "s"}.` : `Pedido gerado com ${files.length} planilhas.`];
+    const products = selectedSummary.reduce((n, group) => n + group.rows.length, 0);
+    const partes = [
+      files.length === 1
+        ? `Pedido gerado com ${products} produto${products === 1 ? "" : "s"}.`
+        : `Pedido gerado com ${files.length} planilhas (${products} produto${products === 1 ? "" : "s"}).`,
+    ];
     if (summarySkipped === 1) partes.push("1 filial não tinha produtos para incluir.");
     else if (summarySkipped > 1) partes.push(`${summarySkipped} filiais não tinham produtos para incluir.`);
     show(partes.join(" "), summarySkipped > 0 ? "warning" : "success");
-    setSummaryGroups(null);
-    setSummarySkipped(0);
+    closeSummary();
   };
 
   const network = storesForSession(session.stores);
@@ -494,6 +537,7 @@ export function PurchaseOrderPage() {
             </span>
             <ActionsOrder
               manyStores={manyStores}
+              showBrand={showBrand}
               canGenerate={po.parts.length > 0 && !po.syncing && !copiando}
               canCopy={manyStores || otherStores.length > 0}
               copyLiberado={po.parts.length > 0 && !po.syncing && !copiando && anyMins}
@@ -770,7 +814,11 @@ export function PurchaseOrderPage() {
       >
         {exportPick && (
           <div className="flex flex-col gap-3">
-            <p className="text-[13.5px] leading-relaxed text-t1">Cada filial marcada gera uma planilha. O arquivo não junta quantidades de filiais diferentes.</p>
+            <p className="text-[13.5px] leading-relaxed text-t1">
+              {showBrand
+                ? "Cada filial marcada entra no resumo. WEPINK e WPINK saem em planilhas separadas (fábricas diferentes)."
+                : "Cada filial marcada gera uma planilha. O arquivo não junta quantidades de filiais diferentes."}
+            </p>
             <Checkbox
               label="Todas as filiais"
               checked={exportPick.length === storeRows.length}
@@ -791,17 +839,36 @@ export function PurchaseOrderPage() {
       </Modal>
       <Modal
         open={summaryGroups != null}
-        onClose={() => setSummaryGroups(null)}
+        onClose={closeSummary}
         title="Resumo do pedido"
         size="lg"
         bodyClassName="flex flex-col overflow-hidden p-0"
         footer={
           <>
-            <span className="mr-auto min-w-0 text-[13px] font-extrabold text-t0">Total {money(brl(summaryTotalCents(summaryGroups ?? [])))}</span>
-            <Button variant="outline" onClick={() => setSummaryGroups(null)}>
+            <span className="mr-auto min-w-0 text-[13px] font-extrabold text-t0">
+              {summaryBrandOptions.length > 1 ? (
+                <span className="flex flex-col gap-0.5 sm:flex-row sm:flex-wrap sm:items-baseline sm:gap-x-3">
+                  {summaryBrandOptions.map((brand) => {
+                    const on = summaryBrands.includes(brand);
+                    const cents = summaryTotalCents((summaryGroups ?? []).filter((g) => g.brand === brand));
+                    return (
+                      <span key={brand} className={cn("tabular-nums", on ? "text-t0" : "text-t2 line-through")}>
+                        {brand} {money(brl(cents))}
+                      </span>
+                    );
+                  })}
+                  <span className="text-t0">Total {money(brl(summaryTotalCents(selectedSummary)))}</span>
+                </span>
+              ) : (
+                <>Total {money(brl(summaryTotalCents(selectedSummary)))}</>
+              )}
+            </span>
+            <Button variant="outline" onClick={closeSummary}>
               Cancelar
             </Button>
-            <Button onClick={generateOrder}>{(summaryGroups?.length ?? 0) > 1 ? "Gerar planilhas" : "Gerar planilha"}</Button>
+            <Button onClick={generateOrder} disabled={selectedSummary.length === 0}>
+              {selectedSummary.length > 1 ? "Gerar planilhas" : "Gerar planilha"}
+            </Button>
           </>
         }
       >
@@ -809,9 +876,26 @@ export function PurchaseOrderPage() {
           <div className="flex min-h-0 flex-1 flex-col">
             <div className="shrink-0 space-y-3 px-5 pt-5">
               <p className="text-[13.5px] leading-relaxed text-t1">
-                {summaryGroups.length === 1 ? `${summaryGroups[0].branchCode} · ${summaryGroups[0].storeName}. ` : `${summaryGroups.length} planilhas. `}
-                Multiplicador {po.factor}x. {summaryProductLabel(summaryGroups)}
+                {selectedSummary.length === 1
+                  ? `${selectedSummary[0].branchCode} · ${selectedSummary[0].storeName}${selectedSummary[0].brand ? ` · ${selectedSummary[0].brand}` : ""}. `
+                  : selectedSummary.length > 1
+                    ? `${selectedSummary.length} planilhas. `
+                    : "Nenhuma marca selecionada. "}
+                Multiplicador {po.factor}x. {summaryProductLabel(selectedSummary)}
+                {summaryBrandOptions.length > 1 ? " Cada marca gera um arquivo separado (fábricas diferentes)." : ""}
               </p>
+              {summaryBrandOptions.length > 1 && (
+                <div className="flex flex-wrap gap-x-4 gap-y-2">
+                  {summaryBrandOptions.map((brand) => (
+                    <Checkbox
+                      key={brand}
+                      label={brand}
+                      checked={summaryBrands.includes(brand)}
+                      onChange={() => toggleSummaryBrand(brand)}
+                    />
+                  ))}
+                </div>
+              )}
               {summarySkipped > 0 && (
                 <p className="text-[13px] leading-relaxed text-t2">
                   {summarySkipped === 1 ? "1 filial marcada não tinha produtos para incluir." : `${summarySkipped} filiais marcadas não tinham produtos para incluir.`}
@@ -819,27 +903,37 @@ export function PurchaseOrderPage() {
               )}
             </div>
             <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 pb-5 pt-3">
-              {summaryGroups.map((group) => (
-                <div key={group.storeId}>
-                  {summaryGroups.length > 1 && <StoreDivisionTitle className="mb-2">{group.branchCode} · {group.storeName}</StoreDivisionTitle>}
-                  <ul className="overflow-hidden rounded-[var(--radius-vela-lg)] border border-line">
-                    {group.rows.map((r) => (
-                      <li key={`${group.storeId}:${r.code}`} className="flex items-center gap-3 border-b border-line px-3 py-2.5 last:border-b-0">
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-[13px] font-bold text-t0">{r.name}</p>
-                          <p className="truncate text-[11px] text-t2">{r.code}</p>
-                        </div>
-                        <div className="shrink-0 text-right">
-                          <p className="font-mono text-[13px] font-extrabold tabular-nums text-t0">{money(brl(purchaseLineCents(r)))}</p>
-                          <p className="whitespace-nowrap font-mono text-[11px] tabular-nums text-t2">
-                            {qty(r.aRequest ?? 0)} × {money(r.costCents == null ? null : r.costCents / 100)}
-                          </p>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
+              {summaryGroups.map((group) => {
+                const included = group.brand == null || summaryBrands.includes(group.brand);
+                const titleParts = [group.branchCode, group.storeName, group.brand].filter(Boolean);
+                const showTitle = summaryGroups.length > 1 || group.brand != null;
+                return (
+                  <div key={`${group.storeId}:${group.brand ?? "all"}`} className={cn(!included && "opacity-45")}>
+                    {showTitle && <StoreDivisionTitle className="mb-2">{titleParts.join(" · ")}</StoreDivisionTitle>}
+                    <ul className="overflow-hidden rounded-[var(--radius-vela-lg)] border border-line">
+                      {group.rows.map((r) => (
+                        <li key={`${group.storeId}:${r.code}`} className="flex items-center gap-3 border-b border-line px-3 py-2.5 last:border-b-0">
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-[13px] font-bold text-t0">{r.name}</p>
+                            <p className="truncate text-[11px] text-t2">{r.code}</p>
+                          </div>
+                          <div className="shrink-0 text-right">
+                            <p className="font-mono text-[13px] font-extrabold tabular-nums text-t0">{money(brl(purchaseLineCents(r)))}</p>
+                            <p className="whitespace-nowrap font-mono text-[11px] tabular-nums text-t2">
+                              {qty(r.aRequest ?? 0)} × {money(r.costCents == null ? null : r.costCents / 100)}
+                            </p>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                    {(summaryGroups.length > 1 || group.brand != null) && (
+                      <p className="mt-1.5 text-right font-mono text-[12px] font-extrabold tabular-nums text-t1">
+                        Subtotal {money(brl(summaryTotalCents([group])))}
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}
@@ -950,6 +1044,7 @@ function summaryProductLabel(groups: OrderGroup[]): string {
 
 function ActionsOrder({
   manyStores,
+  showBrand,
   canGenerate,
   canCopy,
   copyLiberado,
@@ -958,6 +1053,7 @@ function ActionsOrder({
   onCopy,
 }: {
   manyStores: boolean;
+  showBrand: boolean;
   canGenerate: boolean;
   canCopy: boolean;
   copyLiberado: boolean;
@@ -968,7 +1064,13 @@ function ActionsOrder({
   const items: DropdownItem[] = [
     {
       label: "Gerar pedido",
-      description: manyStores ? "Escolhe as filiais e baixa uma planilha para cada uma." : "Abre o resumo e baixa a planilha desta filial.",
+      description: manyStores
+        ? showBrand
+          ? "Escolhe as filiais; WEPINK e WPINK saem em planilhas separadas."
+          : "Escolhe as filiais e baixa uma planilha para cada uma."
+        : showBrand
+          ? "Abre o resumo; você escolhe WEPINK, WPINK ou as duas (arquivos separados)."
+          : "Abre o resumo e baixa a planilha desta filial.",
       disabled: !canGenerate,
       onClick: onGenerate,
     },

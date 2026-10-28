@@ -27,4 +27,10 @@ describe("periodo na URL", () => {
     expect(searchForRoute(paths.profile, "?periodo=hoje")).toBe("");
     expect(searchForRoute(paths.operation.branch, "")).toBe("");
   });
+
+  it("não leva o mês da Escala para outra tela nem de volta pelo menu", () => {
+    expect(searchForRoute(paths.management.schedule, "?filial=f1&month=2026-11")).toBe("?filial=f1");
+    expect(searchForRoute(paths.team, "?filial=f1&periodo=hoje&month=2026-11")).toBe("?filial=f1&periodo=hoje");
+    expect(searchForRoute(paths.stock.inventory, "?month=2026-11")).toBe("");
+  });
 });

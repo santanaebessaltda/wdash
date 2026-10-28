@@ -11,9 +11,15 @@ const PERIOD_ROUTES = new Set<string>([
 ]);
 
 const PERIOD_KEYS = ["period", "from", "to", "periodo", "de", "ate"] as const;
+/** Só da Escala e só no F5 na própria URL — menu / troca de tela não leva. */
+const PAGE_LOCAL_KEYS = ["month"] as const;
 
 export function routeShowsPeriod(pathname: string): boolean {
   return PERIOD_ROUTES.has(pathname);
+}
+
+function stripPageLocal(params: URLSearchParams): void {
+  for (const key of PAGE_LOCAL_KEYS) params.delete(key);
 }
 
 /** Copia a query para outra tela. `periodo`, `de` e `ate` só seguem se o destino tem o campo. */
@@ -21,9 +27,15 @@ export function searchForRoute(to: string, search: string): string {
   const raw = search.startsWith("?") ? search.slice(1) : search;
   if (!raw) return "";
   const pathname = to.split(/[?#]/)[0];
-  if (routeShowsPeriod(pathname)) return search.startsWith("?") ? search : `?${raw}`;
+  if (routeShowsPeriod(pathname)) {
+    const params = new URLSearchParams(raw);
+    stripPageLocal(params);
+    const q = params.toString();
+    return q ? `?${q}` : "";
+  }
   const params = new URLSearchParams(raw);
   for (const key of PERIOD_KEYS) params.delete(key);
+  stripPageLocal(params);
   const q = params.toString();
   return q ? `?${q}` : "";
 }

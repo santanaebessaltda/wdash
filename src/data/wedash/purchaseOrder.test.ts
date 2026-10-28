@@ -4,6 +4,7 @@ import {
   PURCHASE_FILE_TEXT_COLUMNS,
   buildPurchaseOrderView,
   filterPurchaseRows,
+  purchaseOrderByBrand,
   purchaseOrderFileName,
   purchaseOrderFileRows,
   purchaseOrderGroupTone,
@@ -46,13 +47,13 @@ const view = (rows: PurchaseStockRow[], mins: Record<string, number> = {}, facto
     todayIso: TODAY,
   });
 
-describe("isEligible (PC-01: código sem WP, não bloqueado, múltipla > 0)", () => {
+describe("isEligible (PC-01: não bloqueado, múltipla > 0 — WEPINK e WPINK)", () => {
   it("aceita produto liberado com múltipla", () => {
     expect(isEligible(stock())).toBe(true);
   });
-  it("recusa código com WP em qualquer caixa", () => {
-    expect(isEligible(stock({ code: "WP014" }))).toBe(false);
-    expect(isEligible(stock({ code: "wp-ultra" }))).toBe(false);
+  it("aceita código WPINK (WP*) com múltipla", () => {
+    expect(isEligible(stock({ code: "WP014" }))).toBe(true);
+    expect(isEligible(stock({ code: "wp-ultra" }))).toBe(true);
   });
   it("recusa bloqueado para compra", () => {
     expect(isEligible(stock({ blocked: true }))).toBe(false);
@@ -131,18 +132,23 @@ describe("parseMinInput (PC-06 AC 3, 4)", () => {
 });
 
 describe("buildPurchaseOrderView", () => {
-  it("lista o relatório inteiro; WPINK e bloqueado aparecem e ficam fora do pedido (PC-01)", () => {
+  it("lista o relatório inteiro; WPINK com múltipla entra no pedido; bloqueado e sem múltipla ficam fora (PC-01)", () => {
     const v = view(
-      [stock({ balance: 1, openOrder: 1, total: 2 }), stock({ code: "WP014", balance: 8, total: 8, position: 1 }), stock({ code: "X1", blocked: true, balance: 4, total: 4, position: 2 }), stock({ code: "SEM", multiple: null, balance: 3, total: 3, position: 3 })],
+      [
+        stock({ balance: 1, openOrder: 1, total: 2 }),
+        stock({ code: "WP014", balance: 8, total: 8, multiple: 12, position: 1 }),
+        stock({ code: "X1", blocked: true, balance: 4, total: 4, position: 2 }),
+        stock({ code: "SEM", multiple: null, balance: 3, total: 3, position: 3 }),
+      ],
       { "BSPPAR-ATH-001": 72, X1: 12, WP014: 24 },
       1,
       { "BSPPAR-ATH-001": 15 },
     );
     expect(v.rows.map((r) => r.code)).toEqual(["BSPPAR-ATH-001", "WP014", "X1", "SEM"]);
-    expect(v.rows[1]).toMatchObject({ blocked: false, canRequest: false, minimum: 24, saldo: 8, aRequest: null, onOrder: false });
+    expect(v.rows[1]).toMatchObject({ blocked: false, canRequest: true, minimum: 24, saldo: 8, aRequest: 24, onOrder: true });
     expect(v.rows[2]).toMatchObject({ blocked: true, canRequest: false, minimum: 12, saldo: 4, aRequest: null, onOrder: false });
     expect(v.rows[3]).toMatchObject({ canRequest: false, saldo: 3, aRequest: null, onOrder: false });
-    expect(purchaseOrderFileRows(v).map((r) => r[0])).toEqual(["BSPPAR-ATH-001"]);
+    expect(purchaseOrderFileRows(v).map((r) => r[0])).toEqual(["BSPPAR-ATH-001", "WP014"]);
     expect(v.rows[0]).toMatchObject({
       code: "BSPPAR-ATH-001",
       name: "BODY SPLASH PARIS 200ML",
@@ -335,6 +341,27 @@ describe("purchaseOrderFileName (PC-10 AC 4)", () => {
   it("completa com zero à esquerda", () => {
     expect(purchaseOrderFileName(new Date(2026, 0, 5, 9, 4, 1))).toBe("05012026090401.xlsx");
     expect(purchaseOrderFileName(new Date(2026, 9, 3, 7, 38, 38), "00386")).toBe("03102026073838-00386.xlsx");
+  });
+  it("marca no nome quando WEPINK e WPINK saem em arquivos separados", () => {
+    expect(purchaseOrderFileName(new Date(2026, 9, 3, 7, 38, 38), undefined, "WPINK")).toBe("03102026073838-WPINK.xlsx");
+    expect(purchaseOrderFileName(new Date(2026, 9, 3, 7, 38, 38), "00386", "WEPINK")).toBe("03102026073838-00386-WEPINK.xlsx");
+  });
+});
+
+describe("purchaseOrderByBrand", () => {
+  it("separa WEPINK e WPINK na ordem das fábricas", () => {
+    const rows = view(
+      [stock({ code: "WP014", total: 0, position: 0 }), stock({ code: "BSPPAR-ATH-001", total: 0, position: 1 }), stock({ code: "WP099", total: 0, position: 2 })],
+      { WP014: 12, "BSPPAR-ATH-001": 24, WP099: 12 },
+    ).rows;
+    expect(purchaseOrderByBrand(rows).map((g) => [g.brand, g.rows.map((r) => r.code)])).toEqual([
+      ["WEPINK", ["BSPPAR-ATH-001"]],
+      ["WPINK", ["WP014", "WP099"]],
+    ]);
+  });
+  it("omite marca sem itens", () => {
+    const rows = view([stock({ total: 0 })], { "BSPPAR-ATH-001": 24 }).rows;
+    expect(purchaseOrderByBrand(rows).map((g) => g.brand)).toEqual(["WEPINK"]);
   });
 });
 

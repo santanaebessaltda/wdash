@@ -2,11 +2,14 @@
  * Pedido de compra, mesma regra da planilha do dono.
  * Fonte = Saldo Atual e Futuro do Millennium (ESTOQUEEMCOMPRA): Total = saldo + pedidos em aberto.
  * Na lista = todo o Saldo Atual e Futuro, para o rodape bater com o Millennium.
- * Elegivel para o arquivo = codigo sem "WP", nao bloqueado e multipla > 0.
- * O que nao e elegivel (bloqueado, WPINK ou sem multipla) mostra o minimo gravado, sem editar, e fica fora do pedido.
+ * Elegivel para o arquivo = nao bloqueado e multipla > 0 (WEPINK e WPINK).
+ * O que nao e elegivel (bloqueado ou sem multipla) mostra o minimo gravado, sem editar, e fica fora do pedido.
+ * Geracao: WEPINK e WPINK nunca misturam no mesmo arquivo (fabricas diferentes); o resumo separa e deixa escolher uma ou as duas.
  * A pedir = (minimo x multiplicador  Total) arredondado para cima ate a multipla; Total negativo conta como 0.
  * Novo = cadastrado ha menos de 30 dias ou nunca vendido pela loja (so quando o historico cobre 12 meses ou a inauguracao).
  */
+
+import { productBrand } from "./stockProducts";
 
 export type PurchaseStockRow = {
   code: string;
@@ -67,9 +70,9 @@ export function isListed(r: PurchaseStockRow): boolean {
   return r.code.trim().length > 0;
 }
 
-/** Vai para o arquivo do pedido. */
+/** Vai para o arquivo do pedido (WEPINK e WPINK). */
 export function isEligible(r: PurchaseStockRow): boolean {
-  return isListed(r) && !r.code.toUpperCase().includes("WP") && !r.blocked && (r.multiple ?? 0) > 0;
+  return isListed(r) && !r.blocked && (r.multiple ?? 0) > 0;
 }
 
 function dayNumber(iso: string): number {
@@ -237,11 +240,25 @@ export function purchaseOrderTotalCents(rows: PurchaseOrderRow[]): number | null
   return any ? total : null;
 }
 
-export function purchaseOrderFileName(d: Date, branchCode?: string): string {
+export type PurchaseOrderBrand = "WEPINK" | "WPINK";
+
+/** Parte as linhas do pedido por marca (ordem WEPINK → WPINK). Marca sem itens some. */
+export function purchaseOrderByBrand(rows: PurchaseOrderRow[]): Array<{ brand: PurchaseOrderBrand; rows: PurchaseOrderRow[] }> {
+  const buckets: Record<PurchaseOrderBrand, PurchaseOrderRow[]> = { WEPINK: [], WPINK: [] };
+  for (const row of rows) buckets[productBrand(row.code)].push(row);
+  return (["WEPINK", "WPINK"] as const).filter((brand) => buckets[brand].length > 0).map((brand) => ({ brand, rows: buckets[brand] }));
+}
+
+/** Nome do arquivo: carimbo · filial opcional · marca opcional (fabricas diferentes). */
+export function purchaseOrderFileName(d: Date, branchCode?: string, brand?: string): string {
   const p = (n: number) => String(n).padStart(2, "0");
   const stamp = `${p(d.getDate())}${p(d.getMonth() + 1)}${d.getFullYear()}${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;
+  const parts = [stamp];
   const code = branchCode?.trim().replace(/[^\w.-]+/g, "");
-  return code ? `${stamp}-${code}.xlsx` : `${stamp}.xlsx`;
+  if (code) parts.push(code);
+  const mark = brand?.trim().replace(/[^\w.-]+/g, "").toUpperCase();
+  if (mark) parts.push(mark);
+  return `${parts.join("-")}.xlsx`;
 }
 
 const fold = (s: string) => s.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
