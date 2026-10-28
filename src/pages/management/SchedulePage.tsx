@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Accordion, Alert, Badge, Button, Card, Checkbox, Dropdown, Modal, PageHeader, Select, useToast } from "@/components/ui";
+import { Accordion, Alert, Badge, Button, Card, Checkbox, Modal, PageHeader, Select, useToast } from "@/components/ui";
 import { ColorLegend, type LegendItem } from "@/components/wedash/ColorLegend";
 import { ScheduleCardsSkeleton } from "@/components/wedash/LoadingSkeletons";
 import { PersonAvatar } from "@/components/wedash/PersonAvatar";
@@ -708,6 +708,14 @@ export function SchedulePage() {
     return (
       <>
         <Button
+          variant="outline"
+          size="sm"
+          disabled={showSkeleton}
+          onClick={() => setDeleteTarget({ storeId: view.store.id, monthStart })}
+        >
+          Apagar escala
+        </Button>
+        <Button
           size="sm"
           disabled={view.people.length === 0 || showSkeleton}
           onClick={() => {
@@ -717,26 +725,6 @@ export function SchedulePage() {
         >
           Editar escala
         </Button>
-        <Dropdown
-          align="right"
-          portal
-          items={[
-            {
-              label: "Apagar escala",
-              danger: true,
-              onClick: () => setDeleteTarget({ storeId: view.store.id, monthStart }),
-            },
-          ]}
-          trigger={
-            <button
-              type="button"
-              aria-label="Mais ações da escala"
-              className="inline-flex h-8 w-8 items-center justify-center rounded-[10px] text-t1 hover:bg-bg-3"
-            >
-              <Icon d={icons.dots} size={16} />
-            </button>
-          }
-        />
       </>
     );
   }
