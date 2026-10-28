@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Accordion, Alert, Button, Card, Modal, PageHeader, Select, useToast } from "@/components/ui";
 import { ColorLegend, type LegendItem } from "@/components/wedash/ColorLegend";
 import { ScheduleCardsSkeleton } from "@/components/wedash/LoadingSkeletons";
-import { BranchBadge, PeriodBadge } from "@/components/wedash/RecordBadges";
 import { PersonAvatar } from "@/components/wedash/PersonAvatar";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
 import { MonthStep, monthNavBtn } from "@/pages/cash-close/MonthYearPicker";
@@ -13,7 +12,7 @@ import { cn } from "@/lib/cn";
 import { filterCacheGet, filterCacheSet } from "@/lib/filterCache";
 import { useFilterSkeleton } from "@/lib/useFilterSkeleton";
 import { calendarTodayIso } from "@/data/wedash/clock";
-import { addDays, addMonths, endOfMonth, isoToDate, shiftName, startOfMonth } from "@/data/wedash/engine/format";
+import { addDays, addMonths, endOfMonth, isoToDate, startOfMonth } from "@/data/wedash/engine/format";
 import { fetchGoals } from "@/data/wedash/goalsRepo";
 import { scheduleStartMonth, type GoalSpan } from "@/data/wedash/goalMonths";
 import { branchRoleLabel, fetchStoreSellers, fetchStoreShifts, isBranchTeamMember, type Store, type StoreSeller, type StoreShift } from "@/data/wedash/stores";
@@ -49,10 +48,8 @@ function monthLabel(iso: string): string {
   return `${MONTHS[date.getMonth()]} de ${date.getFullYear()}`;
 }
 
-function scheduleTitle(pattern: SchedulePattern, monthStart: string): string {
-  const date = isoToDate(startOfMonth(monthStart));
-  const month = `${MONTHS[date.getMonth()].toLocaleLowerCase("pt-BR")} de ${date.getFullYear()}`;
-  return `${PATTERN_LABEL[pattern]} · ${month}`;
+function scheduleTitle(pattern: SchedulePattern, storeName: string): string {
+  return `${PATTERN_LABEL[pattern]} · ${storeName.toLocaleUpperCase("pt-BR")}`;
 }
 
 /** Semana começando no domingo, como no Calendar. */
@@ -689,8 +686,6 @@ export function SchedulePage() {
                     ? dates.filter((iso) => startOfMonth(iso) === item.monthStart)
                     : dates;
                 const boardDays = view.days.filter((row) => visible.includes(row.day));
-                const badgeFrom = visible[0] ?? item.monthStart;
-                const badgeTo = visible[visible.length - 1] ?? endOfMonth(item.monthStart);
                 const compRows = buildCompOffSummary({
                   monthStart: item.monthStart,
                   monthDays: view.days.filter((row) => startOfMonth(row.day) === item.monthStart),
@@ -703,16 +698,11 @@ export function SchedulePage() {
                   viewMode === "month"
                     ? [item]
                     : view.months.filter((month) => visible.some((iso) => startOfMonth(iso) === month.monthStart));
+                const storeLabel = view.store.tradeName || view.store.name;
                 return (
                   <Card key={`${view.store.id}-${item.monthStart}`}>
                     <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <h3 className="text-[15px] font-bold text-t0">{scheduleTitle(item.schedule.pattern, item.monthStart)}</h3>
-                        <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                          <PeriodBadge from={badgeFrom} to={badgeTo} />
-                          <BranchBadge name={view.store.tradeName || view.store.name} />
-                        </div>
-                      </div>
+                      <h3 className="min-w-0 truncate text-[15px] font-bold text-t0">{scheduleTitle(item.schedule.pattern, storeLabel)}</h3>
                       <div className="flex flex-wrap items-center gap-2">{registeredActions(view, item.monthStart)}</div>
                     </div>
                     <ScheduleBoard
@@ -724,7 +714,6 @@ export function SchedulePage() {
                         schedules: boardSchedules.length > 0 ? boardSchedules : [item],
                         days: boardDays,
                         people: view.people,
-                        shifts: view.shifts,
                       }}
                       onOpenDay={(day, sellerId) => setDayOpen({ storeId: view.store.id, day, sellerId })}
                     />
@@ -803,7 +792,6 @@ type ScheduleSection = {
   schedules: { monthStart: string; schedule: StoredSchedule }[];
   days: StoredDay[];
   people: StoreSeller[];
-  shifts: StoreShift[];
 };
 
 /** Tile no padrão Heatmap: fundo sólido da legenda, sem borda de grade. */
@@ -850,7 +838,7 @@ function ScheduleBoard({
   onOpenDay: (day: string, sellerId: string) => void;
   readOnly?: boolean;
 }) {
-  const { schedules, people, shifts, holidays } = section;
+  const { schedules, people, holidays } = section;
   const byId = new Map(people.map((person) => [person.id, person]));
   const byDay = daysByDate(section.days);
   function scheduleFor(iso: string): StoredSchedule | null {
@@ -878,11 +866,11 @@ function ScheduleBoard({
     .map((id) => {
       const person = byId.get(id);
       const fixed = schedules.flatMap((item) => item.schedule.people).find((row) => row.sellerId === id)?.fixedOffDow ?? null;
-      const shift = shifts.find((item) => item.id === person?.shiftId);
       const offDow = offDowOf(id, fixed);
-      const roleShift = [person ? branchRoleLabel(person.role).toLocaleUpperCase("pt-BR") : "", shift ? shiftName(shift.name) : ""].filter(Boolean).join(" · ");
-      const offLabel = offDow != null ? `FOLGA: ${DOW_LABELS[offDow as 0 | 1 | 2 | 3 | 4 | 5 | 6].toLocaleUpperCase("pt-BR")}` : null;
-      return { id, name: person?.name ?? "Pessoa", roleShift, offLabel, shiftId: person?.shiftId ?? null, code: person?.code ?? null };
+      const role = person ? branchRoleLabel(person.role).toLocaleUpperCase("pt-BR") : "";
+      const offLabel = offDow != null ? `FOLGA: ${DOW_LABELS[offDow as 0 | 1 | 2 | 3 | 4 | 5 | 6].toLocaleUpperCase("pt-BR")}` : "";
+      const detail = [role, offLabel].filter(Boolean).join("  ·  ");
+      return { id, name: person?.name ?? "Pessoa", detail, code: person?.code ?? null };
     })
     .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
 
@@ -895,13 +883,16 @@ function ScheduleBoard({
     return { working, closed: floor.closed, min: floor.min, exact: floor.exact };
   }
 
-  /* Heatmap compacto: gap entre tiles, sem linhas; no celular a grade rola na horizontal. */
-  const columns = `minmax(9.5rem, 11rem) repeat(${dates.length}, minmax(1.75rem, 1fr))`;
+  /* Heatmap compacto: coluna Pessoa mais larga no desktop; no celular a grade rola na horizontal. */
+  const dayCols = `repeat(${dates.length}, minmax(1.75rem, 1fr))`;
   const stickyPerson = "sticky left-0 z-[1] bg-bg-2 pr-2";
   const tile = "flex aspect-square w-full min-w-0 flex-col items-center justify-center rounded-[4px] text-[10px] font-bold leading-none";
   return (
     <div className="min-w-0 overflow-x-auto overscroll-x-contain">
-      <div className="inline-grid w-max min-w-full gap-0.5" style={{ gridTemplateColumns: columns }}>
+      <div
+        className="inline-grid w-max min-w-full gap-0.5 [--person-col:minmax(11rem,14rem)] lg:[--person-col:minmax(14rem,18rem)]"
+        style={{ gridTemplateColumns: `var(--person-col) ${dayCols}` }}
+      >
         <div className={cn(stickyPerson, "flex items-end pb-1 text-left text-[11px] font-bold uppercase tracking-wide text-t2")}>Pessoa</div>
         {dates.map((iso) => {
           const holiday = holidayLabel(holidays, iso);
@@ -926,8 +917,7 @@ function ScheduleBoard({
               <PersonAvatar name={person.name} employeeId={person.code} storeId={section.storeId} size="sm" />
               <span className="min-w-0">
                 <span className="block truncate text-[12px] font-semibold leading-tight text-t0">{person.name}</span>
-                {person.roleShift ? <span className="mt-0.5 block truncate text-[11px] leading-snug text-t2">{person.roleShift}</span> : null}
-                {person.offLabel ? <span className="mt-0.5 block truncate text-[11px] font-semibold leading-snug text-t1">{person.offLabel}</span> : null}
+                {person.detail ? <span className="mt-0.5 block truncate text-[11px] leading-snug text-t2">{person.detail}</span> : null}
               </span>
             </div>
             {dates.map((iso) => {
