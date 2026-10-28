@@ -1120,8 +1120,11 @@ function ScheduleBoard({
       const person = byId.get(id);
       const fixed = schedules.flatMap((item) => item.schedule.people).find((row) => row.sellerId === id)?.fixedOffDow ?? null;
       const offDow = offDowOf(id, fixed);
-      const role = person ? branchRoleLabel(person.role) : "";
-      const offLabel = offDow != null ? `Folga: ${DOW_LABELS[offDow as 0 | 1 | 2 | 3 | 4 | 5 | 6]}` : "";
+      const role = person ? branchRoleLabel(person.role).toLocaleUpperCase("pt-BR") : "";
+      const offLabel =
+        offDow != null
+          ? `FOLGA: ${DOW_LABELS[offDow as 0 | 1 | 2 | 3 | 4 | 5 | 6].toLocaleUpperCase("pt-BR")}`
+          : "";
       const detail = [role, offLabel].filter(Boolean).join("  ·  ");
       return { id, name: (person?.name ?? "Pessoa").toLocaleUpperCase("pt-BR"), detail, code: person?.code ?? null };
     })
