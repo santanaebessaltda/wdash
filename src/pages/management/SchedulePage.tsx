@@ -368,32 +368,14 @@ export function SchedulePage() {
   const storesRef = useRef(storeRows);
   storesRef.current = storeRows;
 
-  const scheduledMonths = useMemo(
-    () => new Set(views.flatMap((view) => view.months.map((item) => item.monthStart))),
-    [views],
-  );
-  const hasScheduleOn = (iso: string) => scheduledMonths.has(startOfMonth(iso));
   const prevMonth = addMonths(monthStart, -1);
   const nextMonth = addMonths(monthStart, 1);
   const weekStart = startOfWeek(focusDay);
-  const canPrev =
-    viewMode === "month"
-      ? scheduledMonths.has(prevMonth)
-      : viewMode === "week"
-        ? Array.from({ length: 7 }, (_, index) => addDays(weekStart, -7 + index)).some(hasScheduleOn)
-        : hasScheduleOn(addDays(focusDay, -1));
-  const canNext =
-    viewMode === "month"
-      ? scheduledMonths.has(nextMonth)
-      : viewMode === "week"
-        ? Array.from({ length: 7 }, (_, index) => addDays(weekStart, 7 + index)).some(hasScheduleOn)
-        : hasScheduleOn(addDays(focusDay, 1));
   const boardDates = useMemo(() => monthDates(monthStart), [monthStart]);
   const focusDates = useMemo(() => focusDatesFor(viewMode, focusDay, monthStart), [viewMode, focusDay, monthStart]);
   const rangeHeading = viewHeading(viewMode, focusDay, monthStart);
 
   function goPrev() {
-    if (!canPrev) return;
     if (viewMode === "month") {
       setMonthStart(prevMonth);
       setFocusDay(prevMonth === startOfMonth(today) ? today : prevMonth);
@@ -411,7 +393,6 @@ export function SchedulePage() {
   }
 
   function goNext() {
-    if (!canNext) return;
     if (viewMode === "month") {
       setMonthStart(nextMonth);
       setFocusDay(nextMonth === startOfMonth(today) ? today : nextMonth);
@@ -807,7 +788,6 @@ export function SchedulePage() {
             <button
               type="button"
               className={monthNavBtn}
-              disabled={!canPrev}
               aria-label={viewMode === "month" ? "Mês anterior" : viewMode === "week" ? "Semana anterior" : "Dia anterior"}
               onClick={goPrev}
             >
@@ -816,7 +796,6 @@ export function SchedulePage() {
             <button
               type="button"
               className={monthNavBtn}
-              disabled={!canNext}
               aria-label={viewMode === "month" ? "Próximo mês" : viewMode === "week" ? "Próxima semana" : "Próximo dia"}
               onClick={goNext}
             >
