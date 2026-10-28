@@ -20,6 +20,7 @@ import { downloadStonePixCsv } from "./stonePix.ts";
 import { ingestStonePixCsv } from "./stoneIngest.ts";
 import { publicWebhookReady, registerStoneWebhooks, runStoneCloseScan } from "./stoneCloseScan.ts";
 import { startStoneWebhook } from "./stoneWebhook.ts";
+import { handleCieloOauthCallback, parseCieloOauthQuery, readCieloOauthSecrets } from "./cieloOauth.ts";
 import { assertSyncConfig, autoRefreshEnabled, deepHistorySpan, describeSpan, onboardingSpan } from "./syncConfig.ts";
 import { isWorkerPaused } from "./workerPause.ts";
 import { acquireWorkerLock, releaseWorkerLock } from "./workerLock.ts";
@@ -84,6 +85,7 @@ async function main() {
   const webhookUrl = process.env.STONE_WEBHOOK_PUBLIC_URL?.trim() ?? "";
   const webhookPort = Number(process.env.PORT ?? "8080") || 8080;
   const shoppingToken = process.env.ALLOS_RUN_TOKEN?.trim() ?? "";
+  const cieloOauthSecrets = readCieloOauthSecrets();
   const webhook = startStoneWebhook({
     port: webhookPort,
     token: webhookToken,
@@ -94,6 +96,25 @@ async function main() {
       const saved = await ingestStonePixCsv(sb, { document: notice.document, day: notice.referenceDate, csv });
       if (!saved) console.warn(`AVISO PIX Stone ${notice.referenceDate}: nenhuma loja para o documento`);
     },
+    onCieloOauth: async (url) => {
+      const page = await handleCieloOauthCallback({
+        query: parseCieloOauthQuery(url),
+        secrets: cieloOauthSecrets,
+        erpSecret,
+      });
+      console.log(`Cielo OAuth: ${page.log}`);
+      if (page.persist) {
+        const { error: dbError } = await sb.from("cielo_oauth_grant").insert({
+          state: page.persist.state || null,
+          access_ciphertext: page.persist.accessCiphertext,
+          refresh_ciphertext: page.persist.refreshCiphertext,
+          expires_at: page.persist.expiresAt,
+          error: page.persist.error,
+        });
+        if (dbError) console.warn(`AVISO Cielo OAuth: não gravou o token — ${dbError.message}`);
+      }
+      return { status: page.status, html: page.html };
+    },
   });
   webhook.on("error", (e) => {
     console.warn(`AVISO PIX Stone: porta ${webhookPort} — ${e instanceof Error ? e.message : String(e)}`);
@@ -102,6 +123,11 @@ async function main() {
     webhookToken
       ? `  PIX Stone                : escutando na porta ${webhookPort}`
       : "  PIX Stone                : sem STONE_WEBHOOK_TOKEN — a rota fica fechada",
+  );
+  console.log(
+    cieloOauthSecrets
+      ? "  Cielo OAuth              : /hooks/cielo/oauth (troca code→token)"
+      : "  Cielo OAuth              : /hooks/cielo/oauth (sem CIELO_OAUTH_CLIENT_* — só recebe o redirect)",
   );
   console.log(
     shoppingToken

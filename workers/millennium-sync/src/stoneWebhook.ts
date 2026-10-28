@@ -79,18 +79,41 @@ function sendJson(res: ServerResponse, body: unknown) {
   res.end(JSON.stringify(body));
 }
 
-/** Escuta o aviso da Stone. Responde na hora; o download do CSV fica no `onPix`. */
+function sendHtml(res: ServerResponse, status: number, html: string) {
+  res.writeHead(status, { "Content-Type": "text/html; charset=utf-8" });
+  res.end(html);
+}
+
+/** Escuta o aviso da Stone e o callback OAuth da Cielo. Responde na hora; o download do CSV fica no `onPix`. */
 export function startStoneWebhook(opts: {
   port: number;
   token: string;
   onPix: (notice: StonePixNotice) => Promise<void>;
   shoppingToken?: string;
   onShopping?: (body: { storeId: string; read: boolean; from: string; to: string; days: string[] }) => Promise<{ ok: boolean; message?: string }>;
+  onCieloOauth?: (url: URL) => Promise<{ status: number; html: string }>;
 }): Server {
   const server = createServer((req, res) => {
     const url = new URL(req.url ?? "/", "http://127.0.0.1");
     if (req.method === "GET" && (url.pathname === "/" || url.pathname === "/health")) {
       send(res, 200);
+      return;
+    }
+    if (req.method === "GET" && url.pathname === "/hooks/cielo/oauth") {
+      if (!opts.onCieloOauth) {
+        send(res, 404);
+        return;
+      }
+      void opts
+        .onCieloOauth(url)
+        .then((page) => sendHtml(res, page.status, page.html))
+        .catch(() =>
+          sendHtml(
+            res,
+            500,
+            "<!doctype html><html lang=pt-BR><body><p>Não foi possível concluir a autorização Cielo.</p></body></html>",
+          ),
+        );
       return;
     }
     if (req.method === "POST" && url.pathname === "/shopping/run") {

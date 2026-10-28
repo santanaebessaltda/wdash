@@ -63,4 +63,25 @@ describe("startStoneWebhook", () => {
     expect(received).toEqual(["2026-10-07"]);
     await new Promise<void>((resolve, reject) => server.close((err) => (err ? reject(err) : resolve())));
   });
+
+  it("responde o callback OAuth da Cielo", async () => {
+    const server = startStoneWebhook({
+      port: 0,
+      token: "segredo",
+      onPix: async () => {},
+      onCieloOauth: async (url) => ({
+        status: 200,
+        html: `<html>ok ${url.searchParams.get("code")}</html>`,
+      }),
+    });
+    await once(server, "listening");
+    const port = (server.address() as AddressInfo).port;
+    const res = await fetch(`http://127.0.0.1:${port}/hooks/cielo/oauth?code=abc&state=s`);
+    expect(res.status).toBe(200);
+    expect(await res.text()).toContain("ok abc");
+    const missing = await fetch(`http://127.0.0.1:${port}/hooks/cielo/oauth?code=x`);
+    // handler sempre chamado; 200 do stub
+    expect(missing.status).toBe(200);
+    await new Promise<void>((resolve, reject) => server.close((err) => (err ? reject(err) : resolve())));
+  });
 });
