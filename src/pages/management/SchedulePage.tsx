@@ -130,7 +130,7 @@ function CompOffAccordion({ rows }: { rows: CompOffSummaryRow[] }) {
                   <tbody>
                     {rows.map((row) => (
                       <tr key={`${row.personId}|${row.holidayDate}`}>
-                        <td className="py-1.5 pr-3 font-semibold uppercase tracking-wide text-t0">{row.personName}</td>
+                        <td className="py-1.5 pr-3 font-semibold tracking-wide text-t0">{row.personName.toLocaleUpperCase("pt-BR")}</td>
                         <td className="py-1.5 pr-3 text-t1">
                           <span className="font-semibold tabular-nums text-t0">{shortDate(row.holidayDate)}</span>
                           {row.holidayName ? <span className="mt-0.5 block text-[11px] text-t2">{row.holidayName}</span> : null}
