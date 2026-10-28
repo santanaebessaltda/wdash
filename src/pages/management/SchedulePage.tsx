@@ -17,7 +17,7 @@ import { fetchGoals } from "@/data/wedash/goalsRepo";
 import { scheduleStartMonth, type GoalSpan } from "@/data/wedash/goalMonths";
 import { branchRoleLabel, fetchStoreSellers, fetchStoreShifts, isBranchTeamMember, type Store, type StoreSeller, type StoreShift } from "@/data/wedash/stores";
 import { DOW_LABELS } from "@/data/wedash/storeHours";
-import { applyDayChoices, buildCompOffSummary, dayEditOptions, defaultDayNeeds, generateMonth, inferCompLinks, issueFromUnknown, PREVIOUS_MONTH_EDIT, weekday, type CellChoice, type CompDue, type CompOffSummaryRow, type DayNeed, type DayStatus, type HolidayRule, type ScheduleGenerateIssue, type SchedulePattern, type Sex } from "@/data/wedash/scheduleGenerate";
+import { applyDayChoices, buildCompOffSummary, COMP_OFF_CLEAR_HINT, dayEditOptions, defaultDayNeeds, generateMonth, inferCompLinks, issueFromUnknown, weekday, type CellChoice, type CompDue, type CompOffSummaryRow, type DayNeed, type DayStatus, type HolidayRule, type ScheduleGenerateIssue, type SchedulePattern, type Sex } from "@/data/wedash/scheduleGenerate";
 import { holidayLabel, holidaysForStore, loadHolidaySeed, loadNationalHolidays, storePlace, type Holiday } from "@/data/wedash/scheduleHolidays";
 import { deleteSchedule, fetchCompDue, fetchPreviousSnapshot, fetchSchedule, patchScheduleCompDue, replaceSchedulePerson, saveManualDay, saveSchedule, type StoredDay, type StoredSchedule } from "@/data/wedash/scheduleRepo";
 import { ScheduleWizard, type ScheduleWizardValue, type WizardBranch } from "./ScheduleWizard";
@@ -206,6 +206,9 @@ type DayEditContext = {
   monthStart: string;
   monthEnd: string;
   monthDays: StoredDay[];
+  /** Regras do mês dono + do anterior (FC no mês seguinte ainda enxerga o feriado). */
+  rules: HolidayRule[];
+  compDue: CompDue[];
 };
 
 /**
@@ -240,7 +243,7 @@ function resolveDayEditContext(
       item.schedule.compDue,
       pool,
     );
-    const links = inferCompLinks([...pool, ...planned], item.schedule.holidayRules, monthEnd);
+    const links = inferCompLinks([...pool, ...planned], item.schedule.holidayRules, monthEnd, item.schedule.compDue);
     return links.some((link) => link.personId === sellerId && link.day === day) ? item : null;
   }
 
@@ -261,11 +264,15 @@ function resolveDayEditContext(
   if (!owner) return null;
 
   const monthEnd = endOfMonth(owner.monthStart);
+  const prevStart = addMonths(owner.monthStart, -1);
   const nextStart = addMonths(owner.monthStart, 1);
+  const prevSchedule = view.months.find((month) => month.monthStart === prevStart)?.schedule ?? null;
   const real = view.days.filter((row) => {
     const month = startOfMonth(row.day);
-    return month === owner.monthStart || month === nextStart;
+    return month === prevStart || month === owner.monthStart || month === nextStart;
   });
+  const rules = [...(prevSchedule?.holidayRules ?? []), ...owner.schedule.holidayRules];
+  const compDue = [...(prevSchedule?.compDue ?? []), ...owner.schedule.compDue];
   const summary = buildCompOffSummary({
     monthStart: owner.monthStart,
     monthDays: real.filter((row) => startOfMonth(row.day) === owner.monthStart),
@@ -274,9 +281,9 @@ function resolveDayEditContext(
     compDue: owner.schedule.compDue,
     people: (view.directory ?? view.people).map((person) => ({ id: person.id, name: person.name })),
   });
-  const monthDays = [...real, ...plannedFcDays(summary, owner.schedule.compDue, real)];
+  const monthDays = [...real, ...plannedFcDays(summary, compDue, real)];
   if (!monthDays.some((row) => row.sellerId === sellerId && row.day === day)) return null;
-  return { schedule: owner.schedule, monthStart: owner.monthStart, monthEnd, monthDays };
+  return { schedule: owner.schedule, monthStart: owner.monthStart, monthEnd, monthDays, rules, compDue };
 }
 
 /** Alinha `compDue` com as FC gravadas (mês seguinte editado na grade). */
@@ -698,8 +705,9 @@ export function SchedulePage() {
       current.map((view) => {
         const saved = next.find((item) => item.storeId === view.store.id);
         if (!saved) return view;
-        const touched = new Set(saved.days.map((group) => group.day));
-        return { ...view, days: [...view.days.filter((row) => !touched.has(row.day)), ...saved.days.flatMap((group) => group.rows)] };
+        const patch = saved.days.flatMap((group) => group.rows);
+        const keys = new Set(patch.map((row) => `${row.sellerId}|${row.day}`));
+        return { ...view, days: [...view.days.filter((row) => !keys.has(`${row.sellerId}|${row.day}`)), ...patch] };
       }),
     );
   }
@@ -949,10 +957,11 @@ export function SchedulePage() {
           day={dayOpen.day}
           sellerId={dayOpen.sellerId}
           pattern={dayEdit.schedule.pattern}
-          rules={dayEdit.schedule.holidayRules}
+          rules={dayEdit.rules}
           dayNeeds={dayEdit.schedule.dayNeeds}
           monthEnd={dayEdit.monthEnd}
           monthDays={dayEdit.monthDays}
+          compDue={dayEdit.compDue}
           names={new Map((dayView.directory ?? dayView.people).map((person) => [person.id, person]))}
           onClose={() => setDayOpen(null)}
           onSave={async (next) => {
@@ -961,7 +970,7 @@ export function SchedulePage() {
               ...dayEdit.monthDays.filter((row) => !editedDays.some((item) => item.sellerId === row.sellerId && item.day === row.day)),
               ...editedDays,
             ];
-            const nextDue = syncCompDue(dayEdit.schedule.compDue, merged, dayEdit.schedule.holidayRules, dayEdit.monthEnd);
+            const nextDue = syncCompDue(dayEdit.schedule.compDue, merged, dayEdit.rules, dayEdit.monthEnd);
             await saveDay([{ storeId: dayView.store.id, days: next }]);
             if (JSON.stringify(nextDue) !== JSON.stringify(dayEdit.schedule.compDue)) {
               await patchScheduleCompDue(dayView.store.id, dayEdit.monthStart, nextDue);
@@ -1416,6 +1425,7 @@ function DayEditor({
   dayNeeds,
   monthEnd,
   monthDays,
+  compDue,
   names,
   onClose,
   onSave,
@@ -1428,17 +1438,18 @@ function DayEditor({
   /** Fim do mês da escala dona (feriado), não necessariamente do dia clicado. */
   monthEnd: string;
   monthDays: StoredDay[];
+  compDue: CompDue[];
   names: Map<string, StoreSeller>;
   onClose: () => void;
   onSave: (next: { day: string; rows: StoredDay[] }[]) => Promise<void>;
 }) {
-  const links = inferCompLinks(monthDays, rules, monthEnd);
+  const links = inferCompLinks(monthDays, rules, monthEnd, compDue);
   const roster = monthDays.filter((row) => row.day === day && row.sellerId === sellerId);
   const personName = (names.get(sellerId)?.name ?? "Pessoa").toLocaleUpperCase("pt-BR");
   const [drafts, setDrafts] = useState<Record<string, { value: CellChoice; holiday: string }>>(() =>
     Object.fromEntries(
       roster.map((row) => {
-        const options = dayEditOptions({ day, days: monthDays, rules, dayNeeds, pattern, personId: row.sellerId, monthEnd });
+        const options = dayEditOptions({ day, days: monthDays, rules, dayNeeds, pattern, personId: row.sellerId, monthEnd, compDue });
         const linked = links.find((item) => item.personId === row.sellerId && item.day === day);
         return [row.sellerId, { value: choiceOf(row.status), holiday: linked?.holiday ?? options.holidays[0]?.date ?? "" }];
       }),
@@ -1455,20 +1466,22 @@ function DayEditor({
       dayNeeds,
       pattern,
       monthEnd,
+      compDue,
       choices: roster.map((row) => ({ personId: row.sellerId, value: drafts[row.sellerId]?.value ?? choiceOf(row.status), holiday: drafts[row.sellerId]?.holiday || null })),
     });
     if (edited.error) {
       setSaveError(edited.error);
       return;
     }
-    const touched = new Set<string>();
-    for (const row of edited.days) {
+    // Só grava as células que mudaram — não reescreve o dia inteiro (evita apagar outros colaboradores).
+    const changed = edited.days.filter((row) => {
       const before = monthDays.find((item) => item.sellerId === row.sellerId && item.day === row.day);
-      if (!before || before.status !== row.status || before.origin !== row.origin) touched.add(row.day);
-    }
+      return !before || before.status !== row.status || before.origin !== row.origin;
+    });
+    const touched = [...new Set(changed.map((row) => row.day))];
     setBusy(true);
     setSaveError(null);
-    void onSave([...touched].map((iso) => ({ day: iso, rows: edited.days.filter((row) => row.day === iso) })))
+    void onSave(touched.map((iso) => ({ day: iso, rows: changed.filter((row) => row.day === iso) })))
       .catch((caught) => setSaveError(caught instanceof Error && caught.message ? caught.message : "Não foi possível salvar o dia."))
       .finally(() => setBusy(false));
   }
@@ -1489,7 +1502,7 @@ function DayEditor({
       }
     >
       {roster.map((row) => {
-        const options = dayEditOptions({ day, days: monthDays, rules, dayNeeds, pattern, personId: row.sellerId, monthEnd });
+        const options = dayEditOptions({ day, days: monthDays, rules, dayNeeds, pattern, personId: row.sellerId, monthEnd, compDue });
         const draft = drafts[row.sellerId] ?? { value: choiceOf(row.status), holiday: "" };
         return (
           <div key={row.sellerId} className="flex flex-col gap-3">
@@ -1498,7 +1511,7 @@ function DayEditor({
               <Select
                 aria-label={`O que ${personName} fará neste dia?`}
                 value={draft.value}
-                disabled={options.locked || busy}
+                disabled={busy}
                 onChange={(event) => {
                   const value = event.target.value as CellChoice;
                   setDrafts((current) => ({ ...current, [row.sellerId]: { ...draft, value } }));
@@ -1524,7 +1537,7 @@ function DayEditor({
                 </Select>
               </label>
             ) : null}
-            {options.locked ? <p className="text-[12.5px] text-t2">{PREVIOUS_MONTH_EDIT}</p> : null}
+            {options.orphanComp ? <p className="text-[12.5px] text-t2">{COMP_OFF_CLEAR_HINT}</p> : null}
             <p className="text-[12.5px] text-t2">Ao alterar uma folga compensatória, a folga anterior vinculada ao feriado também será atualizada.</p>
           </div>
         );

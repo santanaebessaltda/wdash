@@ -284,8 +284,12 @@ export async function saveManualDay(input: {
   rows: { sellerId: string; status: DayStatus; origin: "generated" | "manual" }[];
 }): Promise<void> {
   const sb = await client();
-  const removed = await sb.from("store_schedule_day").delete().eq("store_id", input.storeId).eq("day", input.day);
-  if (removed.error) throw new Error(removed.error.message);
+  // Só mexe nos colaboradores enviados — edição por pessoa não pode apagar o restante do dia.
+  const sellerIds = [...new Set(input.rows.map((row) => row.sellerId))];
+  if (sellerIds.length > 0) {
+    const removed = await sb.from("store_schedule_day").delete().eq("store_id", input.storeId).eq("day", input.day).in("seller_id", sellerIds);
+    if (removed.error) throw new Error(removed.error.message);
+  }
   if (input.rows.length === 0) return;
   const inserted = await sb.from("store_schedule_day").insert(
     input.rows.map((row) => ({

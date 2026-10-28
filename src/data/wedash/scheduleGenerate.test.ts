@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { applyDayChoices, buildCompOffSummary, generateMonth, previousFromSnapshot, scheduleIssueFromEngine, weekday, type EditableDay, type HolidayRule } from "./scheduleGenerate";
+import { applyDayChoices, buildCompOffSummary, dayEditOptions, generateMonth, previousFromSnapshot, scheduleIssueFromEngine, weekday, type EditableDay, type HolidayRule } from "./scheduleGenerate";
 import { easter, nationalHolidays, storePlace } from "./scheduleHolidays";
 
 describe("feriados nacionais", () => {
@@ -386,5 +386,66 @@ describe("edição de um dia", () => {
     });
     expect(edited.error).toMatch(/folgas normais/);
     expect(edited.days.find((row) => row.sellerId === "ana" && row.day === "2026-10-15")?.status).toBe("comp_off");
+  });
+
+  it("permite limpar uma FC mesmo sem vínculo com o feriado no contexto", () => {
+    const orphan: EditableDay[] = [
+      { sellerId: "ana", day: "2026-11-02", status: "comp_off", origin: "generated" },
+      { sellerId: "ana", day: "2026-11-03", status: "work", origin: "generated" },
+    ];
+    const options = dayEditOptions({
+      day: "2026-11-02",
+      days: orphan,
+      rules: [],
+      dayNeeds: needs,
+      pattern: "6x1",
+      personId: "ana",
+      monthEnd: "2026-11-30",
+    });
+    expect(options.locked).toBe(false);
+    expect(options.orphanComp).toBe(true);
+    const edited = applyDayChoices({
+      day: "2026-11-02",
+      days: orphan,
+      rules: [],
+      dayNeeds: needs,
+      pattern: "6x1",
+      monthEnd: "2026-11-30",
+      choices: [{ personId: "ana", value: "work", holiday: null }],
+    });
+    expect(edited.error).toBeNull();
+    expect(edited.days.find((row) => row.sellerId === "ana" && row.day === "2026-11-02")?.status).toBe("work");
+  });
+
+  it("liga FC do mês seguinte ao feriado do mês anterior via regras + dias juntos", () => {
+    const cross: EditableDay[] = [
+      { sellerId: "ana", day: "2026-10-12", status: "holiday_work", origin: "generated" },
+      { sellerId: "ana", day: "2026-11-02", status: "comp_off", origin: "generated" },
+      { sellerId: "ana", day: "2026-11-03", status: "work", origin: "generated" },
+    ];
+    const nextMonthRules: HolidayRule[] = [{ date: "2026-10-12", name: "Nossa Senhora Aparecida", open: true, workers: 3, pay: "extra_off", window: "next_month" }];
+    const options = dayEditOptions({
+      day: "2026-11-02",
+      days: cross,
+      rules: nextMonthRules,
+      dayNeeds: needs,
+      pattern: "6x1",
+      personId: "ana",
+      monthEnd: "2026-11-30",
+    });
+    expect(options.orphanComp).toBe(false);
+    expect(options.fcEnabled).toBe(true);
+    const edited = applyDayChoices({
+      day: "2026-11-03",
+      days: cross,
+      rules: nextMonthRules,
+      dayNeeds: needs,
+      pattern: "6x1",
+      monthEnd: "2026-11-30",
+      choices: [{ personId: "ana", value: "comp_off", holiday: "2026-10-12" }],
+    });
+    expect(edited.error).toBeNull();
+    expect(edited.days.find((row) => row.sellerId === "ana" && row.day === "2026-11-02")?.status).toBe("work");
+    expect(edited.days.find((row) => row.sellerId === "ana" && row.day === "2026-11-03")?.status).toBe("comp_off");
   });
 });

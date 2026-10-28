@@ -303,10 +303,12 @@ function sundayCadence(rule: SundayRule | undefined, sundayMin: number): number 
   return 0;
 }
 
-function holidayDeadline(rule: HolidayRule, monthEnd: string): string {
+function holidayDeadline(rule: HolidayRule, _monthEnd?: string): string {
+  // Prazo sempre a partir do mês do feriado — não do mês da grade aberta (FC no mês seguinte).
+  const holidayMonthEnd = endOfMonth(`${rule.date.slice(0, 7)}-01`);
   if (rule.window === "7_days") return addDays(rule.date, 7);
-  if (rule.window === "next_month") return endOfMonth(addMonths(monthEnd, 1));
-  return monthEnd;
+  if (rule.window === "next_month") return endOfMonth(addMonths(holidayMonthEnd, 1));
+  return holidayMonthEnd;
 }
 
 function markStatus(mark: string): DayStatus {
@@ -546,8 +548,11 @@ export type EditableDay = { sellerId: string; day: string; status: DayStatus; or
 export type CellChoice = "work" | "off" | "comp_off";
 export type CompLink = { personId: string; holiday: string; day: string; deadline: string };
 
+/** @deprecated Mantido para mensagens antigas; a edição de FC órfã não trava mais o select. */
 export const PREVIOUS_MONTH_EDIT = "Este dia pertence à escala do mês anterior. Edite aquela escala para alterá-lo.";
 export const COMP_OFF_BLOCKED = "Escolha um dia de trabalho para conceder a folga adicional pelo feriado. As folgas normais devem ser preservadas.";
+export const COMP_OFF_CLEAR_HINT =
+  "Esta folga compensatória não está ligada a um feriado nesta escala. Você pode trocar para Trabalhar ou Folgar; para remarcar a FC, use um dia de trabalho com feriado elegível.";
 
 function dayFace(rules: HolidayRule[], needs: DayNeed[], iso: string): { holiday: boolean; closed: boolean } {
   const rule = rules.find((item) => item.date === iso);
@@ -645,7 +650,7 @@ export function buildCompOffSummary(input: {
 }
 
 /** Liga cada folga pelo feriado ao feriado trabalhado, como a lista de compensação do gerador. */
-export function inferCompLinks(days: EditableDay[], rules: HolidayRule[], monthEnd: string): CompLink[] {
+export function inferCompLinks(days: EditableDay[], rules: HolidayRule[], monthEnd: string, compDue?: CompDue[]): CompLink[] {
   const links: CompLink[] = [];
   const used = new Set<string>();
   const people = [...new Set(days.map((row) => row.sellerId))];
@@ -662,6 +667,17 @@ export function inferCompLinks(days: EditableDay[], rules: HolidayRule[], monthE
       links.push({ personId, holiday: rule.date, day, deadline });
     }
   }
+  // Pendências gravadas (ex.: FC já no mês seguinte) fecham o vínculo mesmo se a inferência pela grade falhar.
+  for (const due of compDue ?? []) {
+    if (!due.day) continue;
+    const key = `${due.personId}|${due.day}`;
+    if (used.has(key)) continue;
+    if (!days.some((row) => row.sellerId === due.personId && row.day === due.day && row.status === "comp_off")) continue;
+    const rule = rules.find((item) => item.date === due.holiday && item.open && item.pay === "extra_off");
+    if (!rule) continue;
+    used.add(key);
+    links.push({ personId: due.personId, holiday: due.holiday, day: due.day, deadline: due.until || holidayDeadline(rule, monthEnd) });
+  }
   return links;
 }
 
@@ -673,10 +689,14 @@ export function dayEditOptions(input: {
   pattern: SchedulePattern;
   personId: string;
   monthEnd: string;
-}): { locked: boolean; fcEnabled: boolean; holidays: HolidayRule[] } {
+  compDue?: CompDue[];
+}): { locked: boolean; orphanComp: boolean; fcEnabled: boolean; holidays: HolidayRule[] } {
   const row = input.days.find((item) => item.sellerId === input.personId && item.day === input.day);
-  const links = inferCompLinks(input.days, input.rules, input.monthEnd);
-  const locked = row?.status === "comp_off" && !links.some((link) => link.personId === input.personId && link.day === input.day);
+  const links = inferCompLinks(input.days, input.rules, input.monthEnd, input.compDue);
+  const linked = links.some((link) => link.personId === input.personId && link.day === input.day);
+  // FC sem vínculo: não trava o select — dá para limpar (trabalhar/folgar) ou remarcar se houver feriado elegível.
+  const orphanComp = row?.status === "comp_off" && !linked;
+  const locked = false;
   const face = dayFace(input.rules, input.dayNeeds, input.day);
   const holidays = input.rules.filter((rule) => {
     if (rule.pay !== "extra_off" || !rule.open || rule.date >= input.day) return false;
@@ -684,8 +704,9 @@ export function dayEditOptions(input: {
     return worked && input.day <= holidayDeadline(rule, input.monthEnd);
   });
   const choice = row ? cellChoice(row.status) : "work";
-  const fcEnabled = input.pattern !== "12x36" && !locked && (choice === "work" || choice === "comp_off") && !face.holiday && !face.closed && holidays.length > 0;
-  return { locked, fcEnabled, holidays };
+  const fcEnabled =
+    input.pattern !== "12x36" && (choice === "work" || choice === "comp_off") && !face.holiday && !face.closed && holidays.length > 0;
+  return { locked, orphanComp, fcEnabled, holidays };
 }
 
 function writeStatus<T extends EditableDay>(days: T[], personId: string, day: string, status: DayStatus): T[] {
@@ -700,10 +721,11 @@ export function applyDayChoices<T extends EditableDay>(input: {
   dayNeeds: DayNeed[];
   pattern: SchedulePattern;
   monthEnd: string;
+  compDue?: CompDue[];
   choices: { personId: string; value: CellChoice; holiday: string | null }[];
 }): { days: T[]; error: string | null } {
   let days = input.days.map((row) => ({ ...row }));
-  let links = inferCompLinks(days, input.rules, input.monthEnd);
+  let links = inferCompLinks(days, input.rules, input.monthEnd, input.compDue);
   for (const choice of input.choices) {
     const current = days.find((row) => row.sellerId === choice.personId && row.day === input.day);
     if (!current) continue;
@@ -711,7 +733,6 @@ export function applyDayChoices<T extends EditableDay>(input: {
     const same = cellChoice(current.status) === choice.value && (choice.value !== "comp_off" || linked?.holiday === choice.holiday);
     if (same) continue;
     const options = dayEditOptions({ ...input, days, personId: choice.personId });
-    if (options.locked) return { days: input.days, error: PREVIOUS_MONTH_EDIT };
     if (choice.value === "comp_off" && (!options.fcEnabled || !choice.holiday || !options.holidays.some((rule) => rule.date === choice.holiday))) {
       return { days: input.days, error: COMP_OFF_BLOCKED };
     }
