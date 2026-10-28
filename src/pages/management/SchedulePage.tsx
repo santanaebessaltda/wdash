@@ -913,7 +913,7 @@ export function SchedulePage() {
                           <Badge variant="neutral" className="max-w-full truncate">
                             {storeLabel}
                           </Badge>
-                          <Badge variant="neutral">{monthLabel(item.monthStart)}</Badge>
+                          <Badge variant="neutral">{monthLabel(item.monthStart).toLocaleUpperCase("pt-BR")}</Badge>
                         </div>
                       </div>
                       <div className="flex flex-wrap items-center gap-2">{registeredActions(view, item.monthStart)}</div>
