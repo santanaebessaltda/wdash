@@ -770,37 +770,40 @@ export function SchedulePage() {
         title={monthLabel(monthStart)}
         actions={
           <HeaderFilters>
-            <div className="flex gap-1 rounded-[11px] border border-line bg-bg-2 p-1">
-              {VIEW_OPTIONS.map((option) => (
-                <button
-                  key={option.id}
-                  type="button"
-                  onClick={() => setViewMode(option.id)}
-                  className={cn(
-                    "rounded-lg px-3 py-1.5 text-[12.5px] font-bold transition-colors",
-                    viewMode === option.id ? "bg-acc text-white" : "text-t1 hover:text-t0",
-                  )}
-                >
-                  {option.label}
-                </button>
-              ))}
+            {/* No celular: Mês/Semana/Dia + setas na mesma linha (padrão Apps → Calendar). */}
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex gap-1 rounded-[11px] border border-line bg-bg-2 p-1">
+                {VIEW_OPTIONS.map((option) => (
+                  <button
+                    key={option.id}
+                    type="button"
+                    onClick={() => setViewMode(option.id)}
+                    className={cn(
+                      "rounded-lg px-3 py-1.5 text-[12.5px] font-bold transition-colors",
+                      viewMode === option.id ? "bg-acc text-white" : "text-t1 hover:text-t0",
+                    )}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+              <button
+                type="button"
+                className={monthNavBtn}
+                aria-label={viewMode === "month" ? "Mês anterior" : viewMode === "week" ? "Semana anterior" : "Dia anterior"}
+                onClick={goPrev}
+              >
+                <MonthStep dir="anterior" />
+              </button>
+              <button
+                type="button"
+                className={monthNavBtn}
+                aria-label={viewMode === "month" ? "Próximo mês" : viewMode === "week" ? "Próxima semana" : "Próximo dia"}
+                onClick={goNext}
+              >
+                <MonthStep dir="proximo" />
+              </button>
             </div>
-            <button
-              type="button"
-              className={monthNavBtn}
-              aria-label={viewMode === "month" ? "Mês anterior" : viewMode === "week" ? "Semana anterior" : "Dia anterior"}
-              onClick={goPrev}
-            >
-              <MonthStep dir="anterior" />
-            </button>
-            <button
-              type="button"
-              className={monthNavBtn}
-              aria-label={viewMode === "month" ? "Próximo mês" : viewMode === "week" ? "Próxima semana" : "Próximo dia"}
-              onClick={goNext}
-            >
-              <MonthStep dir="proximo" />
-            </button>
             {storeRows.length > 0 ? (
               <Button icon={<Icon d={icons.plus} size={16} />} disabled={showSkeleton || withTeam.length === 0} onClick={openCreate}>
                 Nova escala
