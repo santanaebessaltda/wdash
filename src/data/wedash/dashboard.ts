@@ -3905,6 +3905,198 @@ export function buildTeamMemberDetail(
   return { ...shown, series, seriesGranularity, comparison };
 }
 
+/** Pessoa no detalhe do grupo  -  participação relativa ao faturamento do grupo. */
+export interface TeamGroupPersonRow {
+  key: string;
+  name: string;
+  storeIds: string[];
+  storeRows: string[];
+  revenue: number;
+  sales: number;
+  items: number;
+  averageTicket: number;
+  pa: number | null;
+  participationPct: number;
+  variationPct: number | null;
+}
+
+/** Detalhe de um grupo do card Faturamento por grupo. */
+export interface TeamGroupDetail {
+  /** Rótulo completo (chave da fatia, ex. "Manhã · 09:00–15:00"). */
+  shiftName: string;
+  name: string;
+  schedule?: string;
+  period: ResolvedPeriod;
+  multiStore: boolean;
+  /** Fatia SEM GRUPO IDENTIFICADO  -  sem lista de pessoas. */
+  unattributed: boolean;
+  revenue: number;
+  sales: number;
+  items: number;
+  averageTicket: number;
+  pa: number | null;
+  /** Participação no faturamento da equipe (ou do total da loja, se unattributed). */
+  participationPct: number;
+  people: TeamGroupPersonRow[];
+  series: { label: string; detail?: string; revenue: number; sales: number }[] | null;
+  seriesGranularity: "day" | "month";
+  comparison: TeamMemberDetail["comparison"];
+}
+
+function splitShiftLabel(shiftName: string): { name: string; schedule?: string } {
+  if (shiftName === TEAM_WITHOUT_SHIFT) return { name: TEAM_WITHOUT_SHIFT };
+  const [name, schedule] = shiftName.split(" · ");
+  return { name: name ?? shiftName, ...(schedule ? { schedule } : {}) };
+}
+
+/**
+ * Detalhe de um grupo (fatia do card Faturamento por grupo).
+ * `shiftName` = rótulo completo da fatia. SEM GRUPO IDENTIFICADO = só KPIs da venda sem vendedor.
+ * Passe `view` quando a tela já montou a view (ex. com rateio de meta).
+ */
+export function buildTeamGroupDetail(
+  scope: Scope,
+  input: TeamAggInput,
+  shiftName: string,
+  opts: { view?: TeamDashboardView } = {},
+): TeamGroupDetail | null {
+  const view = opts.view ?? buildTeamDashboardView(scope, input);
+  const period = view.period;
+  const parts = splitShiftLabel(shiftName);
+  const unattributed = shiftName === "SEM GRUPO IDENTIFICADO";
+
+  if (unattributed) {
+    const revenue = view.composition.unidentified;
+    if (Math.round(revenue * 100) < 1) return null;
+    const base = view.composition.total > 0 ? view.composition.total : revenue;
+    return {
+      shiftName,
+      name: parts.name,
+      period,
+      multiStore: view.multiStore,
+      unattributed: true,
+      revenue,
+      sales: 0,
+      items: 0,
+      averageTicket: 0,
+      pa: null,
+      participationPct: divSeguro(revenue, base) * 100,
+      people: [],
+      series: null,
+      seriesGranularity: "day",
+      comparison: null,
+    };
+  }
+
+  const ofGroup = view.people.filter((p) => (p.shift ?? TEAM_WITHOUT_SHIFT) === shiftName);
+  if (ofGroup.length === 0) {
+    const slice = view.shifts.find((s) => s.name === shiftName);
+    if (!slice || Math.round(slice.revenue * 100) < 1) return null;
+  }
+
+  let revenue = 0;
+  let sales = 0;
+  let items = 0;
+  let withoutItems = false;
+  let revenueCmp = 0;
+  let revenuePrev = 0;
+  for (const p of ofGroup) {
+    revenue += p.revenue;
+    sales += p.sales;
+    items += p.items;
+    if (p.pa == null && p.sales > 0) withoutItems = true;
+    revenueCmp += p.revenueCmp;
+    revenuePrev += p.revenuePrev;
+  }
+  if (ofGroup.length === 0) {
+    const slice = view.shifts.find((s) => s.name === shiftName)!;
+    revenue = slice.revenue;
+  }
+
+  const teamBase = view.composition.team > 0 ? view.composition.team : revenue;
+  const pa = withoutItems || sales === 0 ? null : items / sales;
+  const averageTicket = sales > 0 ? revenue / sales : 0;
+  const prev = previousPeriod(period, calendarCurrentHour());
+  const cutsAtToday = prev.hourMax != null;
+  const vsCmp = cutsAtToday ? `${prev.label}, até o mesmo dia` : prev.label;
+  const comparavel = revenue > 0 && revenueCmp > 0 && revenuePrev > 0;
+  const comparison: TeamMemberDetail["comparison"] = comparavel
+    ? {
+        vs: vsCmp,
+        revenue: kpiDelta(revenueCmp, revenuePrev, vsCmp),
+        sales: undefined,
+        ticket: undefined,
+        pa: undefined,
+      }
+    : null;
+
+  const people: TeamGroupPersonRow[] = ofGroup
+    .map((p) => ({
+      key: p.key,
+      name: p.name,
+      storeIds: p.storeIds,
+      storeRows: p.storeRows,
+      revenue: p.revenue,
+      sales: p.sales,
+      items: p.items,
+      averageTicket: p.averageTicket,
+      pa: p.pa,
+      participationPct: divSeguro(p.revenue, revenue) * 100,
+      variationPct: p.variationPct,
+    }))
+    .sort((a, b) => b.revenue - a.revenue || a.name.localeCompare(b.name, "pt-BR"));
+
+  const keys = new Set(ofGroup.map((p) => p.key));
+  const storeIds = new Set(storesInScope(view.scope).map((f) => f.id));
+  const inCurrent = (d: string) => d >= period.start && d <= period.end;
+  const lines = (input.sellerDayAggs ?? []).filter((r) => {
+    if (!storeIds.has(r.storeId) || !inCurrent(r.day)) return false;
+    const key = r.sellerEmployeeId != null ? `e:${r.sellerEmployeeId}` : `n:${r.sellerKey}`;
+    return keys.has(key);
+  });
+
+  let series: TeamGroupDetail["series"] = null;
+  const days = eachDay(period.start, period.end);
+  const seriesGranularity: TeamGroupDetail["seriesGranularity"] = days.length > 31 ? "month" : "day";
+  if (days.length > 1 && keys.size > 0) {
+    const byDay = new Map<string, { revenue: number; sales: number }>();
+    for (const r of lines) {
+      const k = seriesGranularity === "month" ? r.day.slice(0, 7) : r.day;
+      const acc = byDay.get(k) ?? { revenue: 0, sales: 0 };
+      acc.revenue += r.revenueCents / 100;
+      acc.sales += r.salesCount;
+      byDay.set(k, acc);
+    }
+    const eixo = seriesGranularity === "month" ? [...new Set(days.map((d) => d.slice(0, 7)))] : days;
+    const variosAnos = period.start.slice(0, 4) !== period.end.slice(0, 4);
+    series = eixo.map((k) => ({
+      label: seriesGranularity === "month" ? `${shortMonth(`${k}-01`)}${variosAnos ? `/${k.slice(2, 4)}` : ""}` : dayAxisLabel(k, period),
+      ...(seriesGranularity === "day" ? { detail: dayPointDetail(k) } : {}),
+      revenue: byDay.get(k)?.revenue ?? 0,
+      sales: byDay.get(k)?.sales ?? 0,
+    }));
+  }
+
+  return {
+    shiftName,
+    name: parts.name,
+    ...(parts.schedule ? { schedule: parts.schedule } : {}),
+    period,
+    multiStore: view.multiStore,
+    unattributed: false,
+    revenue,
+    sales,
+    items,
+    averageTicket,
+    pa,
+    participationPct: divSeguro(revenue, teamBase) * 100,
+    people,
+    series,
+    seriesGranularity,
+    comparison,
+  };
+}
+
 /* ================================================================
  * TELA VISAO GERAL  -  camada de dados (montarVisaoGeralView)
  * ================================================================ */

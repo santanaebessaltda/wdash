@@ -32,6 +32,7 @@ import { buildChallengeView, type ChallengeStatus } from "@/data/wedash/challeng
 import { ChallengeMiniCard } from "@/pages/challenges/ChallengeMiniCard";
 import { CHALLENGE_STATUS_ORDER } from "@/pages/challenges/shared";
 import { fetchTeamAggInput, useTeamMemberDetail } from "@/pages/dashboard/TeamMemberDetail";
+import { useTeamGroupDetail } from "@/pages/dashboard/TeamGroupDetail";
 import { calendarTodayIso } from "@/data/wedash/clock";
 import { matchesCodeOrName } from "@/lib/personSearch";
 import { goalWeightFrom } from "@/data/wedash/engine/goalProjection";
@@ -434,6 +435,12 @@ export function TeamPage() {
       storeNames: new Map(storesForSession(session.stores).map((store) => [store.id, store.tradeName])),
     },
   });
+  const { open: openGroup, modal: groupModal } = useTeamGroupDetail({
+    scope,
+    data: aggs,
+    view,
+    onPerson: openPerson,
+  });
   const teclaAbre = (p: TeamMemberRow) => (e: React.KeyboardEvent) => {
     if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
@@ -551,12 +558,17 @@ export function TeamPage() {
                           centerValue={brlCent(total)}
                         />
                       </div>
-                      <div className="mt-2 flex flex-col gap-2.5">
+                      <div className="mt-2 flex flex-col gap-1">
                         {shifts.map((t, i) => {
                           const pct = Math.round((t.revenue / total) * 100);
                           const pt = partesShift(t.name === TEAM_WITHOUT_SHIFT ? undefined : t.name);
                           return (
-                            <div key={t.name} className="flex items-start gap-2.5">
+                            <button
+                              key={t.name}
+                              type="button"
+                              onClick={() => openGroup(t.name)}
+                              className="-mx-2 flex items-start gap-2.5 rounded-[var(--radius-vela-sm)] px-2 py-1.5 text-left transition-colors hover:bg-bg-3"
+                            >
                               <span className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-[3px]" style={{ background: colors[i] }} />
                               <div className="min-w-0 flex-1">
                                 <div className="flex items-baseline gap-2">
@@ -570,7 +582,7 @@ export function TeamPage() {
                                     : `${pt.schedule ? `${pt.schedule} · ` : ""}${t.people} ${t.people === 1 ? "pessoa" : "pessoas"}`}
                                 </p>
                               </div>
-                            </div>
+                            </button>
                           );
                         })}
                       </div>
@@ -704,6 +716,7 @@ export function TeamPage() {
       )}
 
       {personModal}
+      {groupModal}
     </div>
   );
 
