@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Accordion, Alert, Badge, Button, Card, Checkbox, Modal, PageHeader, Select, useToast } from "@/components/ui";
 import { ColorLegend, type LegendItem } from "@/components/wedash/ColorLegend";
 import { ScheduleCardsSkeleton } from "@/components/wedash/LoadingSkeletons";
@@ -46,6 +47,16 @@ const SHORT_WEEK = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 function monthLabel(iso: string): string {
   const date = isoToDate(startOfMonth(iso));
   return `${MONTHS[date.getMonth()]} de ${date.getFullYear()}`;
+}
+
+/** `month=2026-11` ou `2026-11-01` na URL — F5 mantém o mês da grade. */
+function monthFromParam(raw: string | null, fallback: string): string {
+  if (!raw) return fallback;
+  const key = raw.slice(0, 7);
+  if (!/^\d{4}-\d{2}$/.test(key)) return fallback;
+  const month = Number(key.slice(5, 7));
+  if (month < 1 || month > 12) return fallback;
+  return `${key}-01`;
 }
 
 /** Semana começando no domingo, como no Calendar. */
@@ -358,15 +369,28 @@ function scheduleCacheReady(c: BranchSchedule[] | null): c is BranchSchedule[] {
 export function SchedulePage() {
   const { show } = useToast();
   const { session, storeRows } = useScopedStores();
+  const [params, setParams] = useSearchParams();
   const many = storeRows.length > 1;
   const today = calendarTodayIso();
-  const [monthStart, setMonthStart] = useState(() => startOfMonth(today));
-  const [focusDay, setFocusDay] = useState(() => today);
+  const [monthStart, setMonthStart] = useState(() => monthFromParam(params.get("month"), startOfMonth(today)));
+  const [focusDay, setFocusDay] = useState(() => {
+    const month = monthFromParam(params.get("month"), startOfMonth(today));
+    return month === startOfMonth(today) ? today : month;
+  });
   const [viewMode, setViewMode] = useState<ScheduleViewMode>("month");
   /** Mostra dias dos meses vizinhos até a última FC do mês. */
   const [showNeighbors, setShowNeighbors] = useState(true);
   const monthStartRef = useRef(monthStart);
   monthStartRef.current = monthStart;
+
+  // Mês na URL (`?month=2026-11`) para o F5 não voltar ao mês atual.
+  useEffect(() => {
+    const want = monthStart.slice(0, 7);
+    if (params.get("month") === want) return;
+    const next = new URLSearchParams(params);
+    next.set("month", want);
+    setParams(next, { replace: true });
+  }, [monthStart, params, setParams]);
   const rangeFrom = monthStart;
   const rangeTo = endOfMonth(monthStart);
   const [views, setViews] = useState<BranchSchedule[]>([]);
