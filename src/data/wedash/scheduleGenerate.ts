@@ -1,6 +1,6 @@
 /** Geração da escala do mês, com a mesma busca do gerador de escalas. */
 
-import { addDays, addMonths, endOfMonth } from "./engine/format";
+import { addDays, addMonths, endOfMonth, startOfMonth } from "./engine/format";
 import { continuation, generate } from "./scheduleEngine";
 
 export type SchedulePattern = "6x1" | "5x2" | "4x3" | "12x36";
@@ -555,13 +555,57 @@ export type CompLink = { personId: string; holiday: string; day: string; deadlin
 export const PREVIOUS_MONTH_EDIT = "Este dia pertence à escala do mês anterior. Edite aquela escala para alterá-lo.";
 export const COMP_OFF_BLOCKED = "Escolha um dia de trabalho para conceder a folga adicional pelo feriado. As folgas normais devem ser preservadas.";
 export const COMP_OFF_CLEAR_HINT =
-  "Esta folga compensatória não está ligada a um feriado nesta escala. Você pode trocar para Trabalhar ou Folgar; para remarcar a FC, use um dia de trabalho com feriado elegível.";
+  "Esta folga compensatória não está ligada a um feriado nesta escala. Você pode trocar para Trabalhar ou Folgar; para remarcar a FC, escolha um feriado elegível e o novo dia abaixo.";
 
 function dayFace(rules: HolidayRule[], needs: DayNeed[], iso: string): { holiday: boolean; closed: boolean } {
   const rule = rules.find((item) => item.date === iso);
   if (rule) return { holiday: true, closed: rule.workers === 0 || !rule.open };
   const need = needs.find((item) => item.dow === weekday(iso));
   return { holiday: false, closed: need ? !need.open : false };
+}
+
+/** Início do prazo de FC (dia seguinte ao feriado, ou 1º dia do mês seguinte). */
+export function compOffNotBefore(rule: HolidayRule): string {
+  if (rule.window === "next_month") return addDays(endOfMonth(`${rule.date.slice(0, 7)}-01`), 1);
+  return addDays(rule.date, 1);
+}
+
+/**
+ * Dias em que a pessoa pode receber a FC deste feriado (loja aberta, sem feriado,
+ * trabalho ou ainda sem linha — FC planejada no mês seguinte).
+ */
+export function eligibleCompOffDays(input: {
+  personId: string;
+  holiday: string;
+  days: EditableDay[];
+  rules: HolidayRule[];
+  dayNeeds: DayNeed[];
+  monthEnd: string;
+  /** Mantém o dia atual da FC na lista mesmo se já estiver marcado. */
+  includeDay?: string | null;
+}): string[] {
+  const rule = input.rules.find((item) => item.date === input.holiday);
+  if (!rule || rule.pay !== "extra_off" || !rule.open) return [];
+  const from = compOffNotBefore(rule);
+  const until = holidayDeadline(rule, input.monthEnd);
+  const out: string[] = [];
+  for (let cursor = from; cursor <= until; cursor = addDays(cursor, 1)) {
+    const face = dayFace(input.rules, input.dayNeeds, cursor);
+    if (face.closed || face.holiday) continue;
+    if (input.includeDay && cursor === input.includeDay) {
+      out.push(cursor);
+      continue;
+    }
+    const row = input.days.find((item) => item.sellerId === input.personId && item.day === cursor);
+    const monthKey = startOfMonth(cursor);
+    const hasMonthRows = input.days.some((item) => item.sellerId === input.personId && startOfMonth(item.day) === monthKey);
+    if (!row) {
+      if (!hasMonthRows) out.push(cursor);
+      continue;
+    }
+    if (row.status === "work") out.push(cursor);
+  }
+  return out;
 }
 
 function cellChoice(status: DayStatus): CellChoice {
@@ -701,19 +745,30 @@ export function dayEditOptions(input: {
   const orphanComp = row?.status === "comp_off" && !linked;
   const locked = false;
   const face = dayFace(input.rules, input.dayNeeds, input.day);
+  // Feriados elegíveis: trabalhou o FE e ainda há prazo — mesmo abrindo a FC já marcada (dia pode ser o atual).
   const holidays = input.rules.filter((rule) => {
     if (rule.pay !== "extra_off" || !rule.open || rule.date >= input.day) return false;
     const worked = input.days.some((item) => item.sellerId === input.personId && item.day === rule.date && item.status === "holiday_work");
     return worked && input.day <= holidayDeadline(rule, input.monthEnd);
   });
   const choice = row ? cellChoice(row.status) : "work";
+  // Em dia fechado/feriado ainda dá para manter/mover FC já marcada (só o destino precisa ser dia aberto).
   const fcEnabled =
-    input.pattern !== "12x36" && (choice === "work" || choice === "comp_off") && !face.holiday && !face.closed && holidays.length > 0;
+    input.pattern !== "12x36" &&
+    (choice === "work" || choice === "comp_off") &&
+    (choice === "comp_off" || (!face.holiday && !face.closed)) &&
+    holidays.length > 0;
   return { locked, orphanComp, fcEnabled, holidays };
 }
 
 function writeStatus<T extends EditableDay>(days: T[], personId: string, day: string, status: DayStatus): T[] {
-  return days.map((row) => (row.sellerId === personId && row.day === day && row.status !== status ? { ...row, status, origin: "manual" } : row));
+  const index = days.findIndex((row) => row.sellerId === personId && row.day === day);
+  if (index < 0) {
+    return [...days, { sellerId: personId, day, status, origin: "manual" } as T];
+  }
+  const current = days[index]!;
+  if (current.status === status && current.origin === "manual") return days;
+  return days.map((row, i) => (i === index ? { ...row, status, origin: "manual" as const } : row));
 }
 
 /** Aplica as escolhas de um dia inteiro com a mesma troca de célula do gerador. */
@@ -725,7 +780,7 @@ export function applyDayChoices<T extends EditableDay>(input: {
   pattern: SchedulePattern;
   monthEnd: string;
   compDue?: CompDue[];
-  choices: { personId: string; value: CellChoice; holiday: string | null }[];
+  choices: { personId: string; value: CellChoice; holiday: string | null; targetDay?: string | null }[];
 }): { days: T[]; error: string | null } {
   let days = input.days.map((row) => ({ ...row }));
   let links = inferCompLinks(days, input.rules, input.monthEnd, input.compDue);
@@ -733,11 +788,30 @@ export function applyDayChoices<T extends EditableDay>(input: {
     const current = days.find((row) => row.sellerId === choice.personId && row.day === input.day);
     if (!current) continue;
     const linked = links.find((link) => link.personId === choice.personId && link.day === input.day);
-    const same = cellChoice(current.status) === choice.value && (choice.value !== "comp_off" || linked?.holiday === choice.holiday);
-    if (same) continue;
+    const placeOn = choice.value === "comp_off" && choice.targetDay ? choice.targetDay : input.day;
+    if (choice.value !== "comp_off") {
+      if (cellChoice(current.status) === choice.value) continue;
+    } else if (choice.holiday) {
+      const existing = links.find((link) => link.personId === choice.personId && link.holiday === choice.holiday);
+      if (existing?.day === placeOn) continue;
+    }
     const options = dayEditOptions({ ...input, days, personId: choice.personId });
-    if (choice.value === "comp_off" && (!options.fcEnabled || !choice.holiday || !options.holidays.some((rule) => rule.date === choice.holiday))) {
-      return { days: input.days, error: COMP_OFF_BLOCKED };
+    if (choice.value === "comp_off") {
+      if (!options.fcEnabled || !choice.holiday || !options.holidays.some((rule) => rule.date === choice.holiday)) {
+        return { days: input.days, error: COMP_OFF_BLOCKED };
+      }
+      const allowed = eligibleCompOffDays({
+        personId: choice.personId,
+        holiday: choice.holiday,
+        days,
+        rules: input.rules,
+        dayNeeds: input.dayNeeds,
+        monthEnd: input.monthEnd,
+        includeDay: linked?.day ?? (current.status === "comp_off" ? input.day : null),
+      });
+      if (!allowed.includes(placeOn)) {
+        return { days: input.days, error: COMP_OFF_BLOCKED };
+      }
     }
     links = links.filter((link) => !(link.personId === choice.personId && link.day === input.day));
     if (choice.value === "comp_off" && choice.holiday) {
@@ -745,10 +819,17 @@ export function applyDayChoices<T extends EditableDay>(input: {
       if (previous) {
         days = writeStatus(days, choice.personId, previous.day, "work");
         links = links.filter((link) => link !== previous);
+      } else if (current.status === "comp_off" && placeOn !== input.day) {
+        days = writeStatus(days, choice.personId, input.day, "work");
       }
       const rule = input.rules.find((item) => item.date === choice.holiday);
-      links.push({ personId: choice.personId, holiday: choice.holiday, day: input.day, deadline: rule ? holidayDeadline(rule, input.monthEnd) : input.monthEnd });
-      days = writeStatus(days, choice.personId, input.day, "comp_off");
+      links.push({
+        personId: choice.personId,
+        holiday: choice.holiday,
+        day: placeOn,
+        deadline: rule ? holidayDeadline(rule, input.monthEnd) : input.monthEnd,
+      });
+      days = writeStatus(days, choice.personId, placeOn, "comp_off");
     } else if (choice.value === "work") {
       const face = dayFace(input.rules, input.dayNeeds, input.day);
       days = writeStatus(days, choice.personId, input.day, face.holiday ? "holiday_work" : "work");

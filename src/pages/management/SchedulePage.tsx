@@ -18,7 +18,7 @@ import { fetchGoals } from "@/data/wedash/goalsRepo";
 import { scheduleStartMonth, type GoalSpan } from "@/data/wedash/goalMonths";
 import { branchRoleLabel, fetchStoreSellers, fetchStoreShifts, isBranchTeamMember, type Store, type StoreSeller, type StoreShift } from "@/data/wedash/stores";
 import { DOW_LABELS } from "@/data/wedash/storeHours";
-import { applyDayChoices, buildCompOffSummary, COMP_OFF_CLEAR_HINT, dayEditOptions, defaultDayNeeds, generateMonth, inferCompLinks, issueFromUnknown, weekday, type CellChoice, type CompDue, type CompOffSummaryRow, type DayNeed, type DayStatus, type HolidayRule, type ScheduleGenerateIssue, type SchedulePattern, type Sex } from "@/data/wedash/scheduleGenerate";
+import { applyDayChoices, buildCompOffSummary, COMP_OFF_CLEAR_HINT, dayEditOptions, defaultDayNeeds, eligibleCompOffDays, generateMonth, inferCompLinks, issueFromUnknown, weekday, type CellChoice, type CompDue, type CompOffSummaryRow, type DayNeed, type DayStatus, type HolidayRule, type ScheduleGenerateIssue, type SchedulePattern, type Sex } from "@/data/wedash/scheduleGenerate";
 import { holidayLabel, holidaysForStore, loadHolidaySeed, loadNationalHolidays, storePlace, type Holiday } from "@/data/wedash/scheduleHolidays";
 import { deleteSchedule, fetchCompDue, fetchPreviousSnapshot, fetchSchedule, patchScheduleCompDue, replaceSchedulePerson, saveManualDay, saveSchedule, type StoredDay, type StoredSchedule } from "@/data/wedash/scheduleRepo";
 import { ScheduleWizard, type ScheduleWizardValue, type WizardBranch } from "./ScheduleWizard";
@@ -987,6 +987,7 @@ export function SchedulePage() {
           monthEnd={dayEdit.monthEnd}
           monthDays={dayEdit.monthDays}
           compDue={dayEdit.compDue}
+          scheduleMonths={new Set(dayView.months.map((month) => month.monthStart))}
           names={new Map((dayView.directory ?? dayView.people).map((person) => [person.id, person]))}
           onClose={() => setDayOpen(null)}
           onSave={async (next) => {
@@ -996,7 +997,12 @@ export function SchedulePage() {
               ...editedDays,
             ];
             const nextDue = syncCompDue(dayEdit.schedule.compDue, merged, dayEdit.rules, dayEdit.monthEnd);
-            await saveDay([{ storeId: dayView.store.id, days: next }]);
+            // FC só no mês seguinte (ainda sem escala): atualiza compDue; não grava dia órfão.
+            const scheduleMonths = new Set(dayView.months.map((month) => month.monthStart));
+            const persistable = next.filter((group) => scheduleMonths.has(startOfMonth(group.day)));
+            if (persistable.length > 0) {
+              await saveDay([{ storeId: dayView.store.id, days: persistable }]);
+            }
             if (JSON.stringify(nextDue) !== JSON.stringify(dayEdit.schedule.compDue)) {
               await patchScheduleCompDue(dayView.store.id, dayEdit.monthStart, nextDue);
               setViews((current) =>
@@ -1451,6 +1457,7 @@ function DayEditor({
   monthEnd,
   monthDays,
   compDue,
+  scheduleMonths,
   names,
   onClose,
   onSave,
@@ -1464,6 +1471,8 @@ function DayEditor({
   monthEnd: string;
   monthDays: StoredDay[];
   compDue: CompDue[];
+  /** Meses com `store_schedule` — FC só em compDue (vizinho) não grava dia órfão. */
+  scheduleMonths: Set<string>;
   names: Map<string, StoreSeller>;
   onClose: () => void;
   onSave: (next: { day: string; rows: StoredDay[] }[]) => Promise<void>;
@@ -1471,12 +1480,13 @@ function DayEditor({
   const links = inferCompLinks(monthDays, rules, monthEnd, compDue);
   const roster = monthDays.filter((row) => row.day === day && row.sellerId === sellerId);
   const personName = (names.get(sellerId)?.name ?? "Pessoa").toLocaleUpperCase("pt-BR");
-  const [drafts, setDrafts] = useState<Record<string, { value: CellChoice; holiday: string }>>(() =>
+  const [drafts, setDrafts] = useState<Record<string, { value: CellChoice; holiday: string; targetDay: string }>>(() =>
     Object.fromEntries(
       roster.map((row) => {
         const options = dayEditOptions({ day, days: monthDays, rules, dayNeeds, pattern, personId: row.sellerId, monthEnd, compDue });
         const linked = links.find((item) => item.personId === row.sellerId && item.day === day);
-        return [row.sellerId, { value: choiceOf(row.status), holiday: linked?.holiday ?? options.holidays[0]?.date ?? "" }];
+        const holiday = linked?.holiday ?? options.holidays[0]?.date ?? "";
+        return [row.sellerId, { value: choiceOf(row.status), holiday, targetDay: day }];
       }),
     ),
   );
@@ -1492,7 +1502,16 @@ function DayEditor({
       pattern,
       monthEnd,
       compDue,
-      choices: roster.map((row) => ({ personId: row.sellerId, value: drafts[row.sellerId]?.value ?? choiceOf(row.status), holiday: drafts[row.sellerId]?.holiday || null })),
+      choices: roster.map((row) => {
+        const draft = drafts[row.sellerId];
+        const value = draft?.value ?? choiceOf(row.status);
+        return {
+          personId: row.sellerId,
+          value,
+          holiday: draft?.holiday || null,
+          targetDay: value === "comp_off" ? draft?.targetDay || day : null,
+        };
+      }),
     });
     if (edited.error) {
       setSaveError(edited.error);
@@ -1528,7 +1547,20 @@ function DayEditor({
     >
       {roster.map((row) => {
         const options = dayEditOptions({ day, days: monthDays, rules, dayNeeds, pattern, personId: row.sellerId, monthEnd, compDue });
-        const draft = drafts[row.sellerId] ?? { value: choiceOf(row.status), holiday: "" };
+        const draft = drafts[row.sellerId] ?? { value: choiceOf(row.status), holiday: "", targetDay: day };
+        const fcDays =
+          draft.value === "comp_off" && draft.holiday
+            ? eligibleCompOffDays({
+                personId: row.sellerId,
+                holiday: draft.holiday,
+                days: monthDays,
+                rules,
+                dayNeeds,
+                monthEnd,
+                includeDay: day,
+              })
+            : [];
+        const targetDay = fcDays.includes(draft.targetDay) ? draft.targetDay : fcDays[0] ?? day;
         return (
           <div key={row.sellerId} className="flex flex-col gap-3">
             <label className="flex flex-col gap-1.5 text-[13px] font-semibold text-t0">
@@ -1548,22 +1580,67 @@ function DayEditor({
               </Select>
             </label>
             {draft.value === "comp_off" && options.fcEnabled ? (
-              <label className="flex flex-col gap-1.5 text-[13px] font-semibold text-t0">
-                Qual feriado gerou esta folga?
-                <Select
-                  aria-label={`Essa folga de ${personName} é por qual feriado?`}
-                  value={draft.holiday}
-                  disabled={busy}
-                  onChange={(event) => setDrafts((current) => ({ ...current, [row.sellerId]: { ...draft, holiday: event.target.value } }))}
-                >
-                  {options.holidays.map((rule) => (
-                    <option key={rule.date} value={rule.date}>{shortDate(rule.date)} · {rule.name}</option>
-                  ))}
-                </Select>
-              </label>
+              <>
+                <label className="flex flex-col gap-1.5 text-[13px] font-semibold text-t0">
+                  Qual feriado gerou esta folga?
+                  <Select
+                    aria-label={`Essa folga de ${personName} é por qual feriado?`}
+                    value={draft.holiday}
+                    disabled={busy}
+                    onChange={(event) => {
+                      const holiday = event.target.value;
+                      const nextDays = eligibleCompOffDays({
+                        personId: row.sellerId,
+                        holiday,
+                        days: monthDays,
+                        rules,
+                        dayNeeds,
+                        monthEnd,
+                        includeDay: day,
+                      });
+                      setDrafts((current) => ({
+                        ...current,
+                        [row.sellerId]: {
+                          ...draft,
+                          holiday,
+                          targetDay: nextDays.includes(draft.targetDay) ? draft.targetDay : nextDays[0] ?? day,
+                        },
+                      }));
+                    }}
+                  >
+                    {options.holidays.map((rule) => (
+                      <option key={rule.date} value={rule.date}>{shortDate(rule.date)} · {rule.name}</option>
+                    ))}
+                  </Select>
+                </label>
+                {fcDays.length > 0 ? (
+                  <label className="flex flex-col gap-1.5 text-[13px] font-semibold text-t0">
+                    Em qual dia cai a folga compensatória?
+                    <Select
+                      aria-label={`Dia da folga compensatória de ${personName}`}
+                      value={targetDay}
+                      disabled={busy}
+                      onChange={(event) =>
+                        setDrafts((current) => ({ ...current, [row.sellerId]: { ...draft, targetDay: event.target.value } }))
+                      }
+                    >
+                      {fcDays.map((iso) => {
+                        const plannedOnly = !scheduleMonths.has(startOfMonth(iso));
+                        return (
+                          <option key={iso} value={iso}>
+                            {shortDate(iso)}
+                            {iso === day ? " · atual" : ""}
+                            {plannedOnly ? " · mês seguinte" : ""}
+                          </option>
+                        );
+                      })}
+                    </Select>
+                  </label>
+                ) : null}
+              </>
             ) : null}
             {options.orphanComp ? <p className="text-[12.5px] text-t2">{COMP_OFF_CLEAR_HINT}</p> : null}
-            <p className="text-[12.5px] text-t2">Ao alterar uma folga compensatória, a folga anterior vinculada ao feriado também será atualizada.</p>
+            <p className="text-[12.5px] text-t2">Ao mudar o dia da folga compensatória, o dia anterior volta a trabalho.</p>
           </div>
         );
       })}

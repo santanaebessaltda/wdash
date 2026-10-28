@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { applyDayChoices, buildCompOffSummary, dayEditOptions, generateMonth, previousFromSnapshot, scheduleIssueFromEngine, weekday, type EditableDay, type HolidayRule } from "./scheduleGenerate";
+import { applyDayChoices, buildCompOffSummary, dayEditOptions, eligibleCompOffDays, generateMonth, previousFromSnapshot, scheduleIssueFromEngine, weekday, type EditableDay, type HolidayRule } from "./scheduleGenerate";
 import { easter, nationalHolidays, storePlace } from "./scheduleHolidays";
 
 describe("feriados nacionais", () => {
@@ -465,5 +465,35 @@ describe("edição de um dia", () => {
     expect(edited.error).toBeNull();
     expect(edited.days.find((row) => row.sellerId === "ana" && row.day === "2026-11-02")?.status).toBe("work");
     expect(edited.days.find((row) => row.sellerId === "ana" && row.day === "2026-11-03")?.status).toBe("comp_off");
+  });
+
+  it("move a FC pelo targetDay a partir da célula atual", () => {
+    const edited = applyDayChoices({
+      day: "2026-10-15",
+      days,
+      rules,
+      dayNeeds: needs,
+      pattern: "6x1",
+      monthEnd: "2026-10-31",
+      choices: [{ personId: "ana", value: "comp_off", holiday: "2026-10-12", targetDay: "2026-10-16" }],
+    });
+    expect(edited.error).toBeNull();
+    expect(edited.days.find((row) => row.sellerId === "ana" && row.day === "2026-10-15")?.status).toBe("work");
+    expect(edited.days.find((row) => row.sellerId === "ana" && row.day === "2026-10-16")?.status).toBe("comp_off");
+  });
+
+  it("lista dias elegíveis para remarcar a FC no prazo do feriado", () => {
+    const list = eligibleCompOffDays({
+      personId: "ana",
+      holiday: "2026-10-12",
+      days,
+      rules,
+      dayNeeds: needs,
+      monthEnd: "2026-10-31",
+      includeDay: "2026-10-15",
+    });
+    expect(list).toContain("2026-10-15");
+    expect(list).toContain("2026-10-16");
+    expect(list).not.toContain("2026-10-12");
   });
 });
