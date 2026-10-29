@@ -54,6 +54,18 @@ import {
   type SpeechRecognitionLike,
 } from "./speech";
 
+const VOICE_READ_KEY = "wedash.jarvis.voiceRead";
+
+function readStoredVoiceRead(): boolean {
+  try {
+    const v = localStorage.getItem(VOICE_READ_KEY);
+    if (v === null) return true;
+    return v === "1";
+  } catch {
+    return true;
+  }
+}
+
 export type JarvisMessage = { from: "user" | "jarvis"; text: string };
 export type JarvisMode = "idle" | "listening" | "thinking" | "speaking";
 export type JarvisCreated =
@@ -83,6 +95,12 @@ type JarvisApi = {
   createdItem: JarvisCreated | null;
   commitBusy: boolean;
   voiceOpen: boolean;
+  /** Leitura em voz das respostas (TTS). Ligada/desligada. */
+  voiceRead: boolean;
+  toggleVoiceRead: () => void;
+  /** Microfone → transcreve no campo de texto (não abre modo voz). */
+  dictating: boolean;
+  toggleDictate: () => void;
   /** `button` = clique (pede mic). `clap` = palmas (só ouve se já tiver permissão). */
   openVoice: (opts?: { source?: "button" | "clap" }) => void;
   closeVoice: () => void;
@@ -124,6 +142,8 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
   const [commitBusy, setCommitBusy] = useState(false);
   const [createdItem, setCreatedItem] = useState<JarvisCreated | null>(null);
   const [voiceOpen, setVoiceOpen] = useState(false);
+  const [voiceRead, setVoiceRead] = useState(readStoredVoiceRead);
+  const [dictating, setDictating] = useState(false);
 
   const endRef = useRef<HTMLDivElement>(null);
   const cancelSpeakRef = useRef<(() => void) | null>(null);
@@ -132,6 +152,9 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
   const scheduleDraftRef = useRef<ScheduleDraft | null>(null);
   const replyGen = useRef(0);
   const voiceOpenRef = useRef(false);
+  const voiceReadRef = useRef(voiceRead);
+  const dictateRecRef = useRef<SpeechRecognitionLike | null>(null);
+  const dictateBaseRef = useRef("");
   const mediaRecRef = useRef<MediaRecorder | null>(null);
   const mediaChunksRef = useRef<Blob[]>([]);
   const mediaStreamRef = useRef<MediaStream | null>(null);
@@ -146,6 +169,7 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
   goalDraftRef.current = goalDraft;
   scheduleDraftRef.current = scheduleDraft;
   voiceOpenRef.current = voiceOpen;
+  voiceReadRef.current = voiceRead;
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -167,8 +191,9 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
         window.setTimeout(() => startListeningRef.current(), 400);
       }
     };
-    // OpenAI TTS (onyx) via Edge; se falhar, Web Speech do Chrome.
-    if (ttsSupported()) {
+    // Modo voz sempre fala; no chat, só se "Leitura em voz" estiver ligada.
+    const shouldSpeak = voiceOpenRef.current || voiceReadRef.current;
+    if (shouldSpeak && ttsSupported()) {
       setMode("speaking");
       cancelSpeakRef.current?.();
       cancelSpeakRef.current = speak(answer, { onEnd: finish });
@@ -176,6 +201,135 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
       finish();
     }
   }, []);
+
+  const toggleVoiceRead = useCallback(() => {
+    setVoiceRead((prev) => {
+      const next = !prev;
+      voiceReadRef.current = next;
+      try {
+        localStorage.setItem(VOICE_READ_KEY, next ? "1" : "0");
+      } catch {
+        /* ignore */
+      }
+      if (!next) {
+        cancelSpeakRef.current?.();
+        stopSpeaking();
+        setMode((cur) => (cur === "speaking" ? "idle" : cur));
+      }
+      return next;
+    });
+  }, []);
+
+  const stopDictate = useCallback(() => {
+    const rec = dictateRecRef.current;
+    dictateRecRef.current = null;
+    if (rec) {
+      try {
+        rec.onresult = null;
+        rec.onerror = null;
+        rec.onend = null;
+        rec.stop();
+      } catch {
+        try {
+          rec.abort();
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+    setDictating(false);
+    setMicHint(null);
+  }, []);
+
+  /** Microfone do composer: fala → texto no campo (não abre overlay). */
+  const toggleDictate = useCallback(() => {
+    if (dictateRecRef.current || dictating) {
+      stopDictate();
+      return;
+    }
+    if (voiceOpenRef.current) return;
+    if (!navigator.mediaDevices?.getUserMedia && !speechRecognitionSupported()) {
+      setMicHint("Sem microfone neste aparelho — digita no campo.");
+      return;
+    }
+
+    stopSpeaking();
+    cancelSpeakRef.current?.();
+    setMicHint("Pedindo acesso ao microfone…");
+
+    const beginRecognition = () => {
+      const rec = createSpeechRecognition();
+      if (!rec) {
+        setMicHint("Transcrição não disponível neste navegador.");
+        setDictating(false);
+        return;
+      }
+      dictateBaseRef.current = draftText.trim();
+      rec.continuous = true;
+      rec.interimResults = true;
+      let finalChunk = "";
+      rec.onresult = (event) => {
+        let interim = "";
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const row = event.results[i];
+          if (!row) continue;
+          const piece = row[0]?.transcript ?? "";
+          if (row.isFinal) finalChunk += `${piece} `;
+          else interim += piece;
+        }
+        const base = dictateBaseRef.current;
+        const spoken = `${finalChunk}${interim}`.trim();
+        setDraftText(base ? (spoken ? `${base} ${spoken}` : base) : spoken);
+      };
+      rec.onerror = (event) => {
+        if (event.error === "aborted") return;
+        if (event.error === "not-allowed") {
+          setMicHint(null);
+          stopDictate();
+          return;
+        }
+        if (event.error === "no-speech") return;
+        setMicHint("Não consegui transcrever. Tenta de novo.");
+        stopDictate();
+      };
+      rec.onend = () => {
+        dictateRecRef.current = null;
+        setDictating(false);
+        setMicHint(null);
+      };
+      try {
+        dictateRecRef.current = rec;
+        setDictating(true);
+        setMicHint("Ouvindo… fala que eu escrevo no campo.");
+        rec.start();
+      } catch {
+        dictateRecRef.current = null;
+        setDictating(false);
+        setMicHint("Não consegui abrir a transcrição.");
+      }
+    };
+
+    // Gesto do clique: pede mic agora (Chrome), depois sobe o STT.
+    if (navigator.mediaDevices?.getUserMedia) {
+      void navigator.mediaDevices
+        .getUserMedia({ audio: true, video: false })
+        .then((stream) => {
+          stream.getTracks().forEach((t) => t.stop());
+          beginRecognition();
+        })
+        .catch((err) => {
+          const name = err instanceof DOMException ? err.name : "";
+          if (name === "NotAllowedError" || name === "PermissionDeniedError" || name === "SecurityError") {
+            setMicHint(null);
+          } else {
+            setMicHint("Não consegui abrir o microfone.");
+          }
+          setDictating(false);
+        });
+      return;
+    }
+    beginRecognition();
+  }, [dictating, draftText, stopDictate]);
 
   const authorizeChallenge = useCallback(async () => {
     if (!session || !challengeDraftRef.current || commitBusy) return;
@@ -807,6 +961,7 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
   const openVoice = useCallback(
     (opts?: { source?: "button" | "clap" }) => {
       const source = opts?.source ?? "button";
+      stopDictate();
       setVoiceOpen(true);
       stopSpeaking();
       setDraftText("");
@@ -827,7 +982,7 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
       // Clique no botão de voz: pedir mic AGORA (mesmo gesto).
       requestMicFromUserGesture();
     },
-    [beginListenAfterMicOk, micAlreadyGranted, requestMicFromUserGesture],
+    [beginListenAfterMicOk, micAlreadyGranted, requestMicFromUserGesture, stopDictate],
   );
 
   const closeVoice = useCallback(() => {
@@ -844,6 +999,7 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
     cancelSpeakRef.current?.();
     stopSpeaking();
     stopMediaTracks();
+    stopDictate();
     setVoiceOpen(false);
     setMessages([]);
     setDraftText("");
@@ -857,7 +1013,7 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
     scheduleDraftRef.current = null;
     setCreatedItem(null);
     setCommitBusy(false);
-  }, [stopMediaTracks]);
+  }, [stopDictate, stopMediaTracks]);
 
   useEffect(() => {
     return () => {
@@ -881,6 +1037,10 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
       createdItem,
       commitBusy,
       voiceOpen,
+      voiceRead,
+      toggleVoiceRead,
+      dictating,
+      toggleDictate,
       openVoice,
       closeVoice,
       finishVoice,
@@ -917,6 +1077,7 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
       closeVoice,
       commitBusy,
       createdItem,
+      dictating,
       draftText,
       finishVoice,
       goalDraft,
@@ -928,7 +1089,10 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
       scheduleDraft,
       speakAnswer,
       storeNameFor,
+      toggleDictate,
+      toggleVoiceRead,
       voiceOpen,
+      voiceRead,
     ],
   );
 

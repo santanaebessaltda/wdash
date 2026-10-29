@@ -203,43 +203,93 @@ export function JarvisPage() {
               value={j.draftText}
               onChange={(e) => j.setDraftText(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === "Enter") j.reply(j.draftText);
+                if (e.key === "Enter" && !j.dictating) j.reply(j.draftText);
               }}
               placeholder="Como posso te ajudar?"
-              disabled={j.mode === "listening"}
+              disabled={j.mode === "listening" || j.dictating}
               className="h-11 w-full bg-transparent px-2 text-[15px] text-t0 outline-none placeholder:text-t2 disabled:opacity-60"
             />
             <div className="mt-2 flex items-center justify-between gap-2 px-1">
-              <span className="hidden text-[11px] text-t2 sm:inline">Texto ou microfone · JARVIS só grava com Autorizar</span>
-              <div className="ml-auto flex items-center gap-1.5">
-                {voiceCaptureSupported() ? (
-                  <button
-                    type="button"
-                    onClick={() => j.openVoice({ source: "button" })}
-                    disabled={busy}
-                    aria-label="Usar microfone"
-                    title="Usar microfone (pede permissão no clique)"
-                    className="flex h-10 w-10 items-center justify-center rounded-full border border-line text-t1 hover:border-acc hover:text-acc disabled:opacity-50"
-                  >
-                    <MicIcon />
-                  </button>
-                ) : null}
+              <div className="flex items-center gap-0.5">
                 <button
                   type="button"
-                  onClick={() => j.reply(j.draftText)}
-                  disabled={!j.draftText.trim() || j.mode === "listening" || j.mode === "thinking"}
-                  className="flex h-10 items-center gap-1.5 rounded-full bg-acc px-4 text-[13px] font-bold text-white hover:bg-acc-2 disabled:opacity-50"
-                  aria-label="Enviar"
+                  onClick={j.toggleVoiceRead}
+                  aria-pressed={j.voiceRead}
+                  aria-label={j.voiceRead ? "Leitura em voz ligada" : "Leitura em voz desligada"}
+                  title={j.voiceRead ? "Leitura em voz: ligada" : "Leitura em voz: desligada"}
+                  className={cn(
+                    "flex h-10 w-10 items-center justify-center rounded-full transition-colors",
+                    j.voiceRead ? "text-acc" : "text-t2 hover:text-t1",
+                  )}
                 >
-                  <SendIcon size={16} />
-                  <span className="hidden sm:inline">Enviar</span>
+                  <SpeakerIcon />
                 </button>
+                {voiceCaptureSupported() ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => j.openVoice({ source: "button" })}
+                      disabled={busy || j.dictating}
+                      aria-label="Conversar por voz"
+                      title="Conversar por voz"
+                      className="flex h-10 w-10 items-center justify-center rounded-full text-t2 hover:text-acc disabled:opacity-50"
+                    >
+                      <WaveIcon />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={j.toggleDictate}
+                      disabled={busy || j.voiceOpen}
+                      aria-pressed={j.dictating}
+                      aria-label={j.dictating ? "Parar transcrição" : "Falar e transcrever"}
+                      title={j.dictating ? "Parar transcrição" : "Microfone: falar e transcrever no texto"}
+                      className={cn(
+                        "flex h-10 w-10 items-center justify-center rounded-full transition-colors disabled:opacity-50",
+                        j.dictating ? "text-acc" : "text-t2 hover:text-acc",
+                      )}
+                    >
+                      <MicIcon />
+                    </button>
+                  </>
+                ) : null}
               </div>
+              <button
+                type="button"
+                onClick={() => j.reply(j.draftText)}
+                disabled={!j.draftText.trim() || j.mode === "listening" || j.mode === "thinking" || j.dictating}
+                className="flex h-10 items-center gap-1.5 rounded-full bg-acc px-4 text-[13px] font-bold text-white hover:bg-acc-2 disabled:opacity-50"
+                aria-label="Enviar"
+              >
+                <SendIcon size={16} />
+                <span className="hidden sm:inline">Enviar</span>
+              </button>
             </div>
           </div>
         </div>
       </div>
     </div>
+  );
+}
+
+function SpeakerIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path
+        d="M11 5 6 9H2v6h4l5 4V5zM15.54 8.46a5 5 0 0 1 0 7.07M19.07 4.93a10 10 0 0 1 0 14.14"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function WaveIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path d="M4 10v4M8 7v10M12 4v16M16 7v10M20 10v4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    </svg>
   );
 }
 
