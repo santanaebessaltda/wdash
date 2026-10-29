@@ -88,16 +88,10 @@ export function JarvisPage() {
       <div className="relative z-10 flex min-h-0 flex-1 flex-col items-center px-4 pb-5 sm:px-8">
         {empty ? (
           <div className="flex flex-1 flex-col items-center justify-center text-center">
-            <p className="text-[11px] font-semibold tracking-[0.22em] text-t2">{hello}</p>
+            <p className="text-[11px] font-semibold tracking-[0.22em] text-acc">{hello}</p>
             <h1 className="mt-2 text-[clamp(2.4rem,6vw,3.6rem)] font-light leading-none tracking-tight text-t0">
               {name}
             </h1>
-            <Link
-              to={paths.overview}
-              className="mt-5 inline-flex items-center rounded-full border border-acc/50 bg-acc/10 px-3.5 py-1.5 text-[12px] font-semibold text-acc hover:bg-acc/20"
-            >
-              ver visão geral
-            </Link>
           </div>
         ) : (
           <div className="mb-4 w-full max-w-2xl flex-1 overflow-y-auto pt-2">
