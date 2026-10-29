@@ -33,6 +33,8 @@ export const paths = {
   /** Entrada canonica do Dashboard = overview. `/dashboard` redireciona. */
   dashboard: "/dashboard",
   overview: "/dashboard/overview",
+  /** Assistente JARVIS (só Gestor) — chat + modo voz. */
+  jarvis: "/jarvis",
   /** WDash finance screen (template Vela uses `paths.finance.*`). */
   financial: "/dashboard/finance",
   products: "/dashboard/products",

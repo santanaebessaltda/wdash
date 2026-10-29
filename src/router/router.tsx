@@ -19,6 +19,7 @@ import { goalRoutes } from "@/pages/goals/routes";
 import { liveRoutes } from "@/pages/live/routes";
 import { retiredRoutes } from "@/pages/coming-soon/routes";
 import { managementRoutes } from "@/pages/management/routes";
+import { jarvisRoutes } from "@/pages/jarvis/routes";
 import { cashCloseRoutes } from "@/pages/cash-close/routes";
 import { stockRoutes } from "@/pages/stock/routes";
 import { operationRoutes } from "@/pages/operation/routes";
@@ -93,6 +94,7 @@ const routeTree: RouteObject[] = [
         element: <AppShell />,
         children: [
           ...dashboardRoutes,
+          ...jarvisRoutes,
           ...teamRoutes,
           { path: paths.board, element: <Navigate to={paths.overview} replace /> },
           ...liveRoutes,

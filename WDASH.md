@@ -211,7 +211,58 @@ Sem esses 4 elementos, o número é "dado jogado na tela" — não serve para de
 
 ### Específicos de produto (`src/components/wedash/`)
 - `WedashBrand` — marca WDash (símbolo + nome); sem marca por empresa
-- ~~`AiChat`~~ **removido (2026-10-07)**: o balão saiu do `AppShell` em 2026-09-28 e o componente `ChatIA` não era importado em lugar nenhum.
+- ~~`AiChat`~~ **removido (2026-10-07)**: o balão saiu do `AppShell` em 2026-09-28 e o componente `ChatIA` não era importado em lugar nenhum. **Substituído pelo JARVIS** (abaixo) — assistente por voz do Gestor; o mock antigo não volta.
+
+### JARVIS — assistente por voz do Gestor (DECIDIDO — 2026-10-29; UX chat/voz — 2026-10-29)
+
+Inspiração de UX: [Néctar](https://www.meu-nectar.com/) (conversa humana, resolve com contexto, gesto + voz). No WDash o nome na tela é **JARVIS**. Papel: sócio sênior em Vendas, Comercial e Administração — discute, analisa e propõe; **nunca grava sozinho**.
+
+**Quem vê:** só visão **Gestor** (`OWNER` / `ADMIN_GLOBAL`). Gerente e Vendedor não têm JARVIS na fase 1.
+
+**Onde roda:** app web e **PWA instalado** (mesmo shell; mic e permissões no aparelho).
+
+**Tom de voz:** linguajar **humano**, informal, no estilo Néctar — curto, confirma o que fez (“Pronto — tô na Visão geral”), sem jargão de produto. Não soa como manual.
+
+**Superfície (DECIDIDO):**
+- Item de menu **JARVIS** (`/jarvis`) — página de chat (casca no padrão Vela `Chat.tsx`: 1 thread, sem lista Slack). **Sem botão flutuante.**
+- Composer com **botão de onda/voz** (como ChatGPT / Néctar). Clicou → **modo voz**: overlay com orbe animado; conversa falada contínua (ouvir → falar → ouvir), sem digitar.
+- Orbe: CSS/canvas reativo ao mic/TTS (estados idle / listening / thinking / speaking). Lottie/WebM só se o orbe não bastar.
+- **Navegação por comando:** “abre Visão geral”, “vai pro Financeiro…” — `navigate` nas rotas do papel do Gestor + fala confirmando. Não pede Autorizar.
+
+**Acionamento por aparelho:**
+| | Desktop | Mobile / PWA |
+|---|---|---|
+| Menu **JARVIS** + chat | sim | sim (entrada principal) |
+| Botão de onda no chat → modo voz | sim | sim |
+| **2 palmas** em qualquer página → mesmo overlay de voz | sim | **não** (falso positivo / iOS) |
+| Wake “Ei JARVIS” contínuo | opcional / depois | **não** (limitação de SO) |
+
+No Néctar mobile o caminho público é modo de voz no chat (+ Watch/Alexa), não gesto global — alinhamos.
+
+**Fluxo obrigatório de escrita:**
+`Ouvir → Analisar (só leitura) → Discutir detalhes com o Gestor → Propor rascunho → Autorizar (voz “autorizo” / botão) → Executar nas mesmas APIs do CRUD → Confirmar na tela (toast + link).`
+
+Leitura e **navegar entre telas** não pedem autorização. Criar/editar/apagar **sempre** pede.
+
+**Escopo de ação (todas as telas em que o Gestor já age):** Metas, Desafios, Escala, Estoque (consulta + ideias), Pedido de compra, Financeiro (leitura primeiro; escrita só depois que o domínio estiver maduro). Dashboard continua **100% leitura** — o JARVIS não inventa botão de CRUD dentro do Dashboard; grava via repositórios/Edges já existentes. Abrir uma tela do menu = navegação, não escrita.
+
+**Metas e Desafios — cobertura total, criação conjunta:**
+- O JARVIS não fica preso a um atalho (ex.: só “estoque parado”). Ele **discute e monta junto** com o Gestor, cobrindo **todos os cenários** que a UI já permite.
+- **Desafios:** modos (Disputa / Mínimo), métricas (quantidade, valor, P.A., ticket, índice), escopos (tudo / produtos / categorias), piso de vendas, prêmios (dinheiro / item / pódio), gerência, datas, loja(s) — o mesmo modelo do editor atual. Origem da ideia pode ser estoque parado, sazonalidade, histórico de vendas, pedido do Gestor, etc.; o fechamento dos campos é conversa + card de proposta.
+- **Metas:** loja/período/equipe, níveis, premiação, rateio, competência — mesmos campos do CRUD; o JARVIS sugere com base em histórico + sazonalidade e só grava após OK.
+- Card de proposta mostra os campos fechados (loja, datas, métrica, alvo, prêmio…) com **Autorizar / Ajustar / Descartar**.
+
+**Análises (leitura, sem OK):** vendas dos últimos meses; produtos parados no estoque (insumo para desafio); datas sazonais (Dia das Mães, Black Friday, Natal…); comparação entre filiais; o que os números da tela ainda não dizem (evolução do `insight.ts` / EQUIP-06, com LLM quando houver backend).
+
+**Números:** só da camada de métricas / repos WDash — não inventa faturamento, estoque nem meta. Se faltar dado, fala que falta.
+
+**Fora de escopo na fase 1:** Gerente/Vendedor; gravação sem autorização; palmas/wake no mobile; wake com o app fechado no iPhone; clone visual pixel-perfect do Néctar (padrão de produto + tom + modo voz).
+
+**Ordem de build:** (1) shell + voz; (2) leitura; (3) Desafio; (4) Meta; (5) Escala; (6) **chat no menu + modo voz + palmas desktop + navegar**; (7) demais escritas e proatividade.
+
+**Fatia 1–5 no código (2026-10-29):** tools de leitura; Desafio / Meta / Escala com Autorizar (`challenge*` / `goal*` / `schedule*`). FAB+modal foi o shell inicial.
+
+**Fatia 6 no código (2026-10-29):** UX Néctar — menu **JARVIS** `/jarvis` (chat Vela + botão de voz); overlay de modo voz com orbe; palmas **só desktop** abrem o overlay; tom humano; intent **navegar** (rotas do Gestor). Sem FAB.
 
 ### Alertas (DECIDIDO — 2026-09-29)
 - **Todo alerta do app usa `Alert`** (`src/components/ui/Alert.tsx`, padrão Components > Alerts do Vela — "Storage almost full" etc.): fundo suave da cor, sem borda, ícone 18px e título em negrito na cor, texto em `text-t1`. Variantes `success · warning · danger · info · accent`; `icon` troca o ícone (Spinner, RadialProgress), `action` = links/botões à direita (`AlertLink` para link de texto), `footer` = conteúdo extra (lista expandida, checkbox).
