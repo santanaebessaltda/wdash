@@ -3,7 +3,7 @@ import type { GoalGroup, Tier } from "@/data/wedash/engine/goalTypes";
 import { fetchGoals } from "@/data/wedash/goalsRepo";
 import { fetchSalesDayAggs } from "@/data/wedash/salesRepo";
 import { brlCent, monthYearTitle } from "@/lib/format";
-import { matchStoresInText, type JarvisContext } from "./context";
+import { matchStoresInText, type JarvisContext, type JarvisStoreRef } from "./context";
 import { looksLikeGoalLadderTalk } from "./respond";
 
 export type GoalDraftForm = {
@@ -232,13 +232,51 @@ export function parseConfigSourceMonth(text: string, today: string): { from: str
   return { from, to: endOfMonth(from) };
 }
 
+/** Filial citada perto de “configuração / outubro / copiar” = fonte da escada. */
+export function pickConfigSourceStore(text: string, matched: JarvisStoreRef[]): JarvisStoreRef | null {
+  if (matched.length === 0) return null;
+  if (matched.length === 1) return matched[0]!;
+  const n = norm(text);
+  for (const s of matched) {
+    const label = norm(s.tradeName || s.name);
+    if (label.length < 3) continue;
+    const idx = n.indexOf(label);
+    if (idx < 0) continue;
+    const around = n.slice(Math.max(0, idx - 48), idx + label.length + 16);
+    if (/configura|igual|copiar|mesma|seguir|de outubro|da meta|filial/.test(around)) return s;
+  }
+  return matched[0]!;
+}
+
+/** Filial de destino: “aqui pra / para a Loja…” — distinta da fonte. */
+export function pickGoalTargetStore(
+  text: string,
+  matched: JarvisStoreRef[],
+  source: JarvisStoreRef | null,
+): JarvisStoreRef | null {
+  const others = source ? matched.filter((s) => s.id !== source.id) : matched;
+  if (others.length === 1) return others[0]!;
+  if (others.length === 0) return source ?? matched[0] ?? null;
+  const n = norm(text);
+  for (const s of others) {
+    const label = norm(s.tradeName || s.name);
+    const idx = n.indexOf(label);
+    if (idx < 0) continue;
+    const around = n.slice(Math.max(0, idx - 24), idx + label.length + 8);
+    if (/\b(pra|para|aqui|nessa|neste|montar|criar)\b/.test(around)) return s;
+  }
+  return others[0]!;
+}
+
 /** Copia modo/escada/rateio/gerência da meta publicada do mês de referência. */
 export async function copyGoalLadderFromPeriod(
   form: GoalDraftForm,
   ctx: JarvisContext,
   win: { from: string; to: string },
+  sourceStoreId?: string,
 ): Promise<GoalDraftForm> {
-  const storeId = form.storeId || (ctx.stores.length === 1 ? ctx.stores[0]!.id : "");
+  const storeId =
+    sourceStoreId || form.storeId || (ctx.stores.length === 1 ? ctx.stores[0]!.id : "");
   if (!storeId) return form;
   try {
     const goals = await fetchGoals({
@@ -276,8 +314,12 @@ export function mergeGoalUtterance(form: GoalDraftForm, text: string, ctx: Jarvi
     tiers: form.tiers.map((t) => ({ ...t })),
   };
 
-  const stores = matchStoresInText(text, ctx.stores);
-  if (stores.length === 1) next.storeId = stores[0]!.id;
+  const pool = ctx.network.length > 0 ? ctx.network : ctx.stores;
+  const stores = matchStoresInText(text, pool);
+  const source = pickConfigSourceStore(text, stores);
+  const targetStore = pickGoalTargetStore(text, stores, source);
+  if (targetStore) next.storeId = targetStore.id;
+  else if (stores.length === 1) next.storeId = stores[0]!.id;
   else if (!next.storeId && ctx.stores.length === 1) next.storeId = ctx.stores[0]!.id;
 
   if (/geral|loja inteira|meta da loja|premia[cç][aã]o se divide/.test(p)) next.tierMode = "GENERAL";
@@ -367,7 +409,10 @@ export async function discussGoal(
   let copiedLadder = false;
   if (sourceWin) {
     const before = JSON.stringify(form.tiers);
-    form = await copyGoalLadderFromPeriod(form, ctx, sourceWin);
+    const pool = ctx.network.length > 0 ? ctx.network : ctx.stores;
+    const matched = matchStoresInText(question, pool);
+    const source = pickConfigSourceStore(question, matched);
+    form = await copyGoalLadderFromPeriod(form, ctx, sourceWin, source?.id);
     copiedLadder = JSON.stringify(form.tiers) !== before;
     if (looksLikeGoalLadderTalk(question) && /10\s*%|por cento a mais|nivel desafio|meta desafio/.test(norm(question))) {
       form = { ...form, tiers: applyChallengeTierPct(form.tiers, 110) };

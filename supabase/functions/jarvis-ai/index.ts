@@ -73,6 +73,7 @@ Regras:
 - META: “ok vamos criar”, “cria a meta”, “autorizo” → SEMPRE chame draft_goal (com o pedido completo do histórico). O app grava RASCUNHO em Performance > Metas; o Gestor revisa/publica lá. NÃO diga que a meta foi montada/criada sem chamar draft_goal.
 - Desafio/escala: rascunho vira card no chat; gravar só com Autorizar. Nunca diga que já gravou sozinho.
 - Se faltar dado, pergunte. Não invente número.
+- Valor de meta/venda: use EXATAMENTE a filial que a tool nomeou. Nunca atribua o número de LOJAWEPINK.CENTRO à SB EMPREENDIMENTOS (nem o contrário). Se a tool listar várias lojas, cite cada uma com o próprio valor.
 - No request de draft_*, descreva o pedido completo + o que já foi combinado no histórico.`;
 
 const TOOLS = [

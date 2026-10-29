@@ -13,6 +13,7 @@ const ctx = {
   tenantId: "t",
   storeIds: ["a"],
   stores: [{ id: "a", name: "CAMPO GRANDE", tradeName: "Shopping Campo Grande", code: "00010" }],
+  network: [{ id: "a", name: "CAMPO GRANDE", tradeName: "Shopping Campo Grande", code: "00010" }],
   today: "2026-10-29",
 };
 

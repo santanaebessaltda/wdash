@@ -111,7 +111,8 @@ export function mergeChallengeUtterance(form: ChallengeForm, text: string, ctx: 
     cashierPrize: { ...form.cashierPrize },
   };
 
-  const stores = matchStoresInText(text, ctx.stores);
+  const pool = ctx.network.length > 0 ? ctx.network : ctx.stores;
+  const stores = matchStoresInText(text, pool);
   if (stores.length === 1) next.storeId = stores[0]!.id;
   else if (!next.storeId && ctx.stores.length === 1) next.storeId = ctx.stores[0]!.id;
 

@@ -2,8 +2,8 @@ import { endOfMonth, startOfMonth } from "@/data/wedash/engine/format";
 import { fetchGoals } from "@/data/wedash/goalsRepo";
 import { fetchSalesDayAggs } from "@/data/wedash/salesRepo";
 import { brlCent, monthYearTitle } from "@/lib/format";
-import { matchStoresInText, scopeLabel, type JarvisContext, type JarvisStoreRef } from "./context";
-import { parseGoalPeriod } from "./goalDraft";
+import { resolveStoresInQuestion, scopeLabel, type JarvisContext, type JarvisStoreRef } from "./context";
+import { parseGoalPeriod, pickConfigSourceStore } from "./goalDraft";
 
 function preferAllBrand<T extends { brand: string }>(rows: T[]): T[] {
   const all = rows.filter((r) => r.brand === "ALL");
@@ -28,10 +28,24 @@ function windowFromQuestion(question: string, today: string): { from: string; to
  * e, se houver vendas no período até hoje, mostra o realizado.
  */
 export async function loadGoalBrief(ctx: JarvisContext, question: string): Promise<string> {
-  const named = matchStoresInText(question, ctx.stores);
-  const stores: JarvisStoreRef[] = named.length > 0 ? named : ctx.stores;
+  // Nome no texto casa na rede inteira (Topbar filtrada nao pode roubar meta de outra loja).
+  let stores: JarvisStoreRef[] = resolveStoresInQuestion(question, ctx);
   if (stores.length === 0) {
-    return "Não achei filial no seu acesso pra olhar a meta.";
+    return "Nao achei filial no seu acesso pra olhar a meta.";
+  }
+  // "config de Outubro da SB … pra Loja" → a leitura da meta fonte e so da SB.
+  const nq = question
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "");
+  const source = pickConfigSourceStore(question, stores);
+  if (
+    source &&
+    stores.length > 1 &&
+    /configura|igual|copiar|mesma/.test(nq) &&
+    /\b(pra|para|aqui)\b/.test(nq)
+  ) {
+    stores = [source];
   }
 
   const win = windowFromQuestion(question, ctx.today);

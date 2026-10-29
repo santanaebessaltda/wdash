@@ -1,6 +1,6 @@
 import { fetchSalesProductPeriodAggs } from "@/data/wedash/salesRepo";
 import { fetchStockCatalog, fetchStoreStock } from "@/data/wedash/stockRepo";
-import { matchStoresInText, scopeLabel, type JarvisContext } from "./context";
+import { resolveStoresInQuestion, scopeLabel, type JarvisContext } from "./context";
 
 export type StalledProduct = {
   code: string;
@@ -94,8 +94,7 @@ function shiftDays(iso: string, delta: number): string {
 }
 
 export async function loadStockStalledBrief(ctx: JarvisContext, question: string): Promise<string> {
-  const matched = matchStoresInText(question, ctx.stores);
-  const stores = matched.length > 0 ? matched : ctx.stores;
+  const stores = resolveStoresInQuestion(question, ctx);
   const storeIds = stores.map((s) => s.id);
   const to = ctx.today;
   const from = shiftDays(to, -29);

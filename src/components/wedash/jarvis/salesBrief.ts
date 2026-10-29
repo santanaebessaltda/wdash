@@ -2,7 +2,7 @@ import { endOfMonth } from "@/data/wedash/engine/format";
 import { fetchSalesDayAggs } from "@/data/wedash/salesRepo";
 import type { SalesDayAgg } from "@/data/wedash/salesTypes";
 import { brlCent } from "@/lib/format";
-import { matchStoresInText, scopeLabel, type JarvisContext, type JarvisStoreRef } from "./context";
+import { resolveStoresInQuestion, scopeLabel, type JarvisContext, type JarvisStoreRef } from "./context";
 
 export type SalesWindow = { from: string; to: string; label: string };
 
@@ -178,8 +178,7 @@ function fmtMonth(ym: string): string {
 }
 
 export async function loadSalesBrief(ctx: JarvisContext, question: string): Promise<string> {
-  const matched = matchStoresInText(question, ctx.stores);
-  const stores = matched.length > 0 ? matched : ctx.stores;
+  const stores = resolveStoresInQuestion(question, ctx);
   const window = resolveSalesWindow(question, ctx.today);
   try {
     const rows = await fetchSalesDayAggs({

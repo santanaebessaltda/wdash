@@ -8,6 +8,8 @@ import {
   parseConfigSourceMonth,
   parseGoalPeriod,
   parseGoalTarget,
+  pickConfigSourceStore,
+  pickGoalTargetStore,
   validateGoalDraft,
 } from "./goalDraft";
 
@@ -15,6 +17,7 @@ const ctx = {
   tenantId: "t",
   storeIds: ["a"],
   stores: [{ id: "a", name: "CAMPO GRANDE", tradeName: "Shopping Campo Grande", code: "00010" }],
+  network: [{ id: "a", name: "CAMPO GRANDE", tradeName: "Shopping Campo Grande", code: "00010" }],
   today: "2026-10-29",
 };
 
@@ -85,5 +88,36 @@ describe("applyChallengeTierPct", () => {
     );
     expect(tiers.map((t) => t.minAttainmentPct)).toEqual([100, 110]);
     expect(tiers[1]?.name).toMatch(/desafio/i);
+  });
+});
+
+describe("fonte vs destino da meta", () => {
+  const sb = { id: "sb", name: "SB EMPREENDIMENTOS", tradeName: "SB EMPREENDIMENTOS", code: "00010" };
+  const centro = {
+    id: "centro",
+    name: "LOJAWEPINK.CENTRO.CAMPOGRANDE",
+    tradeName: "LOJAWEPINK.CENTRO.CAMPOGRANDE",
+    code: "00386",
+  };
+  const multi = {
+    tenantId: "t",
+    storeIds: ["centro"],
+    stores: [centro],
+    network: [sb, centro],
+    today: "2026-10-29",
+  };
+  const q =
+    "Quero seguir a mesma configuração de Outubro da filial SB EMPREENDIMENTOS porém aqui pra Loja, Meta Individual";
+
+  it("fonte = SB e destino = CENTRO", () => {
+    const matched = [sb, centro];
+    expect(pickConfigSourceStore(q, matched)?.id).toBe("sb");
+    expect(pickGoalTargetStore(q, matched, sb)?.id).toBe("centro");
+  });
+
+  it("merge grava storeId da Loja destino", () => {
+    const form = mergeGoalUtterance(emptyGoalForm(""), q, multi);
+    expect(form.storeId).toBe("centro");
+    expect(form.tierMode).toBe("INDIVIDUAL");
   });
 });

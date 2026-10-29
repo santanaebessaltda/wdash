@@ -184,7 +184,8 @@ export async function discussSchedule(
   prev: ScheduleDraft | null,
 ): Promise<{ reply: string; draft: ScheduleDraft }> {
   const p = norm(question);
-  const matched = matchStoresInText(question, ctx.stores);
+  const pool = ctx.network.length > 0 ? ctx.network : ctx.stores;
+  const matched = matchStoresInText(question, pool);
   let storeId = matched[0]?.id ?? prev?.form.storeId ?? (ctx.stores.length === 1 ? ctx.stores[0]!.id : "");
   if (!storeId && /escala/.test(p) && ctx.stores.length > 0) {
     // Sem filial falada: usa a do Topbar / primeira da sessão.
