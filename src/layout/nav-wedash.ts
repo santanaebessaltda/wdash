@@ -28,16 +28,6 @@ const ICON = {
   /** Lucide ClipboardList — Pedido de compra. */
   clipboard: "M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2M9 2h6a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1zM8 12h8M8 16h8M8 8h2",
   help: "M12 7v14M16 12h2M16 8h2M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3zM6 12h2M6 8h2",
-  /** Lucide MessageSquareMore — Chat IA (balão com …). */
-  chatIa:
-    "M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2zM8 10h.01M12 10h.01M16 10h.01",
-};
-
-/** Assistente JARVIS — rótulo no menu: Chat IA. Só Gestor. */
-const jarvis: NavSingle = {
-  label: "Chat IA",
-  icon: ICON.chatIa,
-  to: paths.jarvis,
 };
 
 /** Pessoas da filial. Página direta, sem submenu. */
@@ -147,7 +137,6 @@ export const integrationTabs = integrations.items.map(({ label, to }) => ({ labe
 export const settingsTabs = settings.items.map(({ label, to }) => ({ label, to }));
 
 const navOwner: NavEntry[] = [
-  jarvis,
   {
     label: "Dashboard",
     icon: ICON.dashboard,

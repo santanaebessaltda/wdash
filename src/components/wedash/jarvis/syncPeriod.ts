@@ -18,7 +18,7 @@ function readSavedStoreParam(): string {
 /**
  * Grava o período da pergunta (ex.: “hoje” → today) no sessionStorage.
  * Se a URL atual for uma tela com filtro de período, alinha a query — sem sair do chat
- * (no `/chat-ia` só persiste storage para quando o Gestor abrir o Dashboard depois).
+ * (no chat flutuante só persiste storage para quando o Gestor abrir o Dashboard depois).
  */
 export function syncScopePeriodFromQuestion(
   question: string,

@@ -121,9 +121,7 @@ export function Topbar({ onOpenMobileNav, collapsed, onToggleCollapse }: { onOpe
     covers(location.pathname, paths.management.schedule) ||
     covers(location.pathname, paths.management.salesReport) ||
     location.pathname.startsWith("/operation/") ||
-    location.pathname.startsWith(paths.settings.root) ||
-    location.pathname === paths.jarvis ||
-    location.pathname === paths.legacy.jarvis);
+    location.pathname.startsWith(paths.settings.root));
 
   // Menu do avatar: Meu perfil, Notificações, e no Gestor ERP, Usuários e Logs.
   const conta: DropdownItem[] = [

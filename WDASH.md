@@ -227,11 +227,11 @@ Inspiração de UX: [Néctar](https://www.meu-nectar.com/) (conversa humana, res
 
 **Tom:** informal, humano — curto, confirma o que fez, sem jargão de produto.
 
-**Superfície (DECIDIDO):**
-- Menu **Chat IA** (`/chat-ia`) — hub Néctar; composer + mic + Enviar; **Limpar chat**; F5 zera histórico (só memória de sessão). **Filial:** Topbar.
+**Superfície (DECIDIDO — 2026-10-29):**
+- **Botão flutuante** no canto inferior direito (só Gestor) — painel no estilo Apps > Chat do Vela (thread + composer); mic = ditado; **Limpar**; F5 zera histórico (sessão). **Fora do menu.** `/chat-ia` e `/jarvis` redirecionam para Visão geral. **Filial:** Topbar.
 - Sem navegação/rolagem por comando.
 
-**Leituras no chat:** vendas, **meta cadastrada** (valor-alvo ≠ faturamento), estoque parado, sazonal — resposta no thread (período da pergunta pode gravar em sessionStorage para o Dashboard se o Gestor abrir depois). Pedido “quanto é a meta?” usa `analyze_goal` / `loadGoalBrief`, não `analyze_sales`.
+**Leituras no chat:** vendas, **meta cadastrada** (valor-alvo ≠ faturamento), estoque parado, sazonal — resposta no painel flutuante (período da pergunta pode gravar em sessionStorage para o Dashboard se o Gestor abrir depois). Pedido “quanto é a meta?” usa `analyze_goal` / `loadGoalBrief`, não `analyze_sales`.
 
 **Fluxo obrigatório de escrita:**
 `Pedir no chat → Analisar se precisar → Discutir → Rascunho (card) → Autorizar → APIs do CRUD → Confirmar no chat (+ link opcional).`
@@ -374,7 +374,7 @@ Pergunta: "Quais são meus 80/20? Estou perdendo venda por ruptura? O que descon
  - `period.kind`: `today | yesterday | last7Days | thisMonth | lastMonth | custom` (e os outros presets `thisWeek`, `thisQuarter`, `thisHalf`, `thisYear`). Na URL: `period`, `from`, `to`
  - `division`: `WEPINK | WPINK | null` (URL: `brand`)
 - **`StorePicker`** (`src/pages/dashboard/StorePicker.tsx`) — no Topbar: fantasia + CNPJ, sem ícone (2026-10-10). "Todas as filiais" e "Rede consolidada" em caixa alta (2026-10-10). **2026-10-20:** a linha marcada fica na cor primária, com o check na frente. Todas marcadas = rede. Clicar uma filial, com todas marcadas, deixa só ela; clicar outra soma. O botão mostra o nome ou "N filiais". Quem tem uma loja só não marca. O placar não consolida filiais: o link sai de **Performance > Placar** (`/performance/board`, 2026-10-29) — um link por filial do seletor; o ícone Compartilhar saiu do header. O Atualizar continua só nas telas que dependem do Millennium. Configurações, Adquirentes e Administradora listam as filiais do seletor.
-- **`Topbar`** — nas telas do produto (exceto equipe de vendas) → `StorePicker`, inclusive **Chat IA**. **Sem** seletor nas telas do avatar (Meu perfil, Notificações, ERP, Usuários, Logs). O campo **Buscar na WDash** saiu do header (2026-10-04), para gestor, gerente e vendedor. Ctrl+K ainda abre a paleta.
+- **`Topbar`** — nas telas do produto (exceto equipe de vendas) → `StorePicker`. O Chat IA flutuante usa a filial do Topbar. **Sem** seletor nas telas do avatar (Meu perfil, Notificações, ERP, Usuários, Logs). O campo **Buscar na WDash** saiu do header (2026-10-04), para gestor, gerente e vendedor. Ctrl+K ainda abre a paleta.
 - **`nav-wedash.ts`** — navegação por role (`OWNER` / `MANAGER` / `SELLER` / `ADMIN_GLOBAL`).
 
 ### Gaps reais nos filtros (confirmados no código):
