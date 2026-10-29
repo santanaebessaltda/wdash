@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
 import { Avatar } from "@/components/ui";
 import { validateChallengeForm } from "@/data/wedash/challengeForm";
 import { cn } from "@/lib/cn";
-import { padBottom, pinBottom } from "@/lib/safeArea";
+import { padBottom } from "@/lib/safeArea";
 import { paths } from "@/router/paths";
 import { SendIcon } from "@/pages/apps/icons";
 import { ChallengeProposalCard } from "./ChallengeProposalCard";
@@ -53,9 +54,12 @@ export function JarvisFloat() {
     !j.createdItem &&
     j.mode === "idle";
 
-  return (
-    <div className="pointer-events-none fixed inset-x-0 bottom-0 z-[80] print:hidden" style={pinBottom("0px")}>
-      <div className="pointer-events-auto absolute right-4 flex flex-col items-end gap-3 sm:right-6" style={padBottom("1.25rem")}>
+  // Portal no body: o shell é position:fixed + overflow hidden; FAB no miolo some da tela.
+  return createPortal(
+    <div
+      className="pad-base fixed bottom-0 right-0 z-[80] flex flex-col items-end gap-3 p-4 print:hidden sm:right-2 sm:p-6"
+      style={padBottom("1rem")}
+    >
         {open ? (
           <div
             className={cn(
@@ -294,8 +298,8 @@ export function JarvisFloat() {
         >
           {open ? <CloseIcon large /> : <ChatIaIcon />}
         </button>
-      </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
