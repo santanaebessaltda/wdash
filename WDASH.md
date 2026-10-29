@@ -1756,7 +1756,7 @@ Regra geral: **KPIs em 4 colunas no desktop**, widget central em largura total, 
 
 ## PWA / deploy (2026-10-07)
 
-- **Altura no app instalado** (2026-10-10): no iPhone, `100dvh` e `-webkit-fill-available` ficam mais curtos que a tela e cortam o rodapé. No app instalado a altura vem de `--tela` (`window.innerHeight`).
+- **Altura da janela** (2026-10-10; browser também em 2026-10-29): `100dvh` / `-webkit-fill-available` podem ficar mais curtos que a tela e deixar faixa no rodapé (ou cortar o miolo). A altura de `html`/`body`/`#root`/`.tela-cheia` vem de `--tela` (`window.innerHeight` via `viewportHeight`), no browser e no app instalado; `100dvh`/`100lvh` só como fallback.
 - Sintoma: URL muda e a tela fica branca até F5. Causa típica: shell antigo (aba aberta ou SW) pede chunk com hash velho → 404; `React.lazy` rejeita e a rota não renderiza.
 - Mitigação: `lazyPage` recarrega 1× em falha de import; SW (`public/sw.js` v9+) só grava respostas OK (não cacheia 404 de chunk); navegação continua network-first.
 

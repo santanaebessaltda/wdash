@@ -132,7 +132,7 @@ export function AppShell() {
                   <div
                     className={cn(
                       "min-w-0 print:pb-0",
-                      jarvisHub ? "flex min-h-0 flex-1 flex-col" : "pad-base vela-page-enter",
+                      jarvisHub ? "flex h-full min-h-0 flex-1 flex-col" : "pad-base vela-page-enter",
                     )}
                     style={jarvisHub ? undefined : padBottom("32px")}
                   >

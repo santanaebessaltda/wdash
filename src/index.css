@@ -301,12 +301,13 @@
     height: 100%;
   }
   /* No celular, 100% segue a viewport clássica e deixa uma faixa no rodapé.
-     100dvh ocupa a tela visível. */
+     --tela (viewportHeight) é a altura real; 100dvh só como fallback no 1º paint. */
   @supports (height: 100dvh) {
     html,
     body,
     #root {
-      height: 100dvh;
+      height: var(--tela, 100dvh);
+      min-height: var(--tela, 100dvh);
     }
   }
 
@@ -353,20 +354,18 @@
     }
   }
 
-  /* Altura da tela visível. No PWA, 100vh deixa uma faixa no rodapé
-     (a viewport clássica conta a barra que o app instalado não tem). */
+  /* Altura da tela visível. 100vh deixa faixa no rodapé; --tela acompanha a
+     janela real (browser e PWA). 100dvh/100lvh só como fallback. */
   .tela-cheia {
     min-height: 100vh;
     height: 100%;
   }
   @supports (height: 100dvh) {
     .tela-cheia {
-      height: 100dvh;
-      min-height: 100dvh;
+      height: var(--tela, 100dvh);
+      min-height: var(--tela, 100dvh);
     }
   }
-  /* App instalado: 100dvh e -webkit-fill-available ficam mais curtos que a
-     tela e cortam o rodapé. --tela é a altura real da janela (viewportHeight). */
   @media (display-mode: standalone), (display-mode: fullscreen) {
     html,
     body,

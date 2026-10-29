@@ -22,6 +22,7 @@ import { dayGreeting, firstNameFrom } from "@/components/wedash/jarvis/greeting"
 import { JarvisHubBackdrop } from "@/components/wedash/jarvis/JarvisHubBackdrop";
 import { useJarvis } from "@/components/wedash/jarvis/JarvisProvider";
 import { cn } from "@/lib/cn";
+import { padBottom } from "@/lib/safeArea";
 import { paths } from "@/router/paths";
 import { useSession } from "@/session/SessionProvider";
 import { SendIcon } from "@/pages/apps/icons";
@@ -69,12 +70,12 @@ export function JarvisPage() {
           : "PRONTO";
 
   return (
-    <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-bg-0">
+    <div className="relative flex h-full min-h-0 flex-1 flex-col overflow-hidden bg-bg-0">
       <JarvisHubBackdrop />
 
       <div
-        className="relative z-10 flex min-h-0 flex-1 flex-col items-center px-3 pt-2 sm:px-6 sm:pt-4"
-        style={{ paddingBottom: "max(12px, env(safe-area-inset-bottom, 0px))" }}
+        className="pad-base relative z-10 flex min-h-0 flex-1 flex-col items-center px-3 pt-2 sm:px-6 sm:pt-4"
+        style={padBottom("0px")}
       >
         {empty ? (
           <div className="flex min-h-0 flex-1 flex-col items-center justify-center px-2 text-center">
@@ -187,7 +188,7 @@ export function JarvisPage() {
           </div>
         )}
 
-        <div className={cn("w-full max-w-2xl shrink-0", empty ? "mt-4 mb-2 sm:mb-6" : "mt-auto")}>
+        <div className={cn("w-full max-w-2xl shrink-0", empty ? "mt-4 mb-0 sm:mb-2" : "mt-auto")}>
           {j.micHint && !j.dictating && !j.voiceOpen ? (
             <p className="mb-2 text-center text-[12px] text-t2">{j.micHint}</p>
           ) : null}

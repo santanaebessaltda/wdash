@@ -1,4 +1,4 @@
-/** No PWA do iPhone, 100dvh fica mais curto que a tela e corta o rodapé. */
+/** No mobile (browser e PWA), 100dvh pode ficar mais curto que a janela e deixar faixa no rodapé. */
 function instalado(): boolean {
   const nav = navigator as Navigator & { standalone?: boolean };
   return (
