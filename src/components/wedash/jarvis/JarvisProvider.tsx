@@ -11,7 +11,6 @@ import {
 import { useLocation, useNavigate } from "react-router-dom";
 import { validateChallengeForm } from "@/data/wedash/challengeForm";
 import { isOwner } from "@/layout/nav-wedash";
-import { searchForRoute } from "@/pages/dashboard/periodQuery";
 import { useSession } from "@/session/SessionProvider";
 import { jarvisAnswer } from "./answer";
 import { commitChallenge } from "./challengeCommit";
@@ -56,7 +55,8 @@ import {
   warmJarvisTts,
   type SpeechRecognitionLike,
 } from "./speech";
-import { syncScopePeriodFromQuestion } from "./syncPeriod";
+import { scrollAppMain } from "./pageChrome";
+import { searchWithPeriodFromQuestion, syncScopePeriodFromQuestion } from "./syncPeriod";
 
 const VOICE_READ_KEY = "wedash.jarvis.voiceRead";
 
@@ -615,7 +615,12 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
       if (intent === "navigate" || looksLikeNavigate(q)) {
         const target = resolveNavigate(q, session!.role);
         if (target) {
-          navigate({ pathname: target.to, search: searchForRoute(target.to, location.search) });
+          syncScopePeriodFromQuestion(q, location.pathname, location.search, navigate);
+          navigate({
+            pathname: target.to,
+            search: searchWithPeriodFromQuestion(target.to, location.search, q),
+          });
+          window.setTimeout(() => scrollAppMain({ top: 0 }), 40);
           finish(formatNavigateReply(target));
           return;
         }
@@ -740,9 +745,14 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
         return;
       }
 
+      // Sempre tenta alinhar o período se a pergunta citar hoje/semana/mês (mesmo fora do fast-path).
+      const applyPeriodAndScroll = () => {
+        syncScopePeriodFromQuestion(q, location.pathname, location.search, navigate);
+      };
+
       // Vendas: brief direto (sem round-trip LLM) + alinha o filtro de período da tela.
       if (intent === "analyze_sales") {
-        syncScopePeriodFromQuestion(q, location.pathname, location.search, navigate);
+        applyPeriodAndScroll();
         void loadSalesBrief(ctx, q).then((answer) => {
           if (gen !== replyGen.current) return;
           finish(answer);
@@ -765,6 +775,7 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
           if (llm.reason === "openai_not_configured") {
             setMicHint("IA ainda sem chave no servidor — usando modo local.");
           }
+          applyPeriodAndScroll();
           await replyLocal(q, ctx, finish);
           return;
         }
@@ -773,7 +784,12 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
           if (effect.kind === "navigate") {
             const target = resolveNavigate(effect.request, session.role);
             if (target) {
-              navigate({ pathname: target.to, search: searchForRoute(target.to, location.search) });
+              syncScopePeriodFromQuestion(q, location.pathname, location.search, navigate);
+              navigate({
+                pathname: target.to,
+                search: searchWithPeriodFromQuestion(target.to, location.search, q),
+              });
+              window.setTimeout(() => scrollAppMain({ top: 0 }), 40);
             }
           } else if (effect.kind === "draft_challenge") {
             setGoalDraft(null);
@@ -807,6 +823,9 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
             setCreatedItem(null);
           }
         }
+
+        // Alinha filtro de período se a pergunta citar hoje/semana/mês (no-op se não citar).
+        applyPeriodAndScroll();
 
         finish(llm.content);
       })();

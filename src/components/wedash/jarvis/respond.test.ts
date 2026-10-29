@@ -16,6 +16,8 @@ describe("classifyIntent", () => {
   it("reconhece estoque e vendas", () => {
     expect(classifyIntent("Tem produto parado no estoque?")).toBe("analyze_stock");
     expect(classifyIntent("Como está o faturamento da rede?")).toBe("analyze_sales");
+    expect(classifyIntent("Quanto vendi hoje?")).toBe("analyze_sales");
+    expect(classifyIntent("Quanto a loja vendeu ontem?")).toBe("analyze_sales");
   });
 
   it("reconhece autorização sem rascunho", () => {

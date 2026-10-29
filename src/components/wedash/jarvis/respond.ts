@@ -35,7 +35,12 @@ export function classifyIntent(raw: string): JarvisIntent {
   if (/escala|folga|6\s*[x×]\s*1|plantao|turno/.test(p)) return "schedule";
   if (/sazonal|dia das maes|black friday|natal|pascoa|namorados|datas comemorativas/.test(p)) return "seasonal";
   if (/estoque|parado|encalhe|cobertura|sem girar|parado na prateleira/.test(p)) return "analyze_stock";
-  if (/venda|faturamento|ticket|p\.?\s*a\.?|margem|analis|como (esta|tá) (a |o )?(loja|rede|grupo)/.test(p)) {
+  // “vendi / vendeu / vender” também contam (não só “venda”).
+  if (
+    /vend[aeiou]|faturamento|ticket|p\.?\s*a\.?|margem|analis|como (esta|tá) (a |o )?(loja|rede|grupo)/.test(
+      p,
+    )
+  ) {
     return "analyze_sales";
   }
   return "unknown";
