@@ -2823,7 +2823,7 @@ async function runDailyForceJob(job: SyncJob, deps: SyncJobDeps): Promise<RunSyn
             from: day,
             to: day,
             storeIds,
-            // Uma vez por fechamento da madrugada, no último dia. Não na carga do histórico.
+            // Só na madrugada (último dia do CLOSE). Atualizar manual / auto / carga do histórico não.
             ...( !isSeed && !fillUntil && !job.payload.cashOnly && !job.payload.deep && day === days[days.length - 1]
               ? { refreshMonthSellers: true }
               : {}),
@@ -3098,13 +3098,14 @@ async function runRefreshJob(job: SyncJob, deps: SyncJobDeps): Promise<RunSyncRe
 
   const closeRequested = new Set(job.payload.closeStoreIds ?? []);
   const fullStoreIds = stores.filter((s) => closeRequested.has(s.id)).map((s) => s.id);
+  // Só hoje. Releitura dos vendedores do mês = CLOSE da madrugada (não no clique —
+  // Lista+cupom do mês inteiro por loja deixava o Atualizar lento no Dashboard).
   const res = await runSyncJob(
     innerJob({
       ...(job.payload.from ? { from: job.payload.from } : {}),
       ...(job.payload.to ? { to: job.payload.to } : {}),
       ...(job.payload.storeIds?.length ? { storeIds: job.payload.storeIds } : {}),
       ...(fullStoreIds.length ? { fullStoreIds } : {}),
-      ...(!auto ? { refreshMonthSellers: true } : {}),
     }),
     innerDeps,
   );

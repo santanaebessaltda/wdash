@@ -32,8 +32,18 @@ export function shouldRefreshScreen(prev: number | null, next: number | null, ch
   return changed !== false;
 }
 
-/** O aviso pede esta conferência. Quem escuta é o Atualizar do topo, que só avisa a tela se o número mudou. */
+/**
+ * O aviso pede esta conferência. Quem escuta é o Atualizar do topo.
+ * Com `force` (toque no aviso): a tela relê o banco mesmo se a marca não avançou —
+ * o push já prova que o número mudou; watermark com várias contas ERP pode ficar parado.
+ */
 export const CHECK_SALES_EVENT = "wedash:check-sales";
+
+export type CheckSalesDetail = { force?: boolean };
+
+export function isForcedSalesCheck(event: Event): boolean {
+  return event instanceof CustomEvent && Boolean((event.detail as CheckSalesDetail | undefined)?.force);
+}
 
 let ticket = 0;
 
@@ -61,11 +71,11 @@ function whenSessionReady(): Promise<void> {
   });
 }
 
-/** O app voltou ou o aviso foi aberto. A tela só troca os valores se a conferência achar venda nova. */
+/** Toque no aviso: força a tela a reler as vendas (não depende da marca nem do visibilityState). */
 export function reloadSalesAfterOpen(): void {
   const mine = ++ticket;
   void whenSessionReady().then(() => {
     if (mine !== ticket) return;
-    window.dispatchEvent(new Event(CHECK_SALES_EVENT));
+    window.dispatchEvent(new CustomEvent(CHECK_SALES_EVENT, { detail: { force: true } satisfies CheckSalesDetail }));
   });
 }

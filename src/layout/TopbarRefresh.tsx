@@ -10,7 +10,13 @@ import { storesForSession } from "@/data/wedash/stores";
 import { useActiveSession } from "@/session/SessionProvider";
 import { readScreenRefresh, refreshMomentTitle, useScreenRefreshGeneration } from "@/pages/dashboard/screenRefresh";
 import { SALES_SYNCED_EVENT, useForceRefresh } from "@/pages/dashboard/useForceRefresh";
-import { CHECK_SALES_EVENT, salesChanged, shouldRefreshScreen, watermarkAfterRead } from "@/push/resumeSales";
+import {
+  CHECK_SALES_EVENT,
+  isForcedSalesCheck,
+  salesChanged,
+  shouldRefreshScreen,
+  watermarkAfterRead,
+} from "@/push/resumeSales";
 const WATERMARK_POLL_MS = 60_000;
 /** Loja aberta sem busca das vendas ha mais que isso (2 rodadas automaticas) = dado atrasado. */
 const STALE_OPEN_MS = 2 * AUTO_REFRESH_MIN * 60_000;
@@ -37,7 +43,7 @@ export function TopbarRefresh({ storeIds }: { storeIds: string[] }) {
   const [screenBusy, setScreenBusy] = useState(false);
 
   const loadWatermark = useCallback(
-    async (notifyIfNewer: boolean): Promise<boolean> => {
+    async (notifyIfNewer: boolean, opts?: { forceScreen?: boolean }): Promise<boolean> => {
       if (!can) return false;
       try {
         const [wm, st] = await Promise.all([
@@ -47,14 +53,14 @@ export function TopbarRefresh({ storeIds }: { storeIds: string[] }) {
         const prev = lastWatermark.current;
         const stored = watermarkAfterRead(prev, wm);
         let changed: boolean | null = null;
-        if (notifyIfNewer && salesChanged(prev, stored)) {
+        if (!opts?.forceScreen && notifyIfNewer && salesChanged(prev, stored)) {
           changed = await salesChangedSince(session.tenantId, new Date(prev as number).toISOString());
         }
         lastWatermark.current = stored;
         setErpConnection(st ? erpConnectionOf(st, storeKey ? storeKey.split(",") : []) : "unknown");
         setWatermark(stored != null ? new Date(stored) : null);
         setLoaded(true);
-        if (shouldRefreshScreen(prev, stored, changed)) {
+        if (opts?.forceScreen || shouldRefreshScreen(prev, stored, changed)) {
           window.dispatchEvent(new Event(SALES_SYNCED_EVENT));
         }
         return true;
@@ -72,17 +78,24 @@ export function TopbarRefresh({ storeIds }: { storeIds: string[] }) {
     // PWA em segundo plano congela o intervalo. No iPhone, abrir pelo aviso
     // muitas vezes não muda visibilityState: pageshow e focus cobrem isso.
     // Leitura que falha tenta de novo — senão a marca some e a tela não recarrega.
+    // Toque no aviso (`force`): não espera visibility visível — no iPhone o estado
+    // pode continuar "hidden" e a conferência antiga saía sem reler a tela.
     let cancel = false;
     let resumeTimer = 0;
     let retryTimer = 0;
-    const onResume = () => {
-      if (document.visibilityState === "hidden") return;
+    const onResume = (event?: Event) => {
+      const force = event != null && isForcedSalesCheck(event);
+      if (!force && document.visibilityState === "hidden") return;
       window.clearTimeout(resumeTimer);
       resumeTimer = window.setTimeout(() => {
-        void loadWatermark(true).then((ok) => {
-          if (cancel || ok || document.visibilityState !== "visible") return;
+        void loadWatermark(true, force ? { forceScreen: true } : undefined).then((ok) => {
+          if (cancel || ok) return;
+          if (!force && document.visibilityState !== "visible") return;
           window.clearTimeout(retryTimer);
-          retryTimer = window.setTimeout(() => void loadWatermark(true), 1500);
+          retryTimer = window.setTimeout(
+            () => void loadWatermark(true, force ? { forceScreen: true } : undefined),
+            1500,
+          );
         });
       }, 200);
     };

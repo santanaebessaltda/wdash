@@ -1123,8 +1123,7 @@ describe("runSyncJob", () => {
     );
     expect(result.ok).toBe(true);
     expect(windows.length).toBeGreaterThan(0);
-    expect(windows.filter((w) => w.from === w.to).every((w) => w.from === "2026-09-19")).toBe(true);
-    expect(windows).toContainEqual({ from: "2026-09-01", to: "2026-09-19" });
+    expect(windows.every((w) => w.from === "2026-09-19" && w.to === "2026-09-19")).toBe(true);
     expect(deps.updateCredential).toHaveBeenCalledWith(
       expect.objectContaining({ lastLightSyncAt: expect.any(Date) }),
     );
@@ -1193,8 +1192,7 @@ describe("runSyncJob", () => {
     );
     expect(result.ok).toBe(true);
     expect(windows.length).toBeGreaterThan(0);
-    expect(windows.filter((w) => w.from === w.to).every((w) => w.from === "2026-09-19")).toBe(true);
-    expect(windows).toContainEqual({ from: "2026-09-01", to: "2026-09-19" });
+    expect(windows.every((w) => w.from === "2026-09-19" && w.to === "2026-09-19")).toBe(true);
   });
 
   it("FORCE_LIGHT without payload stays today-only (compat)", async () => {
@@ -1267,7 +1265,7 @@ describe("Atualizar (manual e automático)", () => {
     });
     const result = await runSyncJob(baseJob({ kind: "FORCE" }), deps);
     expect(result.ok).toBe(true);
-    expect(listaDays(fetchSalesLista)).toEqual(["2026-09-17", "2026-09-18", "2026-09-19", "2026-09-01"]);
+    expect(listaDays(fetchSalesLista)).toEqual(["2026-09-17", "2026-09-18", "2026-09-19"]);
     expect(markStoresClosed.mock.calls.map((c) => c[0])).toEqual([
       [{ storeId: "s1", day: "2026-09-17" }],
       [{ storeId: "s1", day: "2026-09-18" }],
@@ -1324,19 +1322,19 @@ describe("Atualizar (manual e automático)", () => {
       expect((await run()).ok).toBe(true);
       const coupon1 = fetchCouponReport.mock.calls.length;
       const margem1 = fetchRelatorioMargem.mock.calls.length;
-      // Hoje + releitura dos vendedores do mês.
-      expect(coupon1).toBe(2);
+      // Só hoje — releitura dos vendedores do mês fica no CLOSE.
+      expect(coupon1).toBe(1);
       expect(margem1).toBeGreaterThan(0);
 
       expect((await run()).ok).toBe(true);
-      // Segunda rodada: Lista de hoje + Lista do mês. Cupom de hoje pulado; cupom do mês relido. Margem parada.
-      expect(fetchSalesLista).toHaveBeenCalledTimes(4);
-      expect(fetchCouponReport).toHaveBeenCalledTimes(coupon1 + 1);
+      // Segunda rodada: Lista de hoje; cupom e margem pulados (sem venda nova).
+      expect(fetchSalesLista).toHaveBeenCalledTimes(2);
+      expect(fetchCouponReport).toHaveBeenCalledTimes(coupon1);
       expect(fetchRelatorioMargem).toHaveBeenCalledTimes(margem1);
 
       lista = [...lista, sale("2", 50_00)];
       expect((await run()).ok).toBe(true);
-      expect(fetchCouponReport).toHaveBeenCalledTimes(coupon1 + 1 + 2);
+      expect(fetchCouponReport).toHaveBeenCalledTimes(coupon1 + 1);
       expect(fetchRelatorioMargem.mock.calls.length).toBeGreaterThan(margem1);
     } finally {
       vi.useRealTimers();

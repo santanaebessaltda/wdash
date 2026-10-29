@@ -1,6 +1,14 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { NOTIFICATION_OPEN, isNotificationOpen, salesChanged, shouldRefreshScreen, watermarkAfterRead } from "./resumeSales";
+import {
+  CHECK_SALES_EVENT,
+  NOTIFICATION_OPEN,
+  isForcedSalesCheck,
+  isNotificationOpen,
+  salesChanged,
+  shouldRefreshScreen,
+  watermarkAfterRead,
+} from "./resumeSales";
 
 describe("notification open", () => {
   it("recognizes the message the service worker sends", () => {
@@ -12,6 +20,12 @@ describe("notification open", () => {
   it("uses the same message the service worker posts", () => {
     const sw = readFileSync(new URL("../../public/sw.js", import.meta.url), "utf8");
     expect(sw).toContain(NOTIFICATION_OPEN);
+  });
+
+  it("marks the check-sales event from a notification tap as forced", () => {
+    expect(isForcedSalesCheck(new CustomEvent(CHECK_SALES_EVENT, { detail: { force: true } }))).toBe(true);
+    expect(isForcedSalesCheck(new CustomEvent(CHECK_SALES_EVENT, { detail: {} }))).toBe(false);
+    expect(isForcedSalesCheck(new Event(CHECK_SALES_EVENT))).toBe(false);
   });
 });
 
