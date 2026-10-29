@@ -229,7 +229,7 @@ Inspiração de UX: [Néctar](https://www.meu-nectar.com/) (conversa humana, res
 - Item de menu **Chat IA** (`/chat-ia`; `/jarvis` redireciona) — hub estilo **Néctar**: saudação **BOM DIA / BOA TARDE / BOA NOITE** + primeiro nome; composer centralizado; **full-bleed**; esfera geodésica **só no hub vazio**. Ícone: Lucide MessageSquareMore. **Sem botão flutuante.** **Filial:** Topbar.
 - Composer: campo de texto + **Microfone** (REC → Whisper no campo) + **Enviar**. Sem alto-falante / onda de conversa.
 - **Navegação / rolagem por comando** no chat (“abre Visão geral”, “rola a página”) — sem Autorizar.
-- **F5** zera o chat (hub + orb); histórico só em memória na sessão.
+- **F5** zera o chat (hub + orb); histórico só em memória na sessão. Com conversa aberta, **Limpar chat** (topo da thread) volta ao hub vazio — mesma ação do `clearChat`.
 
 **Acionamento:**
 | | Desktop | Mobile / PWA |

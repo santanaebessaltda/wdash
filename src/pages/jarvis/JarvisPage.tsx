@@ -73,7 +73,20 @@ export function JarvisPage() {
             </h1>
           </div>
         ) : (
-          <div className="mb-3 w-full max-w-2xl min-h-0 flex-1 overflow-y-auto overscroll-contain px-1 pt-1 sm:px-2">
+          <div className="mb-3 flex w-full max-w-2xl min-h-0 flex-1 flex-col px-1 pt-1 sm:px-2">
+            <div className="mb-2 flex shrink-0 justify-end">
+              <button
+                type="button"
+                onClick={j.clearChat}
+                disabled={busy}
+                aria-label="Limpar chat"
+                title="Limpar chat"
+                className="rounded-full px-2.5 py-1 text-[12px] font-semibold text-t2 transition-colors hover:bg-bg-3 hover:text-t0 disabled:opacity-50"
+              >
+                Limpar chat
+              </button>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
             <div className="flex flex-col gap-3 sm:gap-4">
               {j.messages.map((m, i) => (
                 <div key={i} className={cn("flex gap-2.5", m.from === "user" && "flex-row-reverse")}>
@@ -173,6 +186,7 @@ export function JarvisPage() {
                 </Link>
               </div>
             ) : null}
+            </div>
           </div>
         )}
 
