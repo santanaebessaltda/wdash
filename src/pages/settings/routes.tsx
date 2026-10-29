@@ -14,6 +14,7 @@ const StoreDetailPage = lazyPage(() => import("./StoreDetailPage"), "StoreDetail
 const SystemUsersPage = lazyPage(() => import("./SystemUsersPage"), "SystemUsersPage");
 const MyProfilePage = lazyPage(() => import("./MyProfilePage"), "MyProfilePage");
 const NotificationsPage = lazyPage(() => import("./NotificationsPage"), "NotificationsPage");
+const VoiceSettingsPage = lazyPage(() => import("./VoiceSettingsPage"), "VoiceSettingsPage");
 const BranchPage = lazyPage(() => import("../operation/BranchPage"), "BranchPage");
 const AcquirersPage = lazyPage(() => import("../cash-close/AcquirersPage"), "AcquirersPage");
 const ShoppingSettingsPage = lazyPage(() => import("../operation/ShoppingPage"), "ShoppingSettingsPage");
@@ -37,6 +38,7 @@ export const settingsRoutes: RouteObject[] = [
           { path: paths.settings.users, element: <SystemUsersPage /> },
           { path: paths.settings.erp, element: <ErpIntegrationPage /> },
           { path: paths.settings.logs, element: <SyncLogsPage /> },
+          { path: paths.settings.voice, element: <VoiceSettingsPage /> },
         ],
       },
     ],

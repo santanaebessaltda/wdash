@@ -1,26 +1,42 @@
 /**
- * jarvis-ai — OpenAI (chat + Whisper + TTS) só para Gestor.
- * OPENAI_API_KEY em secrets do projeto. Nunca no front.
+ * jarvis-ai — chat/Whisper (OpenAI) + TTS (Gemini) só para Gestor.
+ * OPENAI_API_KEY e GEMINI_API_KEY em secrets. Nunca no front.
  */
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { corsHeaders, serve } from "../_shared/cors.ts";
 import { OWNER_ROLES, loadStaffCaller } from "../_shared/staffAuth.ts";
 
 const OPENAI_URL = "https://api.openai.com/v1";
+const GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta";
 const CHAT_MODEL = Deno.env.get("JARVIS_CHAT_MODEL")?.trim() || "gpt-4o-mini";
 /** STT rápido; fallback whisper-1 se o modelo novo falhar. */
 const STT_MODEL = Deno.env.get("JARVIS_STT_MODEL")?.trim() || "gpt-4o-mini-transcribe";
 /**
- * gpt-4o-mini-tts: bem menos robótico que tts-1/onyx.
- * Voz ash = masculina natural; instructions moldam o tom estilo Néctar.
- * Override: JARVIS_TTS_MODEL / JARVIS_TTS_VOICE.
+ * Gemini TTS (vozes Charon/Kore etc., estilo Néctar).
+ * Override: JARVIS_TTS_MODEL (ex. gemini-3.8-flash-tts), JARVIS_TTS_VOICE.
  */
-const TTS_MODEL = Deno.env.get("JARVIS_TTS_MODEL")?.trim() || "gpt-4o-mini-tts";
-const TTS_VOICE = Deno.env.get("JARVIS_TTS_VOICE")?.trim() || "ash";
+const TTS_MODEL = Deno.env.get("JARVIS_TTS_MODEL")?.trim() || "gemini-2.5-flash-preview-tts";
+const TTS_VOICE_DEFAULT = Deno.env.get("JARVIS_TTS_VOICE")?.trim() || "Charon";
 const TTS_MAX_CHARS = 2000;
-const TTS_INSTRUCTIONS =
-  Deno.env.get("JARVIS_TTS_INSTRUCTIONS")?.trim() ||
-  "Fale em português do Brasil, tom caloroso e natural de sócio sênior — conversacional, próximo do Néctar, sem ritmo de robô nem de locução publicitária. Números e valores já vêm por extenso; leia fluido e confiante.";
+const TTS_SAMPLE_RATE = 24000;
+
+const ALLOWED_VOICES = new Set([
+  "Charon",
+  "Algenib",
+  "Orus",
+  "Algieba",
+  "Puck",
+  "Kore",
+  "Sulafat",
+  "Aoede",
+  "Leda",
+  "Zephyr",
+  "Fenrir",
+  "Achernar",
+  "Achird",
+  "Schedar",
+  "Umbriel",
+]);
 
 
 type ChatMessage = {
@@ -160,7 +176,7 @@ serve(async (req) => {
   if (req.method !== "POST") return json({ ok: false, error: "method_not_allowed" }, 405);
 
   const openaiKey = Deno.env.get("OPENAI_API_KEY")?.trim();
-  if (!openaiKey) return json({ ok: false, error: "openai_not_configured" }, 503);
+  const geminiKey = Deno.env.get("GEMINI_API_KEY")?.trim();
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
   const supabaseAnon = Deno.env.get("SUPABASE_ANON_KEY");
@@ -188,18 +204,20 @@ serve(async (req) => {
 
   const action = String(body.action ?? "chat");
   try {
+    if (action === "speak") {
+      if (!geminiKey) return json({ ok: false, error: "gemini_not_configured" }, 503);
+      return await handleSpeak(geminiKey, body);
+    }
+    if (!openaiKey) return json({ ok: false, error: "openai_not_configured" }, 503);
     if (action === "transcribe") {
       return await handleTranscribe(openaiKey, body);
-    }
-    if (action === "speak") {
-      return await handleSpeak(openaiKey, body);
     }
     if (action === "chat") {
       return await handleChat(openaiKey, body);
     }
     return json({ ok: false, error: "unknown_action" }, 400);
   } catch (err) {
-    const message = err instanceof Error ? err.message : "openai_error";
+    const message = err instanceof Error ? err.message : "jarvis_error";
     console.error("jarvis-ai:", message);
     return json({ ok: false, error: message }, 502);
   }
@@ -217,7 +235,7 @@ async function handleChat(openaiKey: string, body: Record<string, unknown>) {
       : "";
   const voiceMode = body.voiceMode === true;
   const voiceHint = voiceMode
-    ? "\n\nModo voz ativo: responda como papo ao vivo — 1 a 3 frases, sem markdown, sem listas."
+    ? "\n\nModo voz ativo: responda como papo ao vivo — 1 a 3 frases, sem markdown, sem listas. Use vírgulas naturais (ex.: “Pronto, Romeu — tô na Visão geral”)."
     : "";
 
   const messages: ChatMessage[] = [
@@ -309,51 +327,121 @@ async function handleTranscribe(openaiKey: string, body: Record<string, unknown>
   return json({ ok: true, type: "transcript", text });
 }
 
-/** TTS OpenAI → MP3 em base64 (voz dedicada do JARVIS no app). */
-async function handleSpeak(openaiKey: string, body: Record<string, unknown>) {
+function resolveVoice(raw: unknown): string {
+  const v = typeof raw === "string" ? raw.trim() : "";
+  if (v && ALLOWED_VOICES.has(v)) return v;
+  if (ALLOWED_VOICES.has(TTS_VOICE_DEFAULT)) return TTS_VOICE_DEFAULT;
+  return "Charon";
+}
+
+/** Estilo falado: body.style (custom) ou presets de tom. */
+function resolveStyle(body: Record<string, unknown>): string {
+  const custom = typeof body.style === "string" ? body.style.trim() : "";
+  if (custom) return custom.slice(0, 240);
+  const tone = typeof body.tone === "string" ? body.tone.trim().toLowerCase() : "neutral";
+  switch (tone) {
+    case "serious":
+      return "sério e informativo, firme, sem exagero";
+    case "calm":
+      return "calmo e acolhedor, ritmo pausado";
+    case "lively":
+      return "animado e próximo, leve energia positiva";
+    default:
+      return "neutro, conversacional e natural";
+  }
+}
+
+function isWav(bytes: Uint8Array): boolean {
+  return bytes.length >= 12 && bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46;
+}
+
+/** PCM L16 LE mono 24 kHz → WAV com cabeçalho RIFF. */
+function pcmToWav(pcm: Uint8Array, sampleRate = TTS_SAMPLE_RATE): Uint8Array {
+  const dataSize = pcm.length;
+  const buffer = new ArrayBuffer(44 + dataSize);
+  const view = new DataView(buffer);
+  const writeStr = (offset: number, s: string) => {
+    for (let i = 0; i < s.length; i++) view.setUint8(offset + i, s.charCodeAt(i));
+  };
+  writeStr(0, "RIFF");
+  view.setUint32(4, 36 + dataSize, true);
+  writeStr(8, "WAVE");
+  writeStr(12, "fmt ");
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true); // PCM
+  view.setUint16(22, 1, true); // mono
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * 2, true);
+  view.setUint16(32, 2, true);
+  view.setUint16(34, 16, true);
+  writeStr(36, "data");
+  view.setUint32(40, dataSize, true);
+  new Uint8Array(buffer, 44).set(pcm);
+  return new Uint8Array(buffer);
+}
+
+/** TTS Gemini → WAV em base64. */
+async function handleSpeak(geminiKey: string, body: Record<string, unknown>) {
   const raw = typeof body.text === "string" ? body.text.trim() : "";
   if (!raw) return json({ ok: false, error: "text_required" }, 400);
   const text = raw.length > TTS_MAX_CHARS ? `${raw.slice(0, TTS_MAX_CHARS - 1)}…` : raw;
+  const voice = resolveVoice(body.voice);
+  const style = resolveStyle(body);
+  const useSpeechMeta = TTS_MODEL.includes("3.8") || TTS_MODEL.includes("gemini-3");
 
-  const payload: Record<string, unknown> = {
-    model: TTS_MODEL,
-    voice: TTS_VOICE,
-    input: text,
-    response_format: "mp3",
-  };
-  // Só gpt-4o-mini-tts aceita instructions (tom humano).
-  if (TTS_MODEL.includes("gpt-4o-mini-tts") || TTS_MODEL.includes("gpt-4o-tts")) {
-    payload.instructions = TTS_INSTRUCTIONS;
+  const part: Record<string, unknown> = { text };
+  if (useSpeechMeta) {
+    part.speechMetadata = { style: `Português do Brasil. Tom: ${style}. Respeite vírgulas e pausas.` };
+  } else {
+    part.text = `Fale em português do Brasil, tom ${style}, respeitando vírgulas e pausas. Diga exatamente:\n${text}`;
   }
 
-  const res = await fetch(`${OPENAI_URL}/audio/speech`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${openaiKey}`,
-      "Content-Type": "application/json",
+  const payload = {
+    contents: [{ role: "user", parts: [part] }],
+    generationConfig: {
+      responseModalities: ["AUDIO"],
+      speechConfig: {
+        voiceConfig: {
+          prebuiltVoiceConfig: { voiceName: voice },
+        },
+      },
     },
+  };
+
+  const url = `${GEMINI_URL}/models/${encodeURIComponent(TTS_MODEL)}:generateContent?key=${encodeURIComponent(geminiKey)}`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
 
+  const result = await res.json();
   if (!res.ok) {
-    let detail = `tts_http_${res.status}`;
-    try {
-      const errBody = await res.json();
-      if (errBody?.error?.message) detail = String(errBody.error.message);
-    } catch {
-      /* ignore */
-    }
-    throw new Error(detail);
+    const detail = result?.error?.message ?? `gemini_tts_http_${res.status}`;
+    throw new Error(String(detail));
   }
 
-  const bytes = new Uint8Array(await res.arrayBuffer());
-  if (bytes.length < 64) throw new Error("empty_audio");
+  const inline =
+    result?.candidates?.[0]?.content?.parts?.find(
+      (p: { inlineData?: { data?: string; mimeType?: string } }) => p?.inlineData?.data,
+    )?.inlineData ??
+    result?.candidates?.[0]?.content?.parts?.[0]?.inlineData;
+
+  const b64 = typeof inline?.data === "string" ? inline.data : "";
+  if (!b64) throw new Error("empty_audio");
+
+  const rawBytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+  if (rawBytes.length < 64) throw new Error("empty_audio");
+
+  const mimeHint = typeof inline?.mimeType === "string" ? String(inline.mimeType).toLowerCase() : "";
+  const wavBytes = isWav(rawBytes) || mimeHint.includes("wav") ? rawBytes : pcmToWav(rawBytes);
+
   return json({
     ok: true,
     type: "speech",
-    mime: "audio/mpeg",
-    audioBase64: bytesToBase64(bytes),
-    voice: TTS_VOICE,
+    mime: "audio/wav",
+    audioBase64: bytesToBase64(wavBytes),
+    voice,
   });
 }
 

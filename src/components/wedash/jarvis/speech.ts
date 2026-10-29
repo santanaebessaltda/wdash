@@ -1,7 +1,8 @@
-/** STT / TTS — OpenAI TTS (voz JARVIS) com fallback Web Speech. */
+/** STT / TTS — Gemini TTS (voz JARVIS) com fallback Web Speech. */
 
 import { jarvisSpeak } from "./llmClient";
 import { forSpeech } from "./speakablePt";
+import { findVoiceOption, readVoicePrefs, styleForSpeak } from "./voicePrefs";
 
 export interface SpeechRecognitionLike {
   lang: string;
@@ -110,10 +111,20 @@ function speakBrowser(text: string, opts?: { onEnd?: () => void }): () => void {
 }
 
 /**
- * Voz do JARVIS: OpenAI TTS via Edge; se falhar, Web Speech.
+ * Voz do JARVIS: Gemini TTS via Edge; se falhar, Web Speech.
  * Números/R$ passam por `forSpeech` (milhão ≠ mil).
+ * Prefs de voz/tom: localStorage (Configuração da VOZ).
  */
-export function speak(text: string, opts?: { onEnd?: () => void }): () => void {
+export function speak(
+  text: string,
+  opts?: {
+    onEnd?: () => void;
+    /** Override das prefs (prévia na tela de voz). */
+    voice?: string;
+    tone?: string;
+    style?: string;
+  },
+): () => void {
   let cancelled = false;
   let cancelBrowser: (() => void) | null = null;
 
@@ -126,15 +137,19 @@ export function speak(text: string, opts?: { onEnd?: () => void }): () => void {
     return () => undefined;
   }
   const spoken = forSpeech(trimmed);
+  const prefs = readVoicePrefs();
+  const voice = opts?.voice ?? findVoiceOption(prefs.voiceId).geminiVoice;
+  const tone = opts?.tone ?? prefs.tone;
+  const style = opts?.style ?? styleForSpeak(prefs);
 
   void (async () => {
-    const remote = await jarvisSpeak(spoken);
+    const remote = await jarvisSpeak(spoken, { voice, tone, style });
     if (cancelled) return;
 
     if (remote.ok) {
       try {
         const binary = Uint8Array.from(atob(remote.audioBase64), (c) => c.charCodeAt(0));
-        const blob = new Blob([binary], { type: remote.mime || "audio/mpeg" });
+        const blob = new Blob([binary], { type: remote.mime || "audio/wav" });
         const url = URL.createObjectURL(blob);
         activeObjectUrl = url;
         const audio = new Audio(url);

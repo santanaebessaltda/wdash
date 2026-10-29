@@ -136,7 +136,7 @@ function numberToSpeech(raw: string): string {
 
 /**
  * Prepara texto do chat para TTS: moeda e milhares pt-BR por extenso.
- * Mantém o restante (incluindo pontuação) legível.
+ * Mantém vírgulas, pontos e reticências (pausas naturais estilo Néctar).
  */
 export function forSpeech(text: string): string {
   let out = text;
@@ -162,5 +162,8 @@ export function forSpeech(text: string): string {
     return integerToPtBr(Math.round(v * 1000));
   });
 
-  return out.replace(/\s+/g, " ").trim();
+  // Normaliza espaços sem apagar pontuação; reforça pausa após vírgula.
+  out = out.replace(/\s+/g, " ").trim();
+  out = out.replace(/,([^\s])/g, ", $1");
+  return out;
 }

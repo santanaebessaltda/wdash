@@ -12,8 +12,14 @@ export function firstNameFrom(fullName: string): string {
   return part || "Gestor";
 }
 
-/** Fala inicial ao abrir conversa por voz (estilo Néctar). */
+/** Fala inicial ao abrir conversa por voz (estilo Néctar — vírgula vocativa). */
 export function voiceStandbyLine(firstName: string): string {
   const name = firstName.trim() || "Gestor";
-  return `JARVIS à disposição ${name}.`;
+  return `JARVIS à disposição, ${name}.`;
+}
+
+/** Frase de prévia na Configuração da VOZ. */
+export function voicePreviewLine(firstName: string): string {
+  const name = firstName.trim() || "Gestor";
+  return `Eu sou o JARVIS, ${name}.`;
 }
