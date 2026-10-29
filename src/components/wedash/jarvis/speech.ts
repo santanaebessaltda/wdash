@@ -1,8 +1,7 @@
-/** STT / TTS — Gemini TTS (voz JARVIS) com fallback Web Speech. */
+/** STT / TTS — Gemini TTS (voz JARVIS fixa) com fallback Web Speech. */
 
 import { jarvisSpeak } from "./llmClient";
 import { forSpeech } from "./speakablePt";
-import { findVoiceOption, readVoicePrefs, styleForSpeak } from "./voicePrefs";
 
 export interface SpeechRecognitionLike {
   lang: string;
@@ -111,20 +110,10 @@ function speakBrowser(text: string, opts?: { onEnd?: () => void }): () => void {
 }
 
 /**
- * Voz do JARVIS: Gemini TTS via Edge; se falhar, Web Speech.
+ * Voz do JARVIS: Gemini TTS via Edge (Charon / Neutro, fixo); se falhar, Web Speech.
  * Números/R$ passam por `forSpeech` (milhão ≠ mil).
- * Prefs de voz/tom: localStorage (Configuração da VOZ).
  */
-export function speak(
-  text: string,
-  opts?: {
-    onEnd?: () => void;
-    /** Override das prefs (prévia na tela de voz). */
-    voice?: string;
-    tone?: string;
-    style?: string;
-  },
-): () => void {
+export function speak(text: string, opts?: { onEnd?: () => void }): () => void {
   let cancelled = false;
   let cancelBrowser: (() => void) | null = null;
 
@@ -137,13 +126,9 @@ export function speak(
     return () => undefined;
   }
   const spoken = forSpeech(trimmed);
-  const prefs = readVoicePrefs();
-  const voice = opts?.voice ?? findVoiceOption(prefs.voiceId).geminiVoice;
-  const tone = opts?.tone ?? prefs.tone;
-  const style = opts?.style ?? styleForSpeak(prefs);
 
   void (async () => {
-    const remote = await jarvisSpeak(spoken, { voice, tone, style });
+    const remote = await jarvisSpeak(spoken);
     if (cancelled) return;
 
     if (remote.ok) {

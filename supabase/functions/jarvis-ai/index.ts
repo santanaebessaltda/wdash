@@ -12,31 +12,16 @@ const CHAT_MODEL = Deno.env.get("JARVIS_CHAT_MODEL")?.trim() || "gpt-4o-mini";
 /** STT rápido; fallback whisper-1 se o modelo novo falhar. */
 const STT_MODEL = Deno.env.get("JARVIS_STT_MODEL")?.trim() || "gpt-4o-mini-transcribe";
 /**
- * Gemini TTS (vozes Charon/Kore etc., estilo Néctar).
- * Override: JARVIS_TTS_MODEL (ex. gemini-3.8-flash-tts), JARVIS_TTS_VOICE.
+ * Gemini TTS — voz fixa do JARVIS (= Jarvis clássico / Neutro do Néctar → Charon).
+ * Override só via secret: JARVIS_TTS_MODEL / JARVIS_TTS_VOICE.
  */
 const TTS_MODEL = Deno.env.get("JARVIS_TTS_MODEL")?.trim() || "gemini-2.5-flash-preview-tts";
-const TTS_VOICE_DEFAULT = Deno.env.get("JARVIS_TTS_VOICE")?.trim() || "Charon";
+const TTS_VOICE = Deno.env.get("JARVIS_TTS_VOICE")?.trim() || "Charon";
+const TTS_STYLE =
+  Deno.env.get("JARVIS_TTS_STYLE")?.trim() ||
+  "neutro, claro e natural em português do Brasil; respeite vírgulas e pausas; sem ritmo de robô";
 const TTS_MAX_CHARS = 2000;
 const TTS_SAMPLE_RATE = 24000;
-
-const ALLOWED_VOICES = new Set([
-  "Charon",
-  "Algenib",
-  "Orus",
-  "Algieba",
-  "Puck",
-  "Kore",
-  "Sulafat",
-  "Aoede",
-  "Leda",
-  "Zephyr",
-  "Fenrir",
-  "Achernar",
-  "Achird",
-  "Schedar",
-  "Umbriel",
-]);
 
 
 type ChatMessage = {
@@ -327,30 +312,6 @@ async function handleTranscribe(openaiKey: string, body: Record<string, unknown>
   return json({ ok: true, type: "transcript", text });
 }
 
-function resolveVoice(raw: unknown): string {
-  const v = typeof raw === "string" ? raw.trim() : "";
-  if (v && ALLOWED_VOICES.has(v)) return v;
-  if (ALLOWED_VOICES.has(TTS_VOICE_DEFAULT)) return TTS_VOICE_DEFAULT;
-  return "Charon";
-}
-
-/** Estilo falado: body.style (custom) ou presets de tom. */
-function resolveStyle(body: Record<string, unknown>): string {
-  const custom = typeof body.style === "string" ? body.style.trim() : "";
-  if (custom) return custom.slice(0, 240);
-  const tone = typeof body.tone === "string" ? body.tone.trim().toLowerCase() : "neutral";
-  switch (tone) {
-    case "serious":
-      return "sério e informativo, firme, sem exagero";
-    case "calm":
-      return "calmo e acolhedor, ritmo pausado";
-    case "lively":
-      return "animado e próximo, leve energia positiva";
-    default:
-      return "neutro, conversacional e natural";
-  }
-}
-
 function isWav(bytes: Uint8Array): boolean {
   return bytes.length >= 12 && bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46;
 }
@@ -380,20 +341,20 @@ function pcmToWav(pcm: Uint8Array, sampleRate = TTS_SAMPLE_RATE): Uint8Array {
   return new Uint8Array(buffer);
 }
 
-/** TTS Gemini → WAV em base64. */
+/** TTS Gemini → WAV em base64. Voz/tom fixos (sem picker no app). */
 async function handleSpeak(geminiKey: string, body: Record<string, unknown>) {
   const raw = typeof body.text === "string" ? body.text.trim() : "";
   if (!raw) return json({ ok: false, error: "text_required" }, 400);
   const text = raw.length > TTS_MAX_CHARS ? `${raw.slice(0, TTS_MAX_CHARS - 1)}…` : raw;
-  const voice = resolveVoice(body.voice);
-  const style = resolveStyle(body);
+  const voice = TTS_VOICE;
   const useSpeechMeta = TTS_MODEL.includes("3.8") || TTS_MODEL.includes("gemini-3");
 
   const part: Record<string, unknown> = { text };
   if (useSpeechMeta) {
-    part.speechMetadata = { style: `Português do Brasil. Tom: ${style}. Respeite vírgulas e pausas.` };
+    part.speechMetadata = { style: TTS_STYLE };
   } else {
-    part.text = `Fale em português do Brasil, tom ${style}, respeitando vírgulas e pausas. Diga exatamente:\n${text}`;
+    // Prompt curto: evita “Diga exatamente” (soava mais robótico que o Néctar).
+    part.text = `(${TTS_STYLE})\n${text}`;
   }
 
   const payload = {

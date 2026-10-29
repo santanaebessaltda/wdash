@@ -24,9 +24,6 @@ const ICON_USUARIOS =
 const ICON_LOGS = "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M16 13H8M16 17H8M10 9H8";
 const ICON_SAIR = "M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9";
 const ICON_NOTICES = "M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.94 1.94 0 0 0 3.4 0";
-/** Lucide Mic — Configuração da VOZ. */
-const ICON_VOICE =
-  "M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3zM19 10v2a7 7 0 0 1-14 0v-2M12 19v4M8 23h8";
 
 function covers(pathname: string, base: string): boolean {
   return pathname === base || pathname.startsWith(`${base}/`);
@@ -92,12 +89,11 @@ export function Topbar({ onOpenMobileNav, collapsed, onToggleCollapse }: { onOpe
     };
   }, [session.tenantId, session.stores]);
 
-  // Conta do avatar: perfil, notificações, voz, ERP, usuários e logs — sem filtro de filial.
+  // Conta do avatar: perfil, notificações, ERP, usuários e logs — sem filtro de filial.
   const accountShell =
     location.pathname === paths.profile ||
     location.pathname === paths.legacy.profile ||
     covers(location.pathname, paths.settings.notifications) ||
-    covers(location.pathname, paths.settings.voice) ||
     covers(location.pathname, paths.settings.erp) ||
     covers(location.pathname, paths.legacy.settings.erp) ||
     covers(location.pathname, paths.settings.users) ||
@@ -127,12 +123,11 @@ export function Topbar({ onOpenMobileNav, collapsed, onToggleCollapse }: { onOpe
     location.pathname.startsWith("/operation/") ||
     location.pathname.startsWith(paths.settings.root));
 
-  // Menu do avatar: Meu perfil, Notificações, Voz (Gestor), ERP, Usuários e Logs.
+  // Menu do avatar: Meu perfil, Notificações, e no Gestor ERP, Usuários e Logs.
   const conta: DropdownItem[] = [
     { label: "Notificações", icon: <MenuIcon d={ICON_NOTICES} />, onClick: () => navigate(paths.settings.notifications) },
     ...(isOwner(session.role)
       ? [
-          { label: "Voz", icon: <MenuIcon d={ICON_VOICE} />, onClick: () => navigate(paths.settings.voice) },
           { label: "ERP", icon: <MenuIcon d={ICON_ERP} />, onClick: () => navigate(paths.settings.erp) },
           { label: "Usuários", icon: <MenuIcon d={ICON_USUARIOS} />, onClick: () => navigate(paths.settings.users) },
           { label: "Logs", icon: <MenuIcon d={ICON_LOGS} />, onClick: () => navigate(paths.settings.logs) },

@@ -398,8 +398,6 @@ export const paths = {
     logs: "/settings/logs",
     users: "/settings/users",
     notifications: "/settings/notifications",
-    /** Configuração da VOZ do Chat IA (Gestor). */
-    voice: "/settings/voice",
   },
 
   utility: {

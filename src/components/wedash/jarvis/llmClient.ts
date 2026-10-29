@@ -123,23 +123,16 @@ export async function jarvisTranscribe(audioBase64: string, mime: string): Promi
   return { ok: true, text: payload.text };
 }
 
-/** TTS Gemini via Edge. audioBase64 = WAV sem prefixo data:. */
+/** TTS Gemini via Edge (voz fixa Charon/Neutro). audioBase64 = WAV sem prefixo data:. */
 export async function jarvisSpeak(
   text: string,
-  opts?: { voice?: string; tone?: string; style?: string },
 ): Promise<{ ok: true; audioBase64: string; mime: string } | { ok: false; reason: string }> {
   const trimmed = text.trim();
   if (!trimmed) return { ok: false, reason: "empty_text" };
   const sb = getSupabase();
   if (!sb) return { ok: false, reason: "supabase_missing" };
   const { data, error } = await sb.functions.invoke("jarvis-ai", {
-    body: {
-      action: "speak",
-      text: trimmed,
-      ...(opts?.voice ? { voice: opts.voice } : {}),
-      ...(opts?.tone ? { tone: opts.tone } : {}),
-      ...(opts?.style ? { style: opts.style } : {}),
-    },
+    body: { action: "speak", text: trimmed },
   });
   if (error) return { ok: false, reason: error.message || "invoke_failed" };
   const payload = data as { ok?: boolean; error?: string; audioBase64?: string; mime?: string } | null;

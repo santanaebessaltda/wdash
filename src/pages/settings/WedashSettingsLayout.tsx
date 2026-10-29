@@ -8,7 +8,6 @@ import { isOwner } from "@/layout/nav-wedash";
 const TABS = [
   { label: "Meu perfil", to: paths.profile },
   { label: "Notificações", to: paths.settings.notifications },
-  { label: "Voz", to: paths.settings.voice },
   { label: "ERP", to: paths.settings.erp },
   { label: "Usuários", to: paths.settings.users },
   { label: "Logs", to: paths.settings.logs },
@@ -27,10 +26,6 @@ const META: Record<string, { title: string; subtitle: string }> = {
   [paths.settings.notifications]: {
     title: "Notificações",
     subtitle: "Escolha quais avisos você quer receber no celular.",
-  },
-  [paths.settings.voice]: {
-    title: "Configuração da VOZ",
-    subtitle: "Escolha a voz e o tom do JARVIS no Chat IA.",
   },
   [paths.settings.stores]: {
     title: "Filiais",
@@ -52,7 +47,7 @@ const META: Record<string, { title: string; subtitle: string }> = {
 
 /**
  * Shell de Conta (menu do avatar)  -  mesmo padrao Vela (TabNav).
- * Gestor: Meu perfil, Notificações, Voz, ERP, Usuários e Logs.
+ * Gestor: Meu perfil, Notificações, ERP, Usuários e Logs.
  * Gerente e vendedor: Meu perfil e Notificações. Lojas (só por URL) fica sem abas.
  */
 export function WedashSettingsLayout() {

@@ -17,9 +17,3 @@ export function voiceStandbyLine(firstName: string): string {
   const name = firstName.trim() || "Gestor";
   return `JARVIS à disposição, ${name}.`;
 }
-
-/** Frase de prévia na Configuração da VOZ. */
-export function voicePreviewLine(firstName: string): string {
-  const name = firstName.trim() || "Gestor";
-  return `Eu sou o JARVIS, ${name}.`;
-}
