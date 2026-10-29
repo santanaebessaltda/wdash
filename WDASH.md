@@ -224,7 +224,7 @@ Inspiração de UX: [Néctar](https://www.meu-nectar.com/) (conversa humana, res
 **Tom de voz:** linguajar **humano**, informal, no estilo Néctar — curto, confirma o que fez (“Pronto — tô na Visão geral”), sem jargão de produto. Não soa como manual.
 
 **Superfície (DECIDIDO):**
-- Item de menu **JARVIS** (`/jarvis`) — página de chat (casca no padrão Vela `Chat.tsx`: 1 thread, sem lista Slack). **Sem botão flutuante.**
+- Item de menu **Chat IA** (`/jarvis`) — página de chat do JARVIS (casca no padrão Vela `Chat.tsx`: 1 thread, sem lista Slack). Ícone balão com … (Lucide MessageSquareMore). **Sem botão flutuante.**
 - Composer com **botão de onda/voz** (como ChatGPT / Néctar). Clicou → **modo voz**: overlay com orbe animado; conversa falada contínua (ouvir → falar → ouvir), sem digitar.
 - Orbe: CSS/canvas reativo ao mic/TTS (estados idle / listening / thinking / speaking). Lottie/WebM só se o orbe não bastar.
 - **Navegação por comando:** “abre Visão geral”, “vai pro Financeiro…” — `navigate` nas rotas do papel do Gestor + fala confirmando. Não pede Autorizar.
@@ -264,7 +264,7 @@ Leitura e **navegar entre telas** não pedem autorização. Criar/editar/apagar 
 
 **Fatia 1–5 no código (2026-10-29):** tools de leitura; Desafio / Meta / Escala com Autorizar (`challenge*` / `goal*` / `schedule*`). FAB+modal foi o shell inicial.
 
-**Fatia 6 no código (2026-10-29):** UX Néctar — menu **JARVIS** `/jarvis` (chat Vela + botão de voz); overlay de modo voz com orbe; palmas **só desktop** abrem o overlay; tom humano; intent **navegar** (rotas do Gestor). Sem FAB.
+**Fatia 6 no código (2026-10-29):** UX Néctar — menu **Chat IA** `/jarvis` (chat Vela + botão de voz); overlay de modo voz com orbe; palmas **só desktop** abrem o overlay; tom humano; intent **navegar** (rotas do Gestor). Sem FAB.
 
 **Fatia 7 no código (2026-10-29):** **OpenAI ligada.** Edge `jarvis-ai` (chat `gpt-4o-mini` + tools + Whisper + **TTS**). Secret `OPENAI_API_KEY` no Supabase (nunca no front). Front: `llmClient` com loop de tools (vendas/estoque/sazonal/navegar/rascunhos); fallback local se a Edge falhar. Modo voz = MediaRecorder → Whisper → fala. Autorizar de meta/desafio/escala continua no app.
 

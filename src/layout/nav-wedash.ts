@@ -28,14 +28,15 @@ const ICON = {
   /** Lucide ClipboardList — Pedido de compra. */
   clipboard: "M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2M9 2h6a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1zM8 12h8M8 16h8M8 8h2",
   help: "M12 7v14M16 12h2M16 8h2M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3zM6 12h2M6 8h2",
-  /** Orbe / assistente — JARVIS. */
-  jarvis: "M12 2a4 4 0 0 1 4 4v1.1a8 8 0 0 1 3.2 1.5L20 7.5l1 1.7-1.2.7A8 8 0 0 1 20 12a8 8 0 0 1-.2 1.9l1.2.7-1 1.7-1.2-.8A8 8 0 0 1 16 16.9V18a4 4 0 0 1-8 0v-1.1a8 8 0 0 1-3.2-1.5L4 16.5l-1-1.7 1.2-.7A8 8 0 0 1 4 12c0-.7.1-1.3.2-1.9L3 9.4l1-1.7 1.2.8A8 8 0 0 1 8 7.1V6a4 4 0 0 1 4-4zm0 6a4 4 0 1 0 0 8 4 4 0 0 0 0-8z",
+  /** Lucide MessageSquareMore — Chat IA (balão com …). */
+  chatIa:
+    "M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2zM8 10h.01M12 10h.01M16 10h.01",
 };
 
-/** Assistente JARVIS — só Gestor. */
+/** Assistente JARVIS — rótulo no menu: Chat IA. Só Gestor. */
 const jarvis: NavSingle = {
-  label: "JARVIS",
-  icon: ICON.jarvis,
+  label: "Chat IA",
+  icon: ICON.chatIa,
   to: paths.jarvis,
 };
 

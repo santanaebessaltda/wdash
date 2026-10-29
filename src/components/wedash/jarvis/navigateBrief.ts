@@ -25,7 +25,6 @@ export function jarvisNavTargets(
   return [
     ...fromNav,
     { label: helpNavItem.label, to: helpNavItem.to, group: "Ajuda" },
-    { label: "JARVIS", to: paths.jarvis, group: "Principal" },
   ];
 }
 
@@ -56,6 +55,8 @@ const ALIASES: Record<string, string> = {
   filial: paths.operation.branch,
   funcionamento: paths.operation.hours,
   jarvis: paths.jarvis,
+  "chat ia": paths.jarvis,
+  chat: paths.jarvis,
 };
 
 export function looksLikeNavigate(raw: string): boolean {
