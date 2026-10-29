@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Avatar } from "@/components/ui";
 import { validateChallengeForm } from "@/data/wedash/challengeForm";
@@ -21,10 +22,18 @@ import {
 import { dayGreeting, firstNameFrom } from "@/components/wedash/jarvis/greeting";
 import { JarvisHubBackdrop } from "@/components/wedash/jarvis/JarvisHubBackdrop";
 import { useJarvis } from "@/components/wedash/jarvis/JarvisProvider";
+import {
+  stores as branchesFixture,
+  storesForSession,
+  hydrateSessionStores,
+  type Store,
+} from "@/data/wedash/stores";
 import { cn } from "@/lib/cn";
 import { padBottom } from "@/lib/safeArea";
 import { paths } from "@/router/paths";
-import { useSession } from "@/session/SessionProvider";
+import { StorePicker } from "@/pages/dashboard/StorePicker";
+import { useScope } from "@/pages/dashboard/useScope";
+import { useActiveSession, useSession } from "@/session/SessionProvider";
 import { SendIcon } from "@/pages/apps/icons";
 
 function voiceCaptureSupported(): boolean {
@@ -32,6 +41,40 @@ function voiceCaptureSupported(): boolean {
   const w = window as unknown as { SpeechRecognition?: unknown; webkitSpeechRecognition?: unknown };
   return Boolean(
     navigator.mediaDevices?.getUserMedia || w.SpeechRecognition || w.webkitSpeechRecognition,
+  );
+}
+
+/** Filial no hub do Chat IA (mesmo escopo do Topbar; a rota não mostra o picker no header). */
+function JarvisStoreChip() {
+  const session = useActiveSession();
+  const { scope, setScope } = useScope();
+  const [listStores, setListStores] = useState<Store[]>(() => {
+    const hit = storesForSession(session.stores);
+    return hit.length > 0 ? hit : branchesFixture;
+  });
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      if (session.stores.length === 0) {
+        if (!cancelled) setListStores([]);
+        return;
+      }
+      const hit = storesForSession(session.stores);
+      const loaded = await hydrateSessionStores(session.tenantId, session.stores);
+      if (cancelled) return;
+      if (loaded.length > 0) setListStores(loaded);
+      else if (hit.length > 0) setListStores(hit);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [session.tenantId, session.stores]);
+
+  return (
+    <div className="mx-auto mb-3 w-full max-w-sm">
+      <StorePicker scope={scope} onChange={setScope} minhas={listStores} />
+    </div>
   );
 }
 
@@ -189,6 +232,7 @@ export function JarvisPage() {
         )}
 
         <div className={cn("w-full max-w-2xl shrink-0", empty ? "mt-4 mb-0 sm:mb-2" : "mt-auto")}>
+          <JarvisStoreChip />
           {j.micHint && !j.dictating && !j.voiceOpen ? (
             <p className="mb-2 text-center text-[12px] text-t2">{j.micHint}</p>
           ) : null}

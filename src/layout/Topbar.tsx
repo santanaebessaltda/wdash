@@ -89,9 +89,21 @@ export function Topbar({ onOpenMobileNav, collapsed, onToggleCollapse }: { onOpe
     };
   }, [session.tenantId, session.stores]);
 
+  // Conta do avatar: perfil, notificações, ERP, usuários e logs — sem filtro de filial.
+  const accountShell =
+    location.pathname === paths.profile ||
+    location.pathname === paths.legacy.profile ||
+    covers(location.pathname, paths.settings.notifications) ||
+    covers(location.pathname, paths.settings.erp) ||
+    covers(location.pathname, paths.legacy.settings.erp) ||
+    covers(location.pathname, paths.settings.users) ||
+    covers(location.pathname, paths.legacy.settings.users) ||
+    covers(location.pathname, paths.settings.logs);
+
   // Loja e filtro global: Topbar nas telas do produto (nao so Dashboard).
   const showsStorePicker =
     session.role !== "SELLER" &&
+    !accountShell &&
     (location.pathname === paths.dashboard ||
     location.pathname.startsWith(paths.dashboard + "/") ||
     location.pathname === paths.live.root ||
@@ -109,8 +121,7 @@ export function Topbar({ onOpenMobileNav, collapsed, onToggleCollapse }: { onOpe
     covers(location.pathname, paths.management.schedule) ||
     covers(location.pathname, paths.management.salesReport) ||
     location.pathname.startsWith("/operation/") ||
-    location.pathname.startsWith(paths.settings.root) ||
-    location.pathname === paths.profile);
+    location.pathname.startsWith(paths.settings.root));
 
   // Menu do avatar: Meu perfil, Notificações, e no Gestor ERP, Usuários e Logs.
   const conta: DropdownItem[] = [
