@@ -46,7 +46,14 @@ import {
   type ScheduleDraft,
 } from "./scheduleDraft";
 import { firstNameFrom, voiceStandbyLine } from "./greeting";
-import { speak, stopSpeaking, ttsSupported, type SpeechRecognitionLike } from "./speech";
+import {
+  createSpeechRecognition,
+  speak,
+  speechRecognitionSupported,
+  stopSpeaking,
+  ttsSupported,
+  type SpeechRecognitionLike,
+} from "./speech";
 
 const VOICE_READ_KEY = "wedash.jarvis.voiceRead";
 
@@ -231,7 +238,8 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
     const finish = () => {
       setMode((cur) => (cur === "speaking" ? "idle" : cur));
       if (opts?.listenAfter && voiceOpenRef.current && !voicePausedRef.current) {
-        window.setTimeout(() => startListeningRef.current(), 120);
+        // Mic quente: escuta na hora que a fala acaba (sem pausa artificial).
+        startListeningRef.current();
       }
     };
     // Modo voz sempre fala; no chat, só se "Leitura em voz" estiver ligada.
@@ -736,7 +744,7 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
         }));
 
       void (async () => {
-        const llm = await jarvisLlmTurn(history, ctx, q);
+        const llm = await jarvisLlmTurn(history, ctx, q, { voiceMode: inVoice });
         if (gen !== replyGen.current) return;
 
         if (!llm.ok) {
@@ -825,6 +833,13 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
     setVoiceLevels(Array.from({ length: 40 }, () => 0.12));
   }, [stopVad]);
 
+  const liveMicStream = useCallback((): MediaStream | undefined => {
+    const s = mediaStreamRef.current;
+    if (!s) return undefined;
+    const live = s.getTracks().some((t) => t.readyState === "live");
+    return live ? s : undefined;
+  }, []);
+
   const finishMediaRecording = useCallback(() => {
     const rec = mediaRecRef.current;
     if (!rec || rec.state === "inactive") return;
@@ -832,14 +847,13 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
     rec.onstop = () => {
       const chunks = mediaChunksRef.current;
       const mime = rec.mimeType || "audio/webm";
-      mediaStreamRef.current?.getTracks().forEach((t) => t.stop());
-      mediaStreamRef.current = null;
+      // Mantém o mic aberto entre turnos (só para o recorder).
       mediaRecRef.current = null;
       if (chunks.length === 0) {
         setMode("idle");
         setMicHint("Não peguei áudio. Fala um pouco mais alto e tenta de novo.");
         if (voiceOpenRef.current && !voicePausedRef.current) {
-          window.setTimeout(() => startListeningRef.current(), 250);
+          window.setTimeout(() => startListeningRef.current(), 120);
         }
         return;
       }
@@ -858,7 +872,6 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
             );
             return;
           }
-          // Texto da fala entra no chat via `reply` (user + resposta JARVIS).
           setDraftText("");
           reply(tr.text);
         } catch {
@@ -894,10 +907,141 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const startMediaWithVadRef = useRef<(s?: MediaStream) => void>(() => undefined);
+
+  const attachVoiceLevels = useCallback((stream: MediaStream, active: () => boolean) => {
+    try {
+      const AudioCtx =
+        window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      const source = ctx.createMediaStreamSource(stream);
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 512;
+      analyser.smoothingTimeConstant = 0.4;
+      source.connect(analyser);
+      const freqData = new Uint8Array(analyser.frequencyBinCount);
+      const tick = () => {
+        if (!active()) {
+          void ctx.close();
+          return;
+        }
+        analyser.getByteFrequencyData(freqData);
+        const bars = 40;
+        const step = Math.max(1, Math.floor(freqData.length / bars));
+        const next: number[] = [];
+        for (let i = 0; i < bars; i++) {
+          let sum = 0;
+          for (let j = 0; j < step; j++) sum += freqData[i * step + j] ?? 0;
+          next.push(Math.min(1, sum / step / 150));
+        }
+        setVoiceLevels(next);
+        vadRafRef.current = requestAnimationFrame(tick);
+      };
+      if (ctx.state === "suspended") void ctx.resume();
+      vadRafRef.current = requestAnimationFrame(tick);
+    } catch {
+      /* waveform opcional */
+    }
+  }, []);
+
+  /** Conversa por voz: Web Speech (local, rápido). Fallback Whisper se falhar. */
+  const startWebSpeechListen = useCallback(() => {
+    if (voicePausedRef.current || !voiceOpenRef.current) return;
+    const rec = createSpeechRecognition();
+    if (!rec) {
+      void startMediaWithVadRef.current();
+      return;
+    }
+    try {
+      speechRecRef.current?.abort();
+    } catch {
+      /* ignore */
+    }
+    stopVad();
+    stopSpeaking();
+    setMicHint(null);
+    setDraftText("");
+    speechRecRef.current = rec;
+    rec.continuous = false;
+    rec.interimResults = true;
+    let finalText = "";
+    let gotResult = false;
+
+    // Waveform com mic já aberto (ou pede um stream leve).
+    void (async () => {
+      try {
+        const stream =
+          liveMicStream() ??
+          (await navigator.mediaDevices.getUserMedia({
+            audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+          }));
+        if (!voiceOpenRef.current || voicePausedRef.current) {
+          if (!liveMicStream()) stream.getTracks().forEach((t) => t.stop());
+          return;
+        }
+        mediaStreamRef.current = stream;
+        attachVoiceLevels(stream, () => speechRecRef.current === rec && voiceOpenRef.current);
+      } catch {
+        /* sem waveform */
+      }
+    })();
+
+    rec.onresult = (event) => {
+      let interim = "";
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const row = event.results[i];
+        if (!row) continue;
+        const piece = row[0]?.transcript ?? "";
+        if (row.isFinal) {
+          finalText += piece;
+          gotResult = true;
+        } else interim += piece;
+      }
+      const shown = (finalText || interim).trim();
+      if (shown) setDraftText(shown);
+    };
+    rec.onerror = (event) => {
+      const err = event.error;
+      if (err === "aborted") return;
+      speechRecRef.current = null;
+      if (err === "no-speech") {
+        setMode("idle");
+        if (voiceOpenRef.current && !voicePausedRef.current) {
+          window.setTimeout(() => startListeningRef.current(), 80);
+        }
+        return;
+      }
+      // Chrome sem STT estável → Whisper
+      void startMediaWithVadRef.current(liveMicStream());
+    };
+    rec.onend = () => {
+      if (speechRecRef.current !== rec) return;
+      speechRecRef.current = null;
+      stopVad();
+      const said = finalText.trim();
+      if (said) {
+        setDraftText("");
+        setMode("thinking");
+        reply(said);
+        return;
+      }
+      if (!gotResult && voiceOpenRef.current && !voicePausedRef.current) {
+        setMode("idle");
+      }
+    };
+    try {
+      rec.start();
+      setMode("listening");
+    } catch {
+      void startMediaWithVadRef.current(liveMicStream());
+    }
+  }, [attachVoiceLevels, liveMicStream, reply, stopVad]);
+
   const startMediaWithVad = useCallback(
     async (existingStream?: MediaStream) => {
       if (voicePausedRef.current) return;
-      if ((!navigator.mediaDevices?.getUserMedia && !existingStream) || typeof MediaRecorder === "undefined") {
+      if ((!navigator.mediaDevices?.getUserMedia && !existingStream && !liveMicStream()) || typeof MediaRecorder === "undefined") {
         setMicHint("Sem microfone neste aparelho — usa o chat escrito.");
         setMode("idle");
         return;
@@ -908,11 +1052,12 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
         setDraftText("");
         const stream =
           existingStream ??
+          liveMicStream() ??
           (await navigator.mediaDevices.getUserMedia({
             audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
           }));
         if (voicePausedRef.current || !voiceOpenRef.current) {
-          stream.getTracks().forEach((t) => t.stop());
+          if (stream !== mediaStreamRef.current) stream.getTracks().forEach((t) => t.stop());
           return;
         }
         mediaStreamRef.current = stream;
@@ -934,7 +1079,7 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
           setMode("idle");
           setMicHint("Falhou a gravação. Tenta de novo.");
         };
-        rec.start(100);
+        rec.start(80);
         setMode("listening");
         setMicHint(null);
 
@@ -945,7 +1090,7 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
         const source = ctx.createMediaStreamSource(stream);
         const analyser = ctx.createAnalyser();
         analyser.fftSize = 512;
-        analyser.smoothingTimeConstant = 0.45;
+        analyser.smoothingTimeConstant = 0.4;
         source.connect(analyser);
         const timeData = new Float32Array(analyser.fftSize);
         const freqData = new Uint8Array(analyser.frequencyBinCount);
@@ -972,26 +1117,26 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
           for (let i = 0; i < bars; i++) {
             let sum = 0;
             for (let j = 0; j < step; j++) sum += freqData[i * step + j] ?? 0;
-            next.push(Math.min(1, sum / step / 160));
+            next.push(Math.min(1, sum / step / 150));
           }
           setVoiceLevels(next);
 
           const now = performance.now();
           const dt = now - lastTs;
           lastTs = now;
-          // Silêncio curto depois de falar → envia mais rápido (estilo Néctar).
-          if (peak >= 0.035) {
+          if (peak >= 0.03) {
             heardSpeech = true;
             silentMs = 0;
           } else if (heardSpeech) {
             silentMs += dt;
-            if (silentMs >= 650) {
+            // ~0,42s de silêncio → envia (conversa mais ágil).
+            if (silentMs >= 420) {
               void ctx.close();
               finishVoiceRef.current();
               return;
             }
           }
-          if (now - startedAt > 18_000) {
+          if (now - startedAt > 16_000) {
             void ctx.close();
             finishVoiceRef.current();
             return;
@@ -1011,14 +1156,18 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
         );
       }
     },
-    [stopMediaTracks],
+    [liveMicStream, stopMediaTracks],
   );
+  startMediaWithVadRef.current = (s?: MediaStream) => {
+    void startMediaWithVad(s);
+  };
 
-  /** Já com mic liberado: Whisper + waveform (mesmo path do botão de onda). */
+  /** Já com mic liberado: Web Speech (rápido) ou Whisper. */
   const beginListenAfterMicOk = useCallback(() => {
     if (!voiceOpenRef.current || voicePausedRef.current) return;
-    void startMediaWithVad();
-  }, [startMediaWithVad]);
+    if (speechRecognitionSupported()) startWebSpeechListen();
+    else void startMediaWithVad(liveMicStream());
+  }, [liveMicStream, startMediaWithVad, startWebSpeechListen]);
 
   const pauseVoiceSession = useCallback(() => {
     if (!voiceOpenRef.current || voicePausedRef.current) return;
@@ -1038,8 +1187,8 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
     voicePausedRef.current = false;
     setVoicePaused(false);
     setMicHint(null);
-    void startMediaWithVad();
-  }, [startMediaWithVad]);
+    beginListenAfterMicOk();
+  }, [beginListenAfterMicOk]);
 
   useEffect(() => {
     const onVis = () => {
@@ -1081,7 +1230,7 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
               setMode("idle");
               return;
             }
-            void startMediaWithVad(stream);
+            beginListenAfterMicOk();
           },
         });
       })
@@ -1095,7 +1244,7 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
           setMicHint("Não consegui abrir o microfone. Tenta de novo.");
         }
       });
-  }, [session?.name, startMediaWithVad]);
+  }, [beginListenAfterMicOk, session?.name]);
 
   const startListening = useCallback(() => {
     if (!voiceOpenRef.current || voicePausedRef.current) return;
@@ -1126,8 +1275,8 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
       return;
     }
     // Idle no modo voz: volta a ouvir (sem repetir a fala inicial).
-    void startMediaWithVad();
-  }, [finishMediaRecording, startMediaWithVad]);
+    beginListenAfterMicOk();
+  }, [beginListenAfterMicOk, finishMediaRecording]);
   finishVoiceRef.current = () => finishVoice();
 
   const openVoice = useCallback(

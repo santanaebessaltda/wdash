@@ -8,7 +8,8 @@ import { OWNER_ROLES, loadStaffCaller } from "../_shared/staffAuth.ts";
 
 const OPENAI_URL = "https://api.openai.com/v1";
 const CHAT_MODEL = Deno.env.get("JARVIS_CHAT_MODEL")?.trim() || "gpt-4o-mini";
-const WHISPER_MODEL = "whisper-1";
+/** STT rápido; fallback whisper-1 se o modelo novo falhar. */
+const STT_MODEL = Deno.env.get("JARVIS_STT_MODEL")?.trim() || "gpt-4o-mini-transcribe";
 /**
  * gpt-4o-mini-tts: bem menos robótico que tts-1/onyx.
  * Voz ash = masculina natural; instructions moldam o tom estilo Néctar.
@@ -38,14 +39,19 @@ type ToolCall = {
 
 const SYSTEM_PROMPT = `Você é o JARVIS, sócio sênior do Gestor no WDash (rede de franquias WEPINK/WPINK).
 
-Tom: português do Brasil, informal e humano — como o Néctar. Frases curtas. Sem jargão de manual, sem listar o cardápio inteiro a cada oi.
+Tom: português do Brasil, informal e humano — como o Néctar. Papo de quem resolve, não de manual.
+
+Velocidade e naturalidade:
+- Respostas CURTAS: em geral 1 a 3 frases. Vai direto ao ponto.
+- Números: cite o essencial (ex.: “um milhão e cento e noventa e dois mil”); sem relatório.
+- Cumprimento (“oi”, “e aí”): uma frase só, sem listar habilidades.
+- Se precisar de tool, chame na hora — sem enrolação antes.
 
 Regras:
 - Nunca invente faturamento, estoque, meta, comissão ou qualquer número. Use as tools de análise.
 - Meta, desafio e escala: você só discute e pede rascunho via tool. Gravar de verdade é o Gestor no botão Autorizar — nunca diga que já gravou sozinho.
 - Navegação: use a tool navigate quando pedirem para abrir uma tela.
-- Se faltar dado da tool, fale que faltou — não chute.
-- Cumprimento (“oi”, “e aí”): responda curto e humano, sem despejar todas as habilidades.`;
+- Se faltar dado da tool, fale que faltou — não chute.`;
 
 const TOOLS = [
   {
@@ -209,9 +215,13 @@ async function handleChat(openaiKey: string, body: Record<string, unknown>) {
     typeof body.contextNote === "string" && body.contextNote.trim()
       ? `\n\nContexto da sessão:\n${body.contextNote.trim()}`
       : "";
+  const voiceMode = body.voiceMode === true;
+  const voiceHint = voiceMode
+    ? "\n\nModo voz ativo: responda como papo ao vivo — 1 a 3 frases, sem markdown, sem listas."
+    : "";
 
   const messages: ChatMessage[] = [
-    { role: "system", content: SYSTEM_PROMPT + contextNote },
+    { role: "system", content: SYSTEM_PROMPT + contextNote + voiceHint },
     ...rawMessages.map((m) => normalizeMessage(m)),
   ];
 
@@ -226,7 +236,8 @@ async function handleChat(openaiKey: string, body: Record<string, unknown>) {
       messages,
       tools: TOOLS,
       tool_choice: "auto",
-      temperature: 0.7,
+      temperature: voiceMode ? 0.55 : 0.65,
+      max_tokens: voiceMode ? 280 : 450,
     }),
   });
 
@@ -270,19 +281,27 @@ async function handleTranscribe(openaiKey: string, body: Record<string, unknown>
 
   const binary = Uint8Array.from(atob(audioBase64), (c) => c.charCodeAt(0));
   const ext = mime.includes("mp4") || mime.includes("m4a") ? "m4a" : mime.includes("ogg") ? "ogg" : "webm";
-  const form = new FormData();
-  form.append("file", new File([binary], `speech.${ext}`, { type: mime }));
-  form.append("model", WHISPER_MODEL);
-  form.append("language", "pt");
 
-  const res = await fetch(`${OPENAI_URL}/audio/transcriptions`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${openaiKey}` },
-    body: form,
-  });
-  const payload = await res.json();
+  async function transcribeWith(model: string) {
+    const form = new FormData();
+    form.append("file", new File([binary], `speech.${ext}`, { type: mime }));
+    form.append("model", model);
+    form.append("language", "pt");
+    const res = await fetch(`${OPENAI_URL}/audio/transcriptions`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${openaiKey}` },
+      body: form,
+    });
+    const payload = await res.json();
+    return { res, payload };
+  }
+
+  let { res, payload } = await transcribeWith(STT_MODEL);
+  if (!res.ok && STT_MODEL !== "whisper-1") {
+    ({ res, payload } = await transcribeWith("whisper-1"));
+  }
   if (!res.ok) {
-    const detail = payload?.error?.message ?? `whisper_http_${res.status}`;
+    const detail = payload?.error?.message ?? `stt_http_${res.status}`;
     throw new Error(String(detail));
   }
   const text = typeof payload.text === "string" ? payload.text.trim() : "";

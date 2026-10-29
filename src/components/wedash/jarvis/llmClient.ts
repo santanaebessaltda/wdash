@@ -32,24 +32,27 @@ function contextNote(ctx: JarvisContext): string {
   return `Hoje: ${ctx.today}. Filiais no escopo: ${stores}. Tenant: ${ctx.tenantId}.`;
 }
 
-/** Um turno com loop de tools (máx. 4). Side effects (navegar / rascunho) o caller aplica. */
+/** Um turno com loop de tools (máx. 3). Side effects (navegar / rascunho) o caller aplica. */
 export async function jarvisLlmTurn(
   history: LlmChatMessage[],
   ctx: JarvisContext,
   userText: string,
+  opts?: { voiceMode?: boolean },
 ): Promise<LlmTurnResult> {
   const sb = getSupabase();
   if (!sb) return { ok: false, reason: "supabase_missing" };
 
   const messages: LlmChatMessage[] = [...history, { role: "user", content: userText }];
   const sideEffects: LlmSideEffect[] = [];
+  const maxRounds = opts?.voiceMode ? 3 : 4;
 
-  for (let round = 0; round < 4; round++) {
+  for (let round = 0; round < maxRounds; round++) {
     const { data, error } = await sb.functions.invoke("jarvis-ai", {
       body: {
         action: "chat",
         messages,
         contextNote: contextNote(ctx),
+        voiceMode: Boolean(opts?.voiceMode),
       },
     });
 
@@ -75,15 +78,21 @@ export async function jarvisLlmTurn(
 
     if (payload.type === "tool_calls" && payload.assistant?.tool_calls?.length) {
       messages.push(payload.assistant);
-      for (const call of payload.assistant.tool_calls) {
-        const name = call.function.name as JarvisToolName;
-        let args: Record<string, unknown> = {};
-        try {
-          args = JSON.parse(call.function.arguments || "{}") as Record<string, unknown>;
-        } catch {
-          args = {};
-        }
-        const ran = await runJarvisTool(name, args, ctx, userText);
+      // Tools em paralelo — menos espera entre análise e resposta.
+      const ranList = await Promise.all(
+        payload.assistant.tool_calls.map(async (call) => {
+          const name = call.function.name as JarvisToolName;
+          let args: Record<string, unknown> = {};
+          try {
+            args = JSON.parse(call.function.arguments || "{}") as Record<string, unknown>;
+          } catch {
+            args = {};
+          }
+          const ran = await runJarvisTool(name, args, ctx, userText);
+          return { call, name, ran };
+        }),
+      );
+      for (const { call, name, ran } of ranList) {
         if (ran.sideEffect) sideEffects.push(ran.sideEffect);
         messages.push({
           role: "tool",
