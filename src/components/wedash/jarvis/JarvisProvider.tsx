@@ -161,22 +161,19 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
 
   const speakAnswer = useCallback((answer: string, opts?: { listenAfter?: boolean }) => {
     setMessages((m) => [...m, { from: "jarvis", text: answer }]);
-    if (ttsSupported()) {
-      setMode("speaking");
-      cancelSpeakRef.current?.();
-      cancelSpeakRef.current = speak(answer, {
-        onEnd: () => {
-          setMode((cur) => (cur === "speaking" ? "idle" : cur));
-          if (opts?.listenAfter && voiceOpenRef.current) {
-            window.setTimeout(() => startListeningRef.current(), 400);
-          }
-        },
-      });
-    } else {
-      setMode("idle");
+    const finish = () => {
+      setMode((cur) => (cur === "speaking" ? "idle" : cur));
       if (opts?.listenAfter && voiceOpenRef.current) {
         window.setTimeout(() => startListeningRef.current(), 400);
       }
+    };
+    // OpenAI TTS (onyx) via Edge; se falhar, Web Speech do Chrome.
+    if (ttsSupported()) {
+      setMode("speaking");
+      cancelSpeakRef.current?.();
+      cancelSpeakRef.current = speak(answer, { onEnd: finish });
+    } else {
+      finish();
     }
   }, []);
 

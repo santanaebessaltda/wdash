@@ -1,4 +1,6 @@
-/** STT / TTS via Web Speech API (Chromium/Android PWA; iOS limitado). */
+/** STT / TTS — OpenAI TTS (voz JARVIS) com fallback Web Speech. */
+
+import { jarvisSpeak } from "./llmClient";
 
 export interface SpeechRecognitionLike {
   lang: string;
@@ -47,12 +49,35 @@ export function createSpeechRecognition(): SpeechRecognitionLike | null {
 }
 
 export function ttsSupported(): boolean {
-  return typeof window !== "undefined" && "speechSynthesis" in window;
+  return typeof window !== "undefined" && ("speechSynthesis" in window || typeof Audio !== "undefined");
 }
 
-/** Fala em pt-BR; cancela fala anterior. */
-export function speak(text: string, opts?: { onEnd?: () => void }): () => void {
-  if (!ttsSupported()) {
+let activeAudio: HTMLAudioElement | null = null;
+let activeObjectUrl: string | null = null;
+
+function stopBrowserTts(): void {
+  if (typeof window !== "undefined" && "speechSynthesis" in window) {
+    window.speechSynthesis.cancel();
+  }
+}
+
+function stopRemoteAudio(): void {
+  if (activeAudio) {
+    activeAudio.onended = null;
+    activeAudio.onerror = null;
+    activeAudio.pause();
+    activeAudio.src = "";
+    activeAudio = null;
+  }
+  if (activeObjectUrl) {
+    URL.revokeObjectURL(activeObjectUrl);
+    activeObjectUrl = null;
+  }
+}
+
+/** Fallback: fala nativa do Chrome em pt-BR. */
+function speakBrowser(text: string, opts?: { onEnd?: () => void }): () => void {
+  if (!("speechSynthesis" in window)) {
     opts?.onEnd?.();
     return () => undefined;
   }
@@ -83,8 +108,69 @@ export function speak(text: string, opts?: { onEnd?: () => void }): () => void {
   };
 }
 
+/**
+ * Voz do JARVIS: OpenAI TTS (onyx) via Edge; se falhar, Web Speech.
+ * Retorna cancelador síncrono (como antes).
+ */
+export function speak(text: string, opts?: { onEnd?: () => void }): () => void {
+  let cancelled = false;
+  let cancelBrowser: (() => void) | null = null;
+
+  stopRemoteAudio();
+  stopBrowserTts();
+
+  const trimmed = text.trim();
+  if (!trimmed) {
+    opts?.onEnd?.();
+    return () => undefined;
+  }
+
+  void (async () => {
+    const remote = await jarvisSpeak(trimmed);
+    if (cancelled) return;
+
+    if (remote.ok) {
+      try {
+        const binary = Uint8Array.from(atob(remote.audioBase64), (c) => c.charCodeAt(0));
+        const blob = new Blob([binary], { type: remote.mime || "audio/mpeg" });
+        const url = URL.createObjectURL(blob);
+        activeObjectUrl = url;
+        const audio = new Audio(url);
+        activeAudio = audio;
+        audio.onended = () => {
+          if (activeAudio === audio) {
+            stopRemoteAudio();
+            opts?.onEnd?.();
+          }
+        };
+        audio.onerror = () => {
+          if (cancelled) return;
+          stopRemoteAudio();
+          cancelBrowser = speakBrowser(trimmed, opts);
+        };
+        await audio.play();
+        return;
+      } catch {
+        if (cancelled) return;
+        stopRemoteAudio();
+      }
+    }
+
+    if (cancelled) return;
+    cancelBrowser = speakBrowser(trimmed, opts);
+  })();
+
+  return () => {
+    cancelled = true;
+    stopRemoteAudio();
+    cancelBrowser?.();
+    stopBrowserTts();
+  };
+}
+
 export function stopSpeaking(): void {
-  if (ttsSupported()) window.speechSynthesis.cancel();
+  stopRemoteAudio();
+  stopBrowserTts();
 }
 
 /** Normaliza texto para comparar wake word. */

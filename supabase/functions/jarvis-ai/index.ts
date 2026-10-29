@@ -1,5 +1,5 @@
 /**
- * jarvis-ai — OpenAI (chat + Whisper) só para Gestor.
+ * jarvis-ai — OpenAI (chat + Whisper + TTS) só para Gestor.
  * OPENAI_API_KEY em secrets do projeto. Nunca no front.
  */
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
@@ -9,6 +9,10 @@ import { OWNER_ROLES, loadStaffCaller } from "../_shared/staffAuth.ts";
 const OPENAI_URL = "https://api.openai.com/v1";
 const CHAT_MODEL = Deno.env.get("JARVIS_CHAT_MODEL")?.trim() || "gpt-4o-mini";
 const WHISPER_MODEL = "whisper-1";
+/** tts-1: barato e estável. Voz onyx = masculina profunda (assistente). */
+const TTS_MODEL = Deno.env.get("JARVIS_TTS_MODEL")?.trim() || "tts-1";
+const TTS_VOICE = Deno.env.get("JARVIS_TTS_VOICE")?.trim() || "onyx";
+const TTS_MAX_CHARS = 2000;
 
 type ChatMessage = {
   role: "system" | "user" | "assistant" | "tool";
@@ -173,6 +177,9 @@ serve(async (req) => {
     if (action === "transcribe") {
       return await handleTranscribe(openaiKey, body);
     }
+    if (action === "speak") {
+      return await handleSpeak(openaiKey, body);
+    }
     if (action === "chat") {
       return await handleChat(openaiKey, body);
     }
@@ -273,6 +280,57 @@ async function handleTranscribe(openaiKey: string, body: Record<string, unknown>
   const text = typeof payload.text === "string" ? payload.text.trim() : "";
   if (!text) return json({ ok: false, error: "empty_transcript" }, 422);
   return json({ ok: true, type: "transcript", text });
+}
+
+/** TTS OpenAI → MP3 em base64 (voz dedicada do JARVIS no app). */
+async function handleSpeak(openaiKey: string, body: Record<string, unknown>) {
+  const raw = typeof body.text === "string" ? body.text.trim() : "";
+  if (!raw) return json({ ok: false, error: "text_required" }, 400);
+  const text = raw.length > TTS_MAX_CHARS ? `${raw.slice(0, TTS_MAX_CHARS - 1)}…` : raw;
+
+  const res = await fetch(`${OPENAI_URL}/audio/speech`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${openaiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: TTS_MODEL,
+      voice: TTS_VOICE,
+      input: text,
+      response_format: "mp3",
+    }),
+  });
+
+  if (!res.ok) {
+    let detail = `tts_http_${res.status}`;
+    try {
+      const errBody = await res.json();
+      if (errBody?.error?.message) detail = String(errBody.error.message);
+    } catch {
+      /* ignore */
+    }
+    throw new Error(detail);
+  }
+
+  const bytes = new Uint8Array(await res.arrayBuffer());
+  if (bytes.length < 64) throw new Error("empty_audio");
+  return json({
+    ok: true,
+    type: "speech",
+    mime: "audio/mpeg",
+    audioBase64: bytesToBase64(bytes),
+    voice: TTS_VOICE,
+  });
+}
+
+function bytesToBase64(bytes: Uint8Array): string {
+  const chunk = 0x8000;
+  let binary = "";
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+  }
+  return btoa(binary);
 }
 
 function normalizeMessage(raw: unknown): ChatMessage {
