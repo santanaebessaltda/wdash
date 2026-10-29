@@ -45,6 +45,7 @@ import {
   validateScheduleDraft,
   type ScheduleDraft,
 } from "./scheduleDraft";
+import { clearChatMessages, loadChatMessages, saveChatMessages } from "./chatHistory";
 import { firstNameFrom, voiceStandbyLine } from "./greeting";
 import {
   createSpeechRecognition,
@@ -144,6 +145,8 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
   const allowed = Boolean(session && isOwner(session.role));
 
   const [messages, setMessages] = useState<JarvisMessage[]>([]);
+  /** Evita gravar [] no storage no tick do hydrate. */
+  const skipChatSaveRef = useRef(true);
   const [mode, setMode] = useState<JarvisMode>("idle");
   const [micHint, setMicHint] = useState<string | null>(null);
   const [draftText, setDraftText] = useState("");
@@ -199,6 +202,25 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
   voiceReadRef.current = voiceRead;
   dictatingRef.current = dictating;
   dictateBusyRef.current = dictateBusy;
+
+  /** Histórico no aparelho (por empresa + membership). */
+  useEffect(() => {
+    skipChatSaveRef.current = true;
+    if (!session || !allowed) {
+      setMessages([]);
+      return;
+    }
+    setMessages(loadChatMessages(session.tenantId, session.membershipId));
+  }, [allowed, session?.tenantId, session?.membershipId]);
+
+  useEffect(() => {
+    if (!session || !allowed) return;
+    if (skipChatSaveRef.current) {
+      skipChatSaveRef.current = false;
+      return;
+    }
+    saveChatMessages(session.tenantId, session.membershipId, messages);
+  }, [allowed, messages, session?.tenantId, session?.membershipId]);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -1297,7 +1319,8 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
         // Palmas não contam como gesto: sem permissão prévia o Chrome não pergunta.
         void (async () => {
           if (await micAlreadyGranted()) {
-            window.setTimeout(() => beginListenAfterMicOk(), 350);
+            // Mesma saudação + histórico do botão (mic já liberado).
+            window.setTimeout(() => requestMicFromUserGesture(), 200);
             return;
           }
           setMicHint(MIC_NEED_CLICK_HINT);
@@ -1308,7 +1331,7 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
       // Clique no botão de voz: pedir mic AGORA (mesmo gesto).
       requestMicFromUserGesture();
     },
-    [beginListenAfterMicOk, cancelDictate, micAlreadyGranted, requestMicFromUserGesture],
+    [cancelDictate, micAlreadyGranted, requestMicFromUserGesture],
   );
 
   const closeVoice = useCallback(() => {
@@ -1334,6 +1357,7 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
     setVoicePaused(false);
     setVoiceOpen(false);
     setMessages([]);
+    if (session) clearChatMessages(session.tenantId, session.membershipId);
     setDraftText("");
     setMicHint(null);
     setMode("idle");
@@ -1345,7 +1369,7 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
     scheduleDraftRef.current = null;
     setCreatedItem(null);
     setCommitBusy(false);
-  }, [cancelDictate, stopMediaTracks]);
+  }, [cancelDictate, session, stopMediaTracks]);
 
   useEffect(() => {
     return () => {
