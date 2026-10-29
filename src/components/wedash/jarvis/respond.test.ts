@@ -20,6 +20,16 @@ describe("classifyIntent", () => {
     expect(classifyIntent("Como está o faturamento da rede?")).toBe("analyze_sales");
     expect(classifyIntent("Quanto vendi hoje?")).toBe("analyze_sales");
     expect(classifyIntent("Quanto a loja vendeu ontem?")).toBe("analyze_sales");
+    expect(classifyIntent("E em todas as filiais?")).toBe("analyze_sales");
+  });
+
+  it("sugestão/reajuste de meta não vira atalho de vendas", () => {
+    expect(
+      classifyIntent(
+        "Na verdade quero que você me der sugestão do novo valor tendo em vista os valores vendidos até hoje",
+      ),
+    ).toBe("goal");
+    expect(classifyIntent("Posso reajustar a meta de outubro?")).toBe("goal");
   });
 
   it("reconhece autorização sem rascunho", () => {

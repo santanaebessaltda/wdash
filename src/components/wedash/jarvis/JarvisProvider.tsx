@@ -35,7 +35,7 @@ import {
   looksLikeNavigate,
   resolveNavigate,
 } from "./navigateBrief";
-import { classifyIntent } from "./respond";
+import { classifyIntent, looksLikeGoalAdvice, looksLikeSalesQuery } from "./respond";
 import { commitSchedule } from "./scheduleCommit";
 import {
   discussSchedule,
@@ -632,8 +632,8 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
         syncScopePeriodFromQuestion(q, location.pathname, location.search, navigate);
       };
 
-      // Vendas: brief direto (sem round-trip LLM) + alinha o filtro de período da tela.
-      if (intent === "analyze_sales") {
+      // Vendas: brief direto só em pergunta clara de leitura — nunca em sugestão/reajuste de meta.
+      if (intent === "analyze_sales" && looksLikeSalesQuery(q) && !looksLikeGoalAdvice(q)) {
         applyPeriodAndScroll();
         void loadSalesBrief(ctx, q).then((answer) => {
           if (gen !== replyGen.current) return;

@@ -17,11 +17,43 @@ export type JarvisIntent =
   | "authorize"
   | "unknown";
 
-export function classifyIntent(raw: string): JarvisIntent {
-  const p = raw
+function normalizeIntentText(raw: string): string {
+  return raw
     .toLowerCase()
     .normalize("NFD")
     .replace(/\p{M}/gu, "");
+}
+
+/**
+ * Pedido de meta / sugestão / reajuste — não pode cair no atalho de “vendas de hoje”
+ * só porque a frase cita “valores vendidos”.
+ */
+export function looksLikeGoalAdvice(raw: string): boolean {
+  const p = normalizeIntentText(raw);
+  return /meta|comissao|premiacao|escada|reajust|sugest|novo valor|valor sugerido|valor da meta|posso (baixar|subir|mudar|alterar)|vai bater|nao vai bater|ating(ir|imento)|proponha|propor (um |o )?valor/.test(
+    p,
+  );
+}
+
+/** Pergunta clara de leitura de vendas (atalho loadSalesBrief). */
+export function looksLikeSalesQuery(raw: string): boolean {
+  const p = normalizeIntentText(raw);
+  if (looksLikeGoalAdvice(p)) return false;
+  if (looksLikeChallengeAdvice(p)) return false;
+  return (
+    /quanto (eu |a loja |a rede |nos |voce )?(vend|faturou)|vendi\b|vendeu\b|vendemos\b|faturamento|ticket|p\.?\s*a\.?\b|margem|analis(e|ar)? (as? |o )?(venda|faturamento)|como (esta|tá) (a |o )?(loja|rede|grupo|venda|faturamento)/.test(
+      p,
+    ) || /^(e )?(em |na |no )?(todas( as)? filiais|a rede|a loja)\??$/.test(p.trim())
+  );
+}
+
+function looksLikeChallengeAdvice(raw: string): boolean {
+  const p = normalizeIntentText(raw);
+  return /desafio/.test(p);
+}
+
+export function classifyIntent(raw: string): JarvisIntent {
+  const p = normalizeIntentText(raw);
 
   if (/^(oi|ola|bom dia|boa tarde|boa noite|e ai|eai)\b/.test(p) || p.includes("tudo bem")) return "greeting";
   if (/o que (voce|vc) (faz|pode)|como (voce|vc) funciona|suas habilidades|no que (voce|vc) ajuda/.test(p)) {
@@ -39,19 +71,12 @@ export function classifyIntent(raw: string): JarvisIntent {
   if (/(abre|abrir|entra|entrar|vai (pra|pro|para)|vamos (pra|pro|para)|mostra|mostrar|me leva|abre a tela)/.test(p)) {
     return "navigate";
   }
-  if (/desafio/.test(p)) return "challenge";
-  if (/meta|comissao|premiacao|escada/.test(p)) return "goal";
+  if (looksLikeChallengeAdvice(p)) return "challenge";
+  if (looksLikeGoalAdvice(p)) return "goal";
   if (/escala|folga|6\s*[x×]\s*1|plantao|turno/.test(p)) return "schedule";
   if (/sazonal|dia das maes|black friday|natal|pascoa|namorados|datas comemorativas/.test(p)) return "seasonal";
   if (/estoque|parado|encalhe|cobertura|sem girar|parado na prateleira/.test(p)) return "analyze_stock";
-  // “vendi / vendeu / vender” também contam (não só “venda”).
-  if (
-    /vend[aeiou]|faturamento|ticket|p\.?\s*a\.?|margem|analis|como (esta|tá) (a |o )?(loja|rede|grupo)/.test(
-      p,
-    )
-  ) {
-    return "analyze_sales";
-  }
+  if (looksLikeSalesQuery(p)) return "analyze_sales";
   return "unknown";
 }
 
