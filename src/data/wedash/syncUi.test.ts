@@ -8,6 +8,7 @@ import {
   formatForceCooldownLabel,
   formatBoardRefreshStatus,
   formatSyncWatermarkLabel,
+  nextAutoRefreshPhrase,
   lastForceAtFromRetryAfter,
   clearPendingForce,
   clearAllPendingForce,
@@ -47,10 +48,10 @@ describe("placar refresh line", () => {
   const zone = "America/Sao_Paulo";
   const stores = [{ hours: openWeek(), timeZone: zone }];
 
-  it("shows the next round 30 minutes after the last one, while the store is open", () => {
+  it("shows a countdown to the next round 30 minutes after the last one, while the store is open", () => {
     const now = new Date("2026-10-22T17:40:00.000Z");
     const watermark = new Date("2026-10-22T17:35:00.000Z");
-    expect(formatBoardRefreshStatus({ watermark, now, stores })).toBe("atualizado às 14:35 · próxima às 15:05");
+    expect(formatBoardRefreshStatus({ watermark, now, stores })).toBe("atualizado às 14:35 · próxima em 25 min");
   });
 
   it("says the round is in progress once that time has passed", () => {
@@ -73,6 +74,12 @@ describe("placar refresh line", () => {
 
   it("keeps the first-sync copy when nothing has been saved", () => {
     expect(formatBoardRefreshStatus({ watermark: null, stores })).toBe("Aguardando primeira sincronização");
+  });
+
+  it("rounds the countdown up to whole minutes", () => {
+    const now = new Date("2026-10-22T17:34:30.000Z");
+    const watermark = new Date("2026-10-22T17:05:00.000Z");
+    expect(nextAutoRefreshPhrase({ watermark, now, stores })).toBe("próxima em 1 min");
   });
 });
 

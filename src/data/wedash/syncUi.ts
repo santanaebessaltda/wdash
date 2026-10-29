@@ -74,43 +74,72 @@ function boardUpdatedPhrase(at: Date, now: Date, timeZone: string): string {
   return `atualizado em ${day.slice(0, 5)} às ${clock}`;
 }
 
+export type AutoRefreshStoreInput = {
+  hours: StoreWeekHours;
+  /** Placar usa `timeZone`; lojas do session usam `timezone`. */
+  timeZone?: string | null;
+  timezone?: string | null;
+};
+
+function storeZones(stores: AutoRefreshStoreInput[]) {
+  return stores.map((store) => ({
+    hours: store.hours,
+    timezone: store.timeZone || store.timezone || "America/Sao_Paulo",
+  }));
+}
+
 /**
- * Linha do placar: última gravação e o horário da próxima rodada automática.
- * Passou esse horário (ou a última do dia ainda não gravou) = "atualizando…".
+ * Contador da próxima rodada automática (Placar + tooltip do Atualizar).
+ * `null` = loja fechada / ainda não abriu / sem horário — não promete próxima.
+ * Passou da hora (ou última do dia ainda não gravou) = "atualizando…".
+ */
+export function nextAutoRefreshPhrase(args: {
+  watermark: Date;
+  now?: Date;
+  stores: AutoRefreshStoreInput[];
+}): string | null {
+  const now = args.now ?? new Date();
+  const zones = storeZones(args.stores);
+  if (zones.length === 0) return null;
+  const catchingUp = zones.some((store) => {
+    if (storePhase(store.hours, now, store.timezone) !== "finalDue") return false;
+    const final = finalRoundAt(store.hours, now, store.timezone);
+    return final != null && args.watermark < final;
+  });
+  if (catchingUp) return "atualizando…";
+  const next = nextAutoRefreshAt({
+    stores: zones,
+    now,
+    intervalMin: AUTO_REFRESH_MIN,
+    lastAutoAt: args.watermark,
+  });
+  if (!next) return null;
+  const ms = next.getTime() - now.getTime();
+  if (ms <= 0) return "atualizando…";
+  const min = Math.max(1, Math.ceil(ms / 60_000));
+  return min === 1 ? "próxima em 1 min" : `próxima em ${min} min`;
+}
+
+/**
+ * Linha do placar: última gravação e contador até a próxima rodada automática.
  * Loja fechada, ainda não abriu, ou sem horário = só a última, sem prometer a próxima.
  */
 export function formatBoardRefreshStatus(args: {
   watermark: Date | null;
   now?: Date;
   loading?: boolean;
-  stores: Array<{ hours: StoreWeekHours; timeZone?: string | null }>;
+  stores: AutoRefreshStoreInput[];
 }): string {
   const watermark = args.watermark;
   if (watermark == null) {
     return args.loading ? "Sincronizando dados…" : "Aguardando primeira sincronização";
   }
   const now = args.now ?? new Date();
-  const zones = args.stores.map((store) => ({
-    hours: store.hours,
-    timezone: store.timeZone || "America/Sao_Paulo",
-  }));
+  const zones = storeZones(args.stores);
   const timeZone = zones[0]?.timezone ?? "America/Sao_Paulo";
   const updated = boardUpdatedPhrase(watermark, now, timeZone);
-  const catchingUp = zones.some((store) => {
-    if (storePhase(store.hours, now, store.timezone) !== "finalDue") return false;
-    const final = finalRoundAt(store.hours, now, store.timezone);
-    return final != null && watermark < final;
-  });
-  if (catchingUp) return `${updated} · atualizando…`;
-  const next = nextAutoRefreshAt({
-    stores: zones,
-    now,
-    intervalMin: AUTO_REFRESH_MIN,
-    lastAutoAt: watermark,
-  });
-  if (!next) return updated;
-  if (next.getTime() <= now.getTime()) return `${updated} · atualizando…`;
-  return `${updated} · próxima às ${clockInZone(next, timeZone)}`;
+  const next = nextAutoRefreshPhrase({ watermark, now, stores: args.stores });
+  return next ? `${updated} · ${next}` : updated;
 }
 
 export function canForceSyncRefresh(role: string): boolean {

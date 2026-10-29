@@ -3,7 +3,7 @@ import { Dropdown, Tooltip, useToast } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import { useMediaQuery } from "@/lib/useMediaQuery";
 import { fetchSyncWatermark, salesChangedSince } from "@/data/wedash/salesRepo";
-import { canForceSyncRefresh, formatForceCooldownLabel } from "@/data/wedash/syncUi";
+import { canForceSyncRefresh, formatForceCooldownLabel, nextAutoRefreshPhrase } from "@/data/wedash/syncUi";
 import { AUTO_REFRESH_MIN, storePhase } from "@/data/wedash/autoRefresh";
 import { erpConnectionOf, fetchErpAccounts, type ErpConnectionState } from "@/data/wedash/erp";
 import { storesForSession } from "@/data/wedash/stores";
@@ -18,6 +18,8 @@ import {
   watermarkAfterRead,
 } from "@/push/resumeSales";
 const WATERMARK_POLL_MS = 60_000;
+/** Atualiza o contador "próxima em Xm" do tooltip / menu. */
+const COUNTDOWN_TICK_MS = 30_000;
 /** Loja aberta sem busca das vendas ha mais que isso (2 rodadas automaticas) = dado atrasado. */
 const STALE_OPEN_MS = 2 * AUTO_REFRESH_MIN * 60_000;
 
@@ -26,7 +28,8 @@ const STALE_OPEN_MS = 2 * AUTO_REFRESH_MIN * 60_000;
  * Tela registrada (`useScreenRefresh`): busca só o que aquela tela mostra; o tooltip é o dela.
  * Ao terminar um FORCE de vendas dispara `SALES_SYNCED_EVENT` — a tela aberta recarrega os próprios dados.
  * Rodada automatica que terminou (watermark avancou no poll, ao voltar ou pelo aviso) dispara o mesmo evento.
- * Tooltip e menu: título = estado da última busca; subtítulo = o que este clique busca.
+ * Tooltip e menu: título = última busca (+ contador da próxima automática nas telas de venda);
+ * subtítulo = o que este clique busca.
  * Bolinha amarela = vendas de hoje ainda nao buscadas ou busca atrasada com loja aberta.
  */
 export function TopbarRefresh({ storeIds }: { storeIds: string[] }) {
@@ -37,10 +40,16 @@ export function TopbarRefresh({ storeIds }: { storeIds: string[] }) {
   const storeKey = storeIds.join(",");
   const [watermark, setWatermark] = useState<Date | null>(null);
   const [loaded, setLoaded] = useState(false);
+  const [now, setNow] = useState(() => new Date());
   const lastWatermark = useRef<number | null>(null);
   const withoutHover = useMediaQuery("(hover: none)");
   const screenGen = useScreenRefreshGeneration();
   const [screenBusy, setScreenBusy] = useState(false);
+
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(new Date()), COUNTDOWN_TICK_MS);
+    return () => window.clearInterval(id);
+  }, []);
 
   const loadWatermark = useCallback(
     async (notifyIfNewer: boolean, opts?: { forceScreen?: boolean }): Promise<boolean> => {
@@ -173,7 +182,6 @@ export function TopbarRefresh({ storeIds }: { storeIds: string[] }) {
     await forcarUpdate();
   };
 
-  const now = new Date();
   const storeRows = storesForSession(session.stores).filter((s) => storeIds.length === 0 || storeIds.includes(s.id));
   if (!can || !canForce) return null;
 
@@ -202,7 +210,16 @@ export function TopbarRefresh({ storeIds }: { storeIds: string[] }) {
   const busyLabel = screen?.busyLabel ?? "Buscando as vendas de hoje…";
   const disconnectTitle =
     erpConnection === "password" ? "A senha do Millennium não é mais válida" : "Millennium desconectado";
-  const idleTitle = screen ? screen.status : refreshMomentTitle(!loaded ? undefined : watermark ? watermark.toISOString() : null);
+  const lastTitle = screen ? screen.status : refreshMomentTitle(!loaded ? undefined : watermark ? watermark.toISOString() : null);
+  const nextPhrase =
+    !own && !disconnected && watermark
+      ? nextAutoRefreshPhrase({
+          watermark,
+          now,
+          stores: storeRows.map((s) => ({ hours: s.hours, timezone: s.timezone })),
+        })
+      : null;
+  const idleTitle = nextPhrase ? `${lastTitle} · ${nextPhrase}` : lastTitle;
   const title = busy ? busyLabel : disconnected ? disconnectTitle : idleTitle;
   const tooltip = `${title}\n${tip}`;
 
