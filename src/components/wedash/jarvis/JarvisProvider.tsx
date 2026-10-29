@@ -30,6 +30,7 @@ import {
   validateGoalDraft,
   type GoalDraft,
 } from "./goalDraft";
+import { blobToBase64, jarvisLlmTurn, jarvisTranscribe, type LlmChatMessage } from "./llmClient";
 import {
   formatNavigateReply,
   looksLikeNavigate,
@@ -44,13 +45,7 @@ import {
   validateScheduleDraft,
   type ScheduleDraft,
 } from "./scheduleDraft";
-import {
-  createSpeechRecognition,
-  speak,
-  speechRecognitionSupported,
-  stopSpeaking,
-  ttsSupported,
-} from "./speech";
+import { speak, stopSpeaking, ttsSupported } from "./speech";
 
 export type JarvisMessage = { from: "user" | "jarvis"; text: string };
 export type JarvisMode = "idle" | "listening" | "thinking" | "speaking";
@@ -60,7 +55,7 @@ export type JarvisCreated =
 
 const OPENING: JarvisMessage = {
   from: "jarvis",
-  text: "E aí. Sou o JARVIS — tipo um sócio na operação. Vendas, estoque, sazonal, meta, desafio, escala… a gente conversa e eu só gravo quando você autorizar. Pode digitar ou apertar o botão de voz.",
+  text: "E aí. Sou o JARVIS. Manda no texto ou no botão de voz — a gente resolve junto, e eu só gravo depois que você autorizar.",
 };
 
 export const SUGGESTIONS = [
@@ -97,6 +92,8 @@ type JarvisApi = {
   voiceOpen: boolean;
   openVoice: () => void;
   closeVoice: () => void;
+  /** Para a gravação e manda pro Whisper. */
+  finishVoice: () => void;
   reply: (q: string) => void;
   authorizeChallenge: () => void;
   authorizeGoal: () => void;
@@ -140,7 +137,12 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
   const scheduleDraftRef = useRef<ScheduleDraft | null>(null);
   const replyGen = useRef(0);
   const voiceOpenRef = useRef(false);
-  const listenAgainRef = useRef<() => void>(() => undefined);
+  const mediaRecRef = useRef<MediaRecorder | null>(null);
+  const mediaChunksRef = useRef<Blob[]>([]);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
+  const startRecordingRef = useRef<() => void>(() => undefined);
+  const messagesRef = useRef<JarvisMessage[]>([OPENING]);
+  messagesRef.current = messages;
 
   challengeDraftRef.current = challengeDraft;
   goalDraftRef.current = goalDraft;
@@ -168,14 +170,14 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
         onEnd: () => {
           setMode((cur) => (cur === "speaking" ? "idle" : cur));
           if (opts?.listenAfter && voiceOpenRef.current) {
-            window.setTimeout(() => listenAgainRef.current(), 280);
+            window.setTimeout(() => startRecordingRef.current(), 320);
           }
         },
       });
     } else {
       setMode("idle");
       if (opts?.listenAfter && voiceOpenRef.current) {
-        window.setTimeout(() => listenAgainRef.current(), 280);
+        window.setTimeout(() => startRecordingRef.current(), 320);
       }
     }
   }, []);
@@ -273,6 +275,80 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
     );
   }, [commitBusy, session, speakAnswer]);
 
+  const replyLocal = useCallback(
+    async (q: string, ctx: ReturnType<typeof jarvisContextFromSession>, finish: (a: string) => void) => {
+      const intent = classifyIntent(q);
+      const n = q
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/\p{M}/gu, "");
+
+      if (intent === "navigate" || looksLikeNavigate(q)) {
+        const target = resolveNavigate(q, session!.role);
+        if (target) {
+          navigate({ pathname: target.to, search: searchForRoute(target.to, location.search) });
+          finish(formatNavigateReply(target));
+          return;
+        }
+        if (!/desafio|meta|escala|comissao|premiacao/.test(n)) {
+          finish("Não achei essa tela. Tenta tipo: abre Visão geral, vai pro Financeiro, abre Escala…");
+          return;
+        }
+      }
+
+      if (
+        intent === "challenge" ||
+        (challengeDraftRef.current && intent === "unknown" && !goalDraftRef.current && !scheduleDraftRef.current)
+      ) {
+        setGoalDraft(null);
+        goalDraftRef.current = null;
+        setScheduleDraft(null);
+        scheduleDraftRef.current = null;
+        const { reply: answer, draft } = await discussChallenge(q, ctx, challengeDraftRef.current);
+        setChallengeDraft(draft);
+        challengeDraftRef.current = draft;
+        setCreatedItem(null);
+        finish(answer);
+        return;
+      }
+
+      if (
+        intent === "goal" ||
+        (goalDraftRef.current && intent === "unknown" && !challengeDraftRef.current && !scheduleDraftRef.current)
+      ) {
+        setChallengeDraft(null);
+        challengeDraftRef.current = null;
+        setScheduleDraft(null);
+        scheduleDraftRef.current = null;
+        const { reply: answer, draft } = await discussGoal(q, ctx, goalDraftRef.current);
+        setGoalDraft(draft);
+        goalDraftRef.current = draft;
+        setCreatedItem(null);
+        finish(answer);
+        return;
+      }
+
+      if (
+        intent === "schedule" ||
+        (scheduleDraftRef.current && intent === "unknown" && !challengeDraftRef.current && !goalDraftRef.current)
+      ) {
+        setChallengeDraft(null);
+        challengeDraftRef.current = null;
+        setGoalDraft(null);
+        goalDraftRef.current = null;
+        const { reply: answer, draft } = await discussSchedule(q, ctx, scheduleDraftRef.current);
+        setScheduleDraft(draft);
+        scheduleDraftRef.current = draft;
+        setCreatedItem(null);
+        finish(answer);
+        return;
+      }
+
+      finish(await jarvisAnswer(q, ctx));
+    },
+    [location.search, navigate, session],
+  );
+
   const reply = useCallback(
     (question: string) => {
       const q = question.trim();
@@ -282,9 +358,9 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
       setMessages((m) => [...m, { from: "user", text: q }]);
       setDraftText("");
       setMode("thinking");
+      setMicHint(null);
       stopSpeaking();
       const ctx = jarvisContextFromSession(session, readTopbarStoreIds());
-      const intent = classifyIntent(q);
       const n = q
         .toLowerCase()
         .normalize("NFD")
@@ -317,6 +393,7 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
         return;
       }
 
+      const intent = classifyIntent(q);
       if (intent === "authorize") {
         if (challengeDraftRef.current) {
           void authorizeChallenge();
@@ -334,149 +411,197 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      if (intent === "navigate" || looksLikeNavigate(q)) {
-        const target = resolveNavigate(q, session.role);
-        if (target) {
-          navigate({ pathname: target.to, search: searchForRoute(target.to, location.search) });
-          finish(formatNavigateReply(target));
+      const history: LlmChatMessage[] = messagesRef.current
+        .filter((m) => m !== OPENING)
+        .slice(-12)
+        .map((m) => ({
+          role: m.from === "user" ? "user" : "assistant",
+          content: m.text,
+        }));
+
+      void (async () => {
+        const llm = await jarvisLlmTurn(history, ctx, q);
+        if (gen !== replyGen.current) return;
+
+        if (!llm.ok) {
+          if (llm.reason === "openai_not_configured") {
+            setMicHint("IA ainda sem chave no servidor — usando modo local.");
+          }
+          await replyLocal(q, ctx, finish);
           return;
         }
-        // "abre um desafio…" sem tela clara → segue pro rascunho, não erro de navegação
-        if (!/desafio|meta|escala|comissao|premiacao/.test(n)) {
-          finish("Não achei essa tela. Tenta tipo: abre Visão geral, vai pro Financeiro, abre Escala…");
-          return;
+
+        for (const effect of llm.sideEffects) {
+          if (effect.kind === "navigate") {
+            const target = resolveNavigate(effect.request, session.role);
+            if (target) {
+              navigate({ pathname: target.to, search: searchForRoute(target.to, location.search) });
+            }
+          } else if (effect.kind === "draft_challenge") {
+            setGoalDraft(null);
+            goalDraftRef.current = null;
+            setScheduleDraft(null);
+            scheduleDraftRef.current = null;
+            const { draft } = await discussChallenge(effect.request || q, ctx, challengeDraftRef.current);
+            if (gen !== replyGen.current) return;
+            setChallengeDraft(draft);
+            challengeDraftRef.current = draft;
+            setCreatedItem(null);
+          } else if (effect.kind === "draft_goal") {
+            setChallengeDraft(null);
+            challengeDraftRef.current = null;
+            setScheduleDraft(null);
+            scheduleDraftRef.current = null;
+            const { draft } = await discussGoal(effect.request || q, ctx, goalDraftRef.current);
+            if (gen !== replyGen.current) return;
+            setGoalDraft(draft);
+            goalDraftRef.current = draft;
+            setCreatedItem(null);
+          } else if (effect.kind === "draft_schedule") {
+            setChallengeDraft(null);
+            challengeDraftRef.current = null;
+            setGoalDraft(null);
+            goalDraftRef.current = null;
+            const { draft } = await discussSchedule(effect.request || q, ctx, scheduleDraftRef.current);
+            if (gen !== replyGen.current) return;
+            setScheduleDraft(draft);
+            scheduleDraftRef.current = draft;
+            setCreatedItem(null);
+          }
         }
-      }
 
-      if (
-        intent === "challenge" ||
-        (challengeDraftRef.current && intent === "unknown" && !goalDraftRef.current && !scheduleDraftRef.current)
-      ) {
-        setGoalDraft(null);
-        goalDraftRef.current = null;
-        setScheduleDraft(null);
-        scheduleDraftRef.current = null;
-        void discussChallenge(q, ctx, challengeDraftRef.current).then(({ reply: answer, draft }) => {
-          if (gen !== replyGen.current) return;
-          setChallengeDraft(draft);
-          challengeDraftRef.current = draft;
-          setCreatedItem(null);
-          finish(answer);
-        });
-        return;
-      }
-
-      if (
-        intent === "goal" ||
-        (goalDraftRef.current && intent === "unknown" && !challengeDraftRef.current && !scheduleDraftRef.current)
-      ) {
-        setChallengeDraft(null);
-        challengeDraftRef.current = null;
-        setScheduleDraft(null);
-        scheduleDraftRef.current = null;
-        void discussGoal(q, ctx, goalDraftRef.current).then(({ reply: answer, draft }) => {
-          if (gen !== replyGen.current) return;
-          setGoalDraft(draft);
-          goalDraftRef.current = draft;
-          setCreatedItem(null);
-          finish(answer);
-        });
-        return;
-      }
-
-      if (
-        intent === "schedule" ||
-        (scheduleDraftRef.current && intent === "unknown" && !challengeDraftRef.current && !goalDraftRef.current)
-      ) {
-        setChallengeDraft(null);
-        challengeDraftRef.current = null;
-        setGoalDraft(null);
-        goalDraftRef.current = null;
-        void discussSchedule(q, ctx, scheduleDraftRef.current).then(({ reply: answer, draft }) => {
-          if (gen !== replyGen.current) return;
-          setScheduleDraft(draft);
-          scheduleDraftRef.current = draft;
-          setCreatedItem(null);
-          finish(answer);
-        });
-        return;
-      }
-
-      void jarvisAnswer(q, ctx).then(finish);
+        finish(llm.content);
+      })();
     },
-    [authorizeChallenge, authorizeGoal, authorizeSchedule, location.search, navigate, session, speakAnswer],
+    [
+      authorizeChallenge,
+      authorizeGoal,
+      authorizeSchedule,
+      location.search,
+      navigate,
+      replyLocal,
+      session,
+      speakAnswer,
+    ],
   );
 
-  const startListen = useCallback(() => {
-    const rec = createSpeechRecognition();
-    if (!rec) {
-      setMicHint("Este aparelho não reconhece voz. Digita aí no chat.");
+  const stopMediaTracks = useCallback(() => {
+    mediaStreamRef.current?.getTracks().forEach((t) => t.stop());
+    mediaStreamRef.current = null;
+    mediaRecRef.current = null;
+  }, []);
+
+  const startRecording = useCallback(async () => {
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setMicHint("Sem microfone neste aparelho — usa o chat escrito.");
       setMode("idle");
       return;
     }
-    setMicHint(null);
-    stopSpeaking();
-    setMode("listening");
-    rec.continuous = false;
-    rec.interimResults = true;
-    let finalText = "";
-    rec.onresult = (event) => {
-      let interim = "";
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        const row = event.results[i];
-        if (!row) continue;
-        const piece = row[0]?.transcript ?? "";
-        if (row.isFinal) finalText += piece;
-        else interim += piece;
-      }
-      if (interim) setDraftText(interim);
-      if (finalText.trim()) setDraftText(finalText.trim());
-    };
-    rec.onerror = () => {
+    try {
+      stopSpeaking();
+      setMicHint(null);
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaStreamRef.current = stream;
+      mediaChunksRef.current = [];
+      const mime = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+        ? "audio/webm;codecs=opus"
+        : MediaRecorder.isTypeSupported("audio/webm")
+          ? "audio/webm"
+          : MediaRecorder.isTypeSupported("audio/mp4")
+            ? "audio/mp4"
+            : "";
+      const rec = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream);
+      mediaRecRef.current = rec;
+      rec.ondataavailable = (ev) => {
+        if (ev.data.size > 0) mediaChunksRef.current.push(ev.data);
+      };
+      rec.onerror = () => {
+        stopMediaTracks();
+        setMode("idle");
+        setMicHint("Falhou a gravação. Tenta de novo.");
+      };
+      rec.start(250);
+      setMode("listening");
+    } catch {
+      stopMediaTracks();
       setMode("idle");
-      setMicHint("Não te ouvi. Toca de novo no botão de voz.");
-    };
-    rec.onend = () => {
-      setMode("idle");
-      const said = finalText.trim();
-      if (said) reply(said);
-      else if (voiceOpenRef.current) {
-        // silêncio — espera o usuário falar de novo ou fechar
+      setMicHint("Preciso de permissão do microfone pra conversar por voz.");
+    }
+  }, [stopMediaTracks]);
+  startRecordingRef.current = () => void startRecording();
+
+  const finishVoice = useCallback(() => {
+    const rec = mediaRecRef.current;
+    if (!rec || rec.state === "inactive") {
+      void startRecording();
+      return;
+    }
+    rec.onstop = () => {
+      const chunks = mediaChunksRef.current;
+      const mime = rec.mimeType || "audio/webm";
+      stopMediaTracks();
+      if (chunks.length === 0) {
+        setMode("idle");
+        setMicHint("Não peguei áudio. Segura um pouco e fala de novo.");
+        return;
       }
+      const blob = new Blob(chunks, { type: mime });
+      setMode("thinking");
+      void (async () => {
+        try {
+          const b64 = await blobToBase64(blob);
+          const tr = await jarvisTranscribe(b64, mime.split(";")[0] || mime);
+          if (!tr.ok) {
+            setMode("idle");
+            setMicHint(
+              tr.reason === "openai_not_configured"
+                ? "Whisper ainda sem chave no servidor."
+                : "Não entendi o áudio. Tenta de novo.",
+            );
+            return;
+          }
+          reply(tr.text);
+        } catch {
+          setMode("idle");
+          setMicHint("Falhou ao enviar o áudio. Tenta de novo.");
+        }
+      })();
     };
     try {
-      rec.start();
+      rec.stop();
     } catch {
+      stopMediaTracks();
       setMode("idle");
-      setMicHint("Microfone ocupado. Fecha outros apps e tenta de novo.");
     }
-  }, [reply]);
-  listenAgainRef.current = startListen;
+  }, [reply, startRecording, stopMediaTracks]);
 
   const openVoice = useCallback(() => {
-    if (!speechRecognitionSupported()) {
-      setMicHint("Voz não roda neste aparelho — usa o chat escrito.");
-      return;
-    }
     setVoiceOpen(true);
     stopSpeaking();
     setMode("idle");
-    window.setTimeout(() => startListen(), 350);
-  }, [startListen]);
+    window.setTimeout(() => void startRecording(), 200);
+  }, [startRecording]);
 
   const closeVoice = useCallback(() => {
     setVoiceOpen(false);
+    try {
+      if (mediaRecRef.current && mediaRecRef.current.state !== "inactive") mediaRecRef.current.stop();
+    } catch {
+      /* ignore */
+    }
+    stopMediaTracks();
     stopSpeaking();
     cancelSpeakRef.current?.();
     setMode("idle");
-  }, []);
+  }, [stopMediaTracks]);
 
   useEffect(() => {
     return () => {
       cancelSpeakRef.current?.();
       stopSpeaking();
+      stopMediaTracks();
     };
-  }, []);
+  }, [stopMediaTracks]);
 
   const api = useMemo<JarvisApi>(
     () => ({
@@ -494,6 +619,7 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
       voiceOpen,
       openVoice,
       closeVoice,
+      finishVoice,
       reply,
       authorizeChallenge: () => void authorizeChallenge(),
       authorizeGoal: () => void authorizeGoal(),
@@ -526,6 +652,7 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
       commitBusy,
       createdItem,
       draftText,
+      finishVoice,
       goalDraft,
       messages,
       micHint,

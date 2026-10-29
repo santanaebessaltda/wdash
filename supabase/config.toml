@@ -40,3 +40,6 @@ verify_jwt = true
 
 [functions.wallet]
 verify_jwt = true
+
+[functions.jarvis-ai]
+verify_jwt = true

@@ -1,19 +1,18 @@
 import { createPortal } from "react-dom";
 import { Button } from "@/components/ui";
-import { cn } from "@/lib/cn";
 import { useJarvis } from "./JarvisProvider";
 import { VoiceOrb } from "./VoiceOrb";
 
-/** Overlay de conversa por voz — orbe + estados; fecha e volta ao chat. */
+/** Overlay de conversa por voz — grava → Whisper → responde → grava de novo. */
 export function VoiceSession() {
-  const { voiceOpen, closeVoice, mode, draftText, micHint, openVoice } = useJarvis();
+  const { voiceOpen, closeVoice, finishVoice, mode, draftText, micHint } = useJarvis();
   if (!voiceOpen || typeof document === "undefined") return null;
 
   const status =
     mode === "listening"
-      ? "Tô te ouvindo…"
+      ? "Tô te ouvindo — fala e toca em Enviar"
       : mode === "thinking"
-        ? "Pensando…"
+        ? "Entendendo…"
         : mode === "speaking"
           ? "Falando…"
           : "Pode falar";
@@ -44,20 +43,14 @@ export function VoiceSession() {
       ) : null}
       {micHint ? <p className="mt-3 max-w-sm px-6 text-center text-[12px] text-warn">{micHint}</p> : null}
       <div className="mt-8 flex gap-2">
-        <Button
-          type="button"
-          variant="secondary"
-          size="sm"
-          onClick={() => openVoice()}
-          disabled={mode === "listening" || mode === "thinking"}
-        >
-          Falar de novo
+        <Button type="button" size="sm" onClick={() => finishVoice()} disabled={mode === "thinking" || mode === "speaking"}>
+          {mode === "listening" ? "Enviar" : "Falar de novo"}
         </Button>
         <Button type="button" size="sm" variant="outline" onClick={closeVoice}>
           Voltar ao chat
         </Button>
       </div>
-      <p className={cn("mt-10 text-[11px] text-t2")}>Conversa por voz com o JARVIS</p>
+      <p className="mt-10 text-[11px] text-t2">Voz com Whisper · conversa com a OpenAI</p>
     </div>,
     document.body,
   );

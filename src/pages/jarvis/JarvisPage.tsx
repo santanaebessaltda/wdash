@@ -19,9 +19,12 @@ import {
   validateScheduleDraft,
 } from "@/components/wedash/jarvis/scheduleDraft";
 import { SUGGESTIONS, useJarvis } from "@/components/wedash/jarvis/JarvisProvider";
-import { speechRecognitionSupported } from "@/components/wedash/jarvis/speech";
 import { cn } from "@/lib/cn";
 import { paths } from "@/router/paths";
+
+function voiceCaptureSupported(): boolean {
+  return typeof window !== "undefined" && Boolean(navigator.mediaDevices?.getUserMedia) && typeof MediaRecorder !== "undefined";
+}
 
 /** Chat JARVIS — casca no espírito do Chat Vela + botão de voz (Néctar / ChatGPT). */
 export function JarvisPage() {
@@ -159,7 +162,7 @@ export function JarvisPage() {
             disabled={j.mode === "listening"}
             className="h-[42px] flex-1 rounded-xl border border-line bg-bg-inset px-3.5 text-[13.5px] text-t0 outline-none placeholder:text-t2 focus:border-acc"
           />
-          {speechRecognitionSupported() ? (
+          {voiceCaptureSupported() ? (
             <button
               type="button"
               onClick={() => j.openVoice()}

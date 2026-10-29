@@ -264,6 +264,8 @@ Leitura e **navegar entre telas** não pedem autorização. Criar/editar/apagar 
 
 **Fatia 6 no código (2026-10-29):** UX Néctar — menu **JARVIS** `/jarvis` (chat Vela + botão de voz); overlay de modo voz com orbe; palmas **só desktop** abrem o overlay; tom humano; intent **navegar** (rotas do Gestor). Sem FAB.
 
+**Fatia 7 no código (2026-10-29):** **OpenAI ligada.** Edge `jarvis-ai` (chat `gpt-4o-mini` + tools + Whisper). Secret `OPENAI_API_KEY` no Supabase (nunca no front). Front: `llmClient` com loop de tools (vendas/estoque/sazonal/navegar/rascunhos); fallback local se a Edge falhar. Modo voz = MediaRecorder → Whisper → TTS (não depende mais do Web Speech frágil). Autorizar de meta/desafio/escala continua no app.
+
 ### Alertas (DECIDIDO — 2026-09-29)
 - **Todo alerta do app usa `Alert`** (`src/components/ui/Alert.tsx`, padrão Components > Alerts do Vela — "Storage almost full" etc.): fundo suave da cor, sem borda, ícone 18px e título em negrito na cor, texto em `text-t1`. Variantes `success · warning · danger · info · accent`; `icon` troca o ícone (Spinner, RadialProgress), `action` = links/botões à direita (`AlertLink` para link de texto), `footer` = conteúdo extra (lista expandida, checkbox).
 - Convertidos: produtos sem custo, carga do histórico, busca das vendas de hoje, avisos do Estoque > Produtos (tabela de custo, transferência, estoque negativo, transferência no detalhe), troca de usuário ERP e acessos faltando no Millennium, `AvisoCard` (Instalar o app) e `Avisos`. Alerta novo → `Alert`, nunca caixa com borda própria.
