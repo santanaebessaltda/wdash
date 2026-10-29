@@ -10,14 +10,15 @@ import { VoiceSession } from "./VoiceSession";
 /** Palmas no desktop abrem o mesmo modo voz do botão de onda. */
 function DesktopClapBridge({ micReady }: { micReady: boolean }) {
   const { session } = useSession();
-  const { allowed, voiceOpen, openVoice } = useJarvis();
+  const { allowed, voiceOpen, openVoice, dictating, dictateBusy } = useJarvis();
   const clapRef = useRef<ClapDetectorHandle | null>(null);
-  const voiceOpenRef = useRef(voiceOpen);
-  voiceOpenRef.current = voiceOpen;
+  /** Voz ou ditado ativos — não dispara palma (o pop do mic gerava falso positivo). */
+  const occupiedRef = useRef(false);
+  occupiedRef.current = voiceOpen || dictating || dictateBusy;
 
   useEffect(() => {
     if (!micReady || !allowed || !session || !isOwner(session.role) || !isJarvisDesktop()) return;
-    if (voiceOpen) {
+    if (voiceOpen || dictating || dictateBusy) {
       clapRef.current?.stop();
       clapRef.current = null;
       return;
@@ -26,13 +27,13 @@ function DesktopClapBridge({ micReady }: { micReady: boolean }) {
     let cancelled = false;
     void startClapDetector(
       () => {
-        if (voiceOpenRef.current) return;
+        if (occupiedRef.current) return;
         openVoice({ source: "clap" });
       },
       { threshold: 0.28, minGapMs: 100, maxGapMs: 1100, cooldownMs: 2000 },
     ).then((handle) => {
       if (cancelled || !handle) return;
-      if (voiceOpenRef.current) {
+      if (occupiedRef.current) {
         handle.stop();
         return;
       }
@@ -44,7 +45,7 @@ function DesktopClapBridge({ micReady }: { micReady: boolean }) {
       clapRef.current?.stop();
       clapRef.current = null;
     };
-  }, [allowed, micReady, openVoice, session, voiceOpen]);
+  }, [allowed, dictateBusy, dictating, micReady, openVoice, session, voiceOpen]);
 
   return null;
 }

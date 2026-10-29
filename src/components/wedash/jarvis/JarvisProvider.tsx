@@ -161,6 +161,9 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
   const replyGen = useRef(0);
   const voiceOpenRef = useRef(false);
   const voiceReadRef = useRef(voiceRead);
+  /** Sync no clique — evita palma abrir voz antes do re-render do `dictating`. */
+  const dictatingRef = useRef(false);
+  const dictateBusyRef = useRef(false);
   const dictateBaseRef = useRef("");
   const dictateRecRef = useRef<MediaRecorder | null>(null);
   const dictateStreamRef = useRef<MediaStream | null>(null);
@@ -184,6 +187,8 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
   scheduleDraftRef.current = scheduleDraft;
   voiceOpenRef.current = voiceOpen;
   voiceReadRef.current = voiceRead;
+  dictatingRef.current = dictating;
+  dictateBusyRef.current = dictateBusy;
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -259,6 +264,8 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
 
   const cancelDictate = useCallback(() => {
     dictateDiscardRef.current = true;
+    dictatingRef.current = false;
+    dictateBusyRef.current = false;
     tearDownDictateHardware();
     setDictating(false);
     setDictateBusy(false);
@@ -274,6 +281,7 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
       return;
     }
     dictateDiscardRef.current = false;
+    dictateBusyRef.current = true;
     setDictateBusy(true);
     setMicHint("Transcrevendo…");
     if (dictateRafRef.current) cancelAnimationFrame(dictateRafRef.current);
@@ -351,6 +359,7 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
   /**
    * Microfone do composer: grava no gesto do clique (pede permissão),
    * UI REC + waveform; ao parar, Whisper → texto no campo.
+   * Marca `dictating` já no clique para o detector de palmas não abrir a sessão de voz.
    */
   const startDictate = useCallback(() => {
     if (dictating || dictateBusy || voiceOpenRef.current) return;
@@ -363,8 +372,13 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
     cancelSpeakRef.current?.();
     dictateDiscardRef.current = false;
     dictateBaseRef.current = draftText;
-    setMicHint("Pedindo acesso ao microfone…");
+    dictatingRef.current = true;
+    dictateBusyRef.current = false;
+    setDictating(true);
+    setDictateBusy(false);
     setDictateSeconds(0);
+    setDictateLevels(Array.from({ length: 40 }, () => 0.12));
+    setMicHint(null);
 
     void navigator.mediaDevices
       .getUserMedia({
@@ -372,6 +386,14 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
         video: false,
       })
       .then((stream) => {
+        // Palmas / botão de onda podem ter aberto a voz enquanto o prompt pendia.
+        if (voiceOpenRef.current || dictateDiscardRef.current) {
+          stream.getTracks().forEach((t) => t.stop());
+          dictatingRef.current = false;
+          setDictating(false);
+          return;
+        }
+
         dictateStreamRef.current = stream;
         dictateChunksRef.current = [];
 
@@ -391,6 +413,8 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
           stream.getTracks().forEach((t) => t.stop());
           dictateStreamRef.current = null;
           dictateRecRef.current = null;
+          dictatingRef.current = false;
+          setDictating(false);
           setMicHint("Não consegui gravar o áudio.");
           return;
         }
@@ -433,8 +457,6 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
           setDictateSeconds((s) => s + 1);
         }, 1000);
 
-        setDictating(true);
-        setDictateBusy(false);
         setMicHint(null);
       })
       .catch((err) => {
@@ -444,6 +466,8 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
         } else {
           setMicHint("Não consegui abrir o microfone.");
         }
+        dictatingRef.current = false;
+        dictateBusyRef.current = false;
         setDictating(false);
         setDictateBusy(false);
       });
@@ -1079,6 +1103,9 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
   const openVoice = useCallback(
     (opts?: { source?: "button" | "clap" }) => {
       const source = opts?.source ?? "button";
+      // Palma não rouba o ditado (pop do getUserMedia / fala gerava falso positivo).
+      if (source === "clap" && (dictatingRef.current || dictateBusyRef.current)) return;
+
       cancelDictate();
       setVoiceOpen(true);
       stopSpeaking();
