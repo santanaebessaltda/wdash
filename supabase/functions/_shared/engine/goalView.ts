@@ -585,12 +585,15 @@ export function buildGoalCardView(input: {
     return sid && groupGoal.has(sid) ? sid : null;
   };
   const membersGroup = new Map<string, number>();
+  /** Quem já estava no 1º dia do período: trava a fatia Individual (entrada não reduz quem ficou). */
+  const startersGroup = new Map<string, number>();
   const salesGroup = new Map<string, number>();
   const weightGroup = new Map<string, number>();
   for (const p of people) {
     const k = groupOf(p);
     if (!k) continue;
     membersGroup.set(k, (membersGroup.get(k) ?? 0) + 1);
+    if (p.presence.has(g.startsOn)) startersGroup.set(k, (startersGroup.get(k) ?? 0) + 1);
     salesGroup.set(k, (salesGroup.get(k) ?? 0) + p.revenue);
     weightGroup.set(k, (weightGroup.get(k) ?? 0) + p.presence.size);
   }
@@ -620,13 +623,17 @@ export function buildGoalCardView(input: {
   }
 
   const sellers: SellerRow[] = people.map((p) => {
-    // Individual: parte cheia = meta do grupo ÷ pessoas. Parcial = essa parte × dias presentes ÷ dias do período.
+    // Individual: parte cheia = meta do grupo ÷ quem já estava no 1º dia (fatia travada).
+    // Quem entra ou sai no meio: essa mesma fatia × dias presentes ÷ dias do período.
+    // Entrada não reduz quem ficou; saída não redistribui o que sobrou. Meta da loja intacta.
     // Grupo: meta do grupo inteira; a premiacao pesa pelos dias. Geral: cada dia se divide entre quem estava.
     const k = groupOf(p);
     const members = k ? (membersGroup.get(k) ?? 0) : 0;
+    const starters = k ? (startersGroup.get(k) ?? 0) : 0;
+    const slotCount = individual ? (starters > 0 ? starters : members) : members;
     const goalRecord = k ? (groupGoal.get(k) ?? 0) : 0;
     const fraction = periodDays > 0 ? p.presence.size / periodDays : 1;
-    const fullShare = members > 0 ? (individual ? goalRecord / members : goalRecord) : 0;
+    const fullShare = slotCount > 0 ? (individual ? goalRecord / slotCount : goalRecord) : 0;
     const individualGoal = individual ? fullShare * fraction : fullShare;
     const share = dailyShare.get(p.key);
     const base = general ? achieved : individual ? p.revenue : k ? (salesGroup.get(k) ?? 0) : 0;

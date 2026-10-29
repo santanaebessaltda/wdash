@@ -328,12 +328,12 @@ describe("goalView", () => {
     expect(levels.get("e:2")!.prizeAmount).toBe(0);
   });
 
-  it("individual: quem entra no meio leva a parte vezes os dias; quem já estava não sobe", () => {
+  it("individual: quem entra no meio é proporcional; quem já estava mantém a fatia", () => {
     const card = buildGoalCardView({
       goal,
       storeNameValue: "LOJA",
-      dayAggs: [day("s1", "2026-09-05", 3000), day("s1", "2026-09-20", 1000)],
-      sellerDayAggs: [seller("2026-09-05", "ANA", 3000, 1), seller("2026-09-20", "BIA", 1000, 2)],
+      dayAggs: [day("s1", "2026-09-05", 6000), day("s1", "2026-09-20", 1000)],
+      sellerDayAggs: [seller("2026-09-05", "ANA", 6000, 1), seller("2026-09-20", "BIA", 1000, 2)],
       team: [
         { storeId: "s1", employeeId: 1, name: "ANA", nameKeys: ["ANA"], salesPerson: true, shiftId: null, shiftName: null },
         { storeId: "s1", employeeId: 2, name: "BIA", nameKeys: ["BIA"], salesPerson: true, shiftId: null, shiftName: null, admittedOn: "2026-09-16" },
@@ -341,13 +341,99 @@ describe("goalView", () => {
       today: "2026-09-30",
     });
     const by = new Map(card.sellers.map((l) => [l.name, l]));
-    expect(by.get("ANA")!.individualGoalAmount).toBeCloseTo(5000);
+    // Fatia travada no headcount do dia 1 (só ANA) → ANA 10.000; BIA 10.000 × 15/30.
+    expect(by.get("ANA")!.individualGoalAmount).toBeCloseTo(10_000);
     expect(by.get("ANA")!.proportionalGoal).toBe(false);
-    expect(by.get("ANA")!.accruedPrize).toBeCloseTo(30);
-    expect(by.get("BIA")!.individualGoalAmount).toBeCloseTo(2500);
+    expect(by.get("ANA")!.accruedPrize).toBeCloseTo(60);
+    expect(by.get("BIA")!.individualGoalAmount).toBeCloseTo(5_000);
     expect(by.get("BIA")!.eligibleDays).toBe(15);
     expect(by.get("BIA")!.periodDays).toBe(30);
     expect(by.get("BIA")!.proportionalGoal).toBe(true);
+  });
+
+  it("individual: saída no meio não muda a fatia de quem ficou", () => {
+    const card = buildGoalCardView({
+      goal,
+      storeNameValue: "LOJA",
+      dayAggs: [day("s1", "2026-09-05", 3000), day("s1", "2026-09-20", 2000)],
+      sellerDayAggs: [
+        seller("2026-09-05", "ANA", 1000, 1),
+        seller("2026-09-05", "BIA", 1000, 2),
+        seller("2026-09-05", "CAU", 1000, 3),
+        seller("2026-09-20", "ANA", 1000, 1),
+        seller("2026-09-20", "BIA", 1000, 2),
+      ],
+      team: [
+        { storeId: "s1", employeeId: 1, name: "ANA", nameKeys: ["ANA"], salesPerson: true, shiftId: null, shiftName: null },
+        { storeId: "s1", employeeId: 2, name: "BIA", nameKeys: ["BIA"], salesPerson: true, shiftId: null, shiftName: null },
+        {
+          storeId: "s1",
+          employeeId: 3,
+          name: "CAU",
+          nameKeys: ["CAU"],
+          salesPerson: false,
+          shiftId: null,
+          shiftName: null,
+          departedOn: "2026-09-10",
+        },
+      ],
+      today: "2026-09-30",
+    });
+    const by = new Map(card.sellers.map((l) => [l.name, l]));
+    const slot = 10_000 / 3;
+    expect(by.get("ANA")!.individualGoalAmount).toBeCloseTo(slot);
+    expect(by.get("BIA")!.individualGoalAmount).toBeCloseTo(slot);
+    expect(by.get("CAU")!.individualGoalAmount).toBeCloseTo(slot * (10 / 30));
+    expect(by.get("ANA")!.proportionalGoal).toBe(false);
+    expect(by.get("CAU")!.proportionalGoal).toBe(true);
+  });
+
+  it("individual: reposição (saiu + entrou) mantém a fatia de quem ficou", () => {
+    const card = buildGoalCardView({
+      goal,
+      storeNameValue: "LOJA",
+      dayAggs: [day("s1", "2026-09-05", 3000), day("s1", "2026-09-20", 3000)],
+      sellerDayAggs: [
+        seller("2026-09-05", "ANA", 1000, 1),
+        seller("2026-09-05", "BIA", 1000, 2),
+        seller("2026-09-05", "CAU", 1000, 3),
+        seller("2026-09-20", "ANA", 1000, 1),
+        seller("2026-09-20", "BIA", 1000, 2),
+        seller("2026-09-20", "DUDA", 1000, 4),
+      ],
+      team: [
+        { storeId: "s1", employeeId: 1, name: "ANA", nameKeys: ["ANA"], salesPerson: true, shiftId: null, shiftName: null },
+        { storeId: "s1", employeeId: 2, name: "BIA", nameKeys: ["BIA"], salesPerson: true, shiftId: null, shiftName: null },
+        {
+          storeId: "s1",
+          employeeId: 3,
+          name: "CAU",
+          nameKeys: ["CAU"],
+          salesPerson: false,
+          shiftId: null,
+          shiftName: null,
+          departedOn: "2026-09-10",
+        },
+        {
+          storeId: "s1",
+          employeeId: 4,
+          name: "DUDA",
+          nameKeys: ["DUDA"],
+          salesPerson: true,
+          shiftId: null,
+          shiftName: null,
+          admittedOn: "2026-09-16",
+        },
+      ],
+      today: "2026-09-30",
+    });
+    const by = new Map(card.sellers.map((l) => [l.name, l]));
+    const slot = 10_000 / 3;
+    expect(by.get("ANA")!.individualGoalAmount).toBeCloseTo(slot);
+    expect(by.get("BIA")!.individualGoalAmount).toBeCloseTo(slot);
+    expect(by.get("CAU")!.individualGoalAmount).toBeCloseTo(slot * (10 / 30));
+    expect(by.get("DUDA")!.individualGoalAmount).toBeCloseTo(slot * (15 / 30));
+    expect(by.get("DUDA")!.proportionalGoal).toBe(true);
   });
 
   it("geral: cada dia se divide só entre quem já estava", () => {
