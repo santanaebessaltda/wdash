@@ -149,8 +149,8 @@ export function warmJarvisTts(): void {
 }
 
 /**
- * Voz do JARVIS: Gemini TTS via Edge (Charon / suave-neutro).
- * Cache em falas curtas; 1 retry rápido; Web Speech só se Gemini falhar de vez.
+ * Voz do JARVIS: OpenAI TTS via Edge (marin ≈ Cove; mais rápido que Gemini).
+ * Cache em falas curtas; 1 retry; Web Speech só se a Edge falhar de vez.
  */
 export function speak(text: string, opts?: { onEnd?: () => void }): () => void {
   let cancelled = false;

@@ -123,7 +123,7 @@ export async function jarvisTranscribe(audioBase64: string, mime: string): Promi
   return { ok: true, text: payload.text };
 }
 
-/** TTS Gemini via Edge (voz fixa Charon/Neutro). audioBase64 = WAV sem prefixo data:. */
+/** TTS via Edge (default OpenAI marin; Gemini se JARVIS_TTS_PROVIDER=gemini). */
 export async function jarvisSpeak(
   text: string,
 ): Promise<{ ok: true; audioBase64: string; mime: string } | { ok: false; reason: string }> {
@@ -142,7 +142,7 @@ export async function jarvisSpeak(
   return {
     ok: true,
     audioBase64: payload.audioBase64,
-    mime: payload.mime || "audio/wav",
+    mime: payload.mime || "audio/mpeg",
   };
 }
 

@@ -1,6 +1,7 @@
 /**
- * jarvis-ai — chat/Whisper (OpenAI) + TTS (Gemini) só para Gestor.
- * OPENAI_API_KEY e GEMINI_API_KEY em secrets. Nunca no front.
+ * jarvis-ai — chat/Whisper/TTS (OpenAI) só para Gestor.
+ * TTS default = OpenAI (mais rápido; voz marin ≈ Cove do ChatGPT).
+ * Gemini opcional: JARVIS_TTS_PROVIDER=gemini + GEMINI_API_KEY.
  */
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { corsHeaders, serve } from "../_shared/cors.ts";
@@ -12,18 +13,21 @@ const CHAT_MODEL = Deno.env.get("JARVIS_CHAT_MODEL")?.trim() || "gpt-4o-mini";
 /** STT rápido; fallback whisper-1 se o modelo novo falhar. */
 const STT_MODEL = Deno.env.get("JARVIS_STT_MODEL")?.trim() || "gpt-4o-mini-transcribe";
 /**
- * Gemini TTS — voz fixa do JARVIS (Charon / suave-neutro).
- * Override: JARVIS_TTS_MODEL / JARVIS_TTS_VOICE / JARVIS_TTS_STYLE.
+ * TTS: openai (padrão, baixa latência) | gemini.
+ * Cove do ChatGPT não está na API pública — marin/cedar são as mais próximas (suaves).
  */
-const TTS_MODEL = Deno.env.get("JARVIS_TTS_MODEL")?.trim() || "gemini-2.5-flash-preview-tts";
-const TTS_VOICE = Deno.env.get("JARVIS_TTS_VOICE")?.trim() || "Charon";
-/** Estilo fixo: mesma entrega na saudação e nas respostas. */
+const TTS_PROVIDER = (Deno.env.get("JARVIS_TTS_PROVIDER")?.trim() || "openai").toLowerCase();
+const TTS_MODEL =
+  Deno.env.get("JARVIS_TTS_MODEL")?.trim() ||
+  (TTS_PROVIDER === "gemini" ? "gemini-2.5-flash-preview-tts" : "gpt-4o-mini-tts");
+const TTS_VOICE =
+  Deno.env.get("JARVIS_TTS_VOICE")?.trim() || (TTS_PROVIDER === "gemini" ? "Charon" : "marin");
 const TTS_STYLE =
   Deno.env.get("JARVIS_TTS_STYLE")?.trim() ||
   [
-    "Fale em português do Brasil, voz suave e neutra, calma e conversacional — nunca robótica nem de locutor.",
-    "Respeite a pontuação do texto: vírgula = pausa curta; ponto ou reticências = pausa maior; interrogação = entonação de pergunta; exclamação = leve ênfase, sem gritar.",
-    "Não invente palavras, não resuma e não leia estas instruções em voz alta — fale apenas o texto pedido.",
+    "Speak Brazilian Portuguese with a soft, warm, neutral tone — calm and conversational, like ChatGPT Cove: clear, friendly, never robotic or announcer-like.",
+    "Honor punctuation: short pause on commas, longer on periods/ellipsis, rising intonation on questions, light emphasis on exclamations without shouting.",
+    "Do not invent words or read these instructions aloud.",
   ].join(" ");
 const TTS_MAX_CHARS = 2000;
 const TTS_SAMPLE_RATE = 24000;
@@ -195,8 +199,12 @@ serve(async (req) => {
   const action = String(body.action ?? "chat");
   try {
     if (action === "speak") {
-      if (!geminiKey) return json({ ok: false, error: "gemini_not_configured" }, 503);
-      return await handleSpeak(geminiKey, body);
+      if (TTS_PROVIDER === "gemini") {
+        if (!geminiKey) return json({ ok: false, error: "gemini_not_configured" }, 503);
+        return await handleSpeakGemini(geminiKey, body);
+      }
+      if (!openaiKey) return json({ ok: false, error: "openai_not_configured" }, 503);
+      return await handleSpeakOpenAi(openaiKey, body);
     }
     if (!openaiKey) return json({ ok: false, error: "openai_not_configured" }, 503);
     if (action === "transcribe") {
@@ -346,8 +354,57 @@ function pcmToWav(pcm: Uint8Array, sampleRate = TTS_SAMPLE_RATE): Uint8Array {
   return new Uint8Array(buffer);
 }
 
-/** TTS Gemini → WAV em base64. Mesma voz/estilo na saudação e nas respostas. */
-async function handleSpeak(geminiKey: string, body: Record<string, unknown>) {
+/** TTS OpenAI → MP3 (baixa latência; marin ≈ Cove). */
+async function handleSpeakOpenAi(openaiKey: string, body: Record<string, unknown>) {
+  const raw = typeof body.text === "string" ? body.text.trim() : "";
+  if (!raw) return json({ ok: false, error: "text_required" }, 400);
+  const text = raw.length > TTS_MAX_CHARS ? `${raw.slice(0, TTS_MAX_CHARS - 1)}…` : raw;
+  const voice = TTS_VOICE;
+
+  const payload: Record<string, unknown> = {
+    model: TTS_MODEL,
+    voice,
+    input: text,
+    response_format: "mp3",
+  };
+  if (TTS_MODEL.includes("gpt-4o-mini-tts") || TTS_MODEL.includes("gpt-4o-tts")) {
+    payload.instructions = TTS_STYLE;
+  }
+
+  const res = await fetch(`${OPENAI_URL}/audio/speech`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${openaiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!res.ok) {
+    let detail = `tts_http_${res.status}`;
+    try {
+      const errBody = await res.json();
+      if (errBody?.error?.message) detail = String(errBody.error.message);
+    } catch {
+      /* ignore */
+    }
+    throw new Error(detail);
+  }
+
+  const bytes = new Uint8Array(await res.arrayBuffer());
+  if (bytes.length < 64) throw new Error("empty_audio");
+  return json({
+    ok: true,
+    type: "speech",
+    mime: "audio/mpeg",
+    audioBase64: bytesToBase64(bytes),
+    voice,
+    provider: "openai",
+  });
+}
+
+/** TTS Gemini → WAV (opcional; mais lento que OpenAI Speech). */
+async function handleSpeakGemini(geminiKey: string, body: Record<string, unknown>) {
   const raw = typeof body.text === "string" ? body.text.trim() : "";
   if (!raw) return json({ ok: false, error: "text_required" }, 400);
   const text = raw.length > TTS_MAX_CHARS ? `${raw.slice(0, TTS_MAX_CHARS - 1)}…` : raw;
@@ -356,15 +413,10 @@ async function handleSpeak(geminiKey: string, body: Record<string, unknown>) {
 
   const part: Record<string, unknown> = useSpeechMeta
     ? { text, speechMetadata: { style: TTS_STYLE } }
-    : {
-        // Texto puro no content; estilo só no systemInstruction (evita o modelo “ler” o prompt).
-        text,
-      };
+    : { text };
 
   const payload: Record<string, unknown> = {
-    systemInstruction: {
-      parts: [{ text: TTS_STYLE }],
-    },
+    systemInstruction: { parts: [{ text: TTS_STYLE }] },
     contents: [{ role: "user", parts: [part] }],
     generationConfig: {
       responseModalities: ["AUDIO"],
@@ -410,6 +462,7 @@ async function handleSpeak(geminiKey: string, body: Record<string, unknown>) {
     mime: "audio/wav",
     audioBase64: bytesToBase64(wavBytes),
     voice,
+    provider: "gemini",
   });
 }
 
