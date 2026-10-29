@@ -3,6 +3,10 @@
 import { jarvisSpeak } from "./llmClient";
 import { forSpeech } from "./speakablePt";
 
+/** Cache de falas curtas (saudação) — mesma voz, sem novo round-trip. */
+const ttsCache = new Map<string, { audioBase64: string; mime: string }>();
+const TTS_CACHE_MAX_CHARS = 96;
+
 export interface SpeechRecognitionLike {
   lang: string;
   continuous: boolean;
@@ -109,10 +113,44 @@ function speakBrowser(text: string, opts?: { onEnd?: () => void }): () => void {
   };
 }
 
+function playRemoteAudio(
+  audioBase64: string,
+  mime: string,
+  opts?: { onEnd?: () => void },
+): void {
+  const binary = Uint8Array.from(atob(audioBase64), (c) => c.charCodeAt(0));
+  const blob = new Blob([binary], { type: mime || "audio/wav" });
+  const url = URL.createObjectURL(blob);
+  activeObjectUrl = url;
+  const audio = new Audio(url);
+  activeAudio = audio;
+  audio.onended = () => {
+    if (activeAudio === audio) {
+      stopRemoteAudio();
+      opts?.onEnd?.();
+    }
+  };
+  audio.onerror = () => {
+    stopRemoteAudio();
+    opts?.onEnd?.();
+  };
+  void audio.play().catch(() => {
+    stopRemoteAudio();
+    opts?.onEnd?.();
+  });
+}
+
+/** Aquece a Edge TTS (TLS + frio) sem tocar áudio — chama no openVoice. */
+export function warmJarvisTts(): void {
+  void jarvisSpeak(".").then((r) => {
+    if (r.ok && r.audioBase64.length < 8) return;
+    /* só esquenta a conexão */
+  });
+}
+
 /**
  * Voz do JARVIS: Gemini TTS via Edge (Charon / suave-neutro).
- * Uma falha transitória → 1 retry (evita saudação no Web Speech e resposta no Gemini).
- * Números/R$ passam por `forSpeech`.
+ * Cache em falas curtas; 1 retry rápido; Web Speech só se Gemini falhar de vez.
  */
 export function speak(text: string, opts?: { onEnd?: () => void }): () => void {
   let cancelled = false;
@@ -129,44 +167,28 @@ export function speak(text: string, opts?: { onEnd?: () => void }): () => void {
   const spoken = forSpeech(trimmed);
 
   void (async () => {
+    const hit = ttsCache.get(spoken);
+    if (hit) {
+      if (cancelled) return;
+      playRemoteAudio(hit.audioBase64, hit.mime, opts);
+      return;
+    }
+
     let remote = await jarvisSpeak(spoken);
     if (!remote.ok && !cancelled) {
-      await new Promise((r) => setTimeout(r, 280));
+      await new Promise((r) => setTimeout(r, 80));
       if (!cancelled) remote = await jarvisSpeak(spoken);
     }
     if (cancelled) return;
 
     if (remote.ok) {
-      try {
-        const binary = Uint8Array.from(atob(remote.audioBase64), (c) => c.charCodeAt(0));
-        const blob = new Blob([binary], { type: remote.mime || "audio/wav" });
-        const url = URL.createObjectURL(blob);
-        activeObjectUrl = url;
-        const audio = new Audio(url);
-        activeAudio = audio;
-        audio.onended = () => {
-          if (activeAudio === audio) {
-            stopRemoteAudio();
-            opts?.onEnd?.();
-          }
-        };
-        audio.onerror = () => {
-          if (cancelled) return;
-          stopRemoteAudio();
-          // Sem fallback de navegador no erro de play — mantém a mesma voz Gemini no próximo turno.
-          opts?.onEnd?.();
-        };
-        await audio.play();
-        return;
-      } catch {
-        if (cancelled) return;
-        stopRemoteAudio();
-        opts?.onEnd?.();
-        return;
+      if (spoken.length <= TTS_CACHE_MAX_CHARS) {
+        ttsCache.set(spoken, { audioBase64: remote.audioBase64, mime: remote.mime });
       }
+      playRemoteAudio(remote.audioBase64, remote.mime, opts);
+      return;
     }
 
-    // Só cai no Web Speech se o Gemini falhou de verdade (duas tentativas).
     if (cancelled) return;
     cancelBrowser = speakBrowser(spoken, opts);
   })();

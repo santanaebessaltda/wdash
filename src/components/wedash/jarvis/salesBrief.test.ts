@@ -32,6 +32,13 @@ describe("resolveSalesWindow", () => {
     expect(w.to).toBe("2026-10-29");
   });
 
+  it("hoje = só o dia (não o mês)", () => {
+    const w = resolveSalesWindow("quanto eu vendi hoje", "2026-10-29");
+    expect(w.from).toBe("2026-10-29");
+    expect(w.to).toBe("2026-10-29");
+    expect(w.label).toBe("hoje");
+  });
+
   it("mês passado", () => {
     const w = resolveSalesWindow("vendas do mês passado", "2026-10-29");
     expect(w.from).toBe("2026-09-01");

@@ -45,16 +45,18 @@ import {
   validateScheduleDraft,
   type ScheduleDraft,
 } from "./scheduleDraft";
-import { clearChatMessages, loadChatMessages, saveChatMessages } from "./chatHistory";
 import { firstNameFrom, voiceStandbyLine } from "./greeting";
+import { loadSalesBrief } from "./salesBrief";
 import {
   createSpeechRecognition,
   speak,
   speechRecognitionSupported,
   stopSpeaking,
   ttsSupported,
+  warmJarvisTts,
   type SpeechRecognitionLike,
 } from "./speech";
+import { syncScopePeriodFromQuestion } from "./syncPeriod";
 
 const VOICE_READ_KEY = "wedash.jarvis.voiceRead";
 
@@ -145,8 +147,6 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
   const allowed = Boolean(session && isOwner(session.role));
 
   const [messages, setMessages] = useState<JarvisMessage[]>([]);
-  /** Evita gravar [] no storage no tick do hydrate. */
-  const skipChatSaveRef = useRef(true);
   const [mode, setMode] = useState<JarvisMode>("idle");
   const [micHint, setMicHint] = useState<string | null>(null);
   const [draftText, setDraftText] = useState("");
@@ -203,25 +203,6 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
   dictatingRef.current = dictating;
   dictateBusyRef.current = dictateBusy;
 
-  /** Histórico no aparelho (por empresa + membership). */
-  useEffect(() => {
-    skipChatSaveRef.current = true;
-    if (!session || !allowed) {
-      setMessages([]);
-      return;
-    }
-    setMessages(loadChatMessages(session.tenantId, session.membershipId));
-  }, [allowed, session?.tenantId, session?.membershipId]);
-
-  useEffect(() => {
-    if (!session || !allowed) return;
-    if (skipChatSaveRef.current) {
-      skipChatSaveRef.current = false;
-      return;
-    }
-    saveChatMessages(session.tenantId, session.membershipId, messages);
-  }, [allowed, messages, session?.tenantId, session?.membershipId]);
-
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, mode, challengeDraft, goalDraft, scheduleDraft, createdItem]);
@@ -256,7 +237,6 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
   );
 
   const speakAnswer = useCallback((answer: string, opts?: { listenAfter?: boolean }) => {
-    setMessages((m) => [...m, { from: "jarvis", text: answer }]);
     const finish = () => {
       setMode((cur) => (cur === "speaking" ? "idle" : cur));
       if (opts?.listenAfter && voiceOpenRef.current && !voicePausedRef.current) {
@@ -268,6 +248,7 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
     // Tab oculta: não gasta TTS — só deixa o texto no chat.
     const shouldSpeak =
       !voicePausedRef.current && (voiceOpenRef.current || voiceReadRef.current);
+    // Dispara TTS antes do setState — menos atraso texto→voz.
     if (shouldSpeak && ttsSupported()) {
       setMode("speaking");
       cancelSpeakRef.current?.();
@@ -275,6 +256,7 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
     } else {
       finish();
     }
+    setMessages((m) => [...m, { from: "jarvis", text: answer }]);
   }, []);
 
   const toggleVoiceRead = useCallback(() => {
@@ -758,6 +740,16 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
         return;
       }
 
+      // Vendas: brief direto (sem round-trip LLM) + alinha o filtro de período da tela.
+      if (intent === "analyze_sales") {
+        syncScopePeriodFromQuestion(q, location.pathname, location.search, navigate);
+        void loadSalesBrief(ctx, q).then((answer) => {
+          if (gen !== replyGen.current) return;
+          finish(answer);
+        });
+        return;
+      }
+
       const history: LlmChatMessage[] = messagesRef.current
         .slice(-12)
         .map((m) => ({
@@ -823,6 +815,7 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
       authorizeChallenge,
       authorizeGoal,
       authorizeSchedule,
+      location.pathname,
       location.search,
       navigate,
       replyLocal,
@@ -1319,7 +1312,8 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
         // Palmas não contam como gesto: sem permissão prévia o Chrome não pergunta.
         void (async () => {
           if (await micAlreadyGranted()) {
-            // Mesma saudação + histórico do botão (mic já liberado).
+            warmJarvisTts();
+            // Mesma saudação do botão (mic já liberado).
             window.setTimeout(() => requestMicFromUserGesture(), 200);
             return;
           }
@@ -1329,6 +1323,7 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
       }
 
       // Clique no botão de voz: pedir mic AGORA (mesmo gesto).
+      warmJarvisTts();
       requestMicFromUserGesture();
     },
     [cancelDictate, micAlreadyGranted, requestMicFromUserGesture],
@@ -1357,7 +1352,6 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
     setVoicePaused(false);
     setVoiceOpen(false);
     setMessages([]);
-    if (session) clearChatMessages(session.tenantId, session.membershipId);
     setDraftText("");
     setMicHint(null);
     setMode("idle");
@@ -1369,7 +1363,7 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
     scheduleDraftRef.current = null;
     setCreatedItem(null);
     setCommitBusy(false);
-  }, [cancelDictate, session, stopMediaTracks]);
+  }, [cancelDictate, stopMediaTracks]);
 
   useEffect(() => {
     return () => {

@@ -39,18 +39,37 @@ function preferAllBrand(rows: SalesDayAgg[]): SalesDayAgg[] {
   return all.length > 0 ? all : rows.filter((r) => r.brand !== "ALL");
 }
 
-/** Interpreta "este mês", "mês passado", "últimos N meses" (padrão: 3 meses + MTD). */
+function weekStartIso(today: string): string {
+  const [y, m, d] = today.split("-").map(Number);
+  const dt = new Date(Date.UTC(y!, m! - 1, d!));
+  const dow = dt.getUTCDay(); // 0=dom
+  const mondayOffset = dow === 0 ? -6 : 1 - dow;
+  dt.setUTCDate(dt.getUTCDate() + mondayOffset);
+  return `${dt.getUTCFullYear()}-${pad(dt.getUTCMonth() + 1)}-${pad(dt.getUTCDate())}`;
+}
+
+/**
+ * Interpreta período na pergunta.
+ * "hoje" ≠ "este mês" (antes "hoje" caía no MTD e errava o número).
+ */
 export function resolveSalesWindow(question: string, today: string): SalesWindow {
   const p = question
     .toLowerCase()
     .normalize("NFD")
     .replace(/\p{M}/gu, "");
 
-  if (/mes passado|ultimo mes|mês passado|último mês/.test(p) || /mes passado|ultimo mes/.test(p)) {
+  if (/mes passado|ultimo mes/.test(p)) {
     const from = shiftMonthStart(today, -1);
     return { from, to: endOfMonth(from), label: "mês passado" };
   }
-  if (/este mes|esse mes|mes atual|hoje|esta semana/.test(p)) {
+  // "hoje" / "vendi hoje" — só o dia (não misturar com mês/semana).
+  if (/\bhoje\b/.test(p) && !/\b(semana|mes)\b/.test(p)) {
+    return { from: today, to: today, label: "hoje" };
+  }
+  if (/esta semana|essa semana|semana atual/.test(p)) {
+    return { from: weekStartIso(today), to: today, label: "esta semana" };
+  }
+  if (/este mes|esse mes|mes atual|mtd/.test(p)) {
     return { from: monthStartOf(today), to: today, label: "este mês até hoje" };
   }
   const nMatch = p.match(/ultim[oa]s?\s+(\d+)\s*mes/);
@@ -61,6 +80,21 @@ export function resolveSalesWindow(question: string, today: string): SalesWindow
     to: today,
     label: months === 1 ? "este mês até hoje" : `últimos ${months} meses até hoje`,
   };
+}
+
+/** Período do Dashboard (URL / sessionStorage) a partir da pergunta. */
+export function periodKindFromQuestion(
+  question: string,
+): "today" | "thisWeek" | "thisMonth" | "lastMonth" | null {
+  const p = question
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "");
+  if (/mes passado|ultimo mes/.test(p)) return "lastMonth";
+  if (/\bhoje\b/.test(p) && !/\b(semana|mes)\b/.test(p)) return "today";
+  if (/esta semana|essa semana|semana atual/.test(p)) return "thisWeek";
+  if (/este mes|esse mes|mes atual|mtd/.test(p)) return "thisMonth";
+  return null;
 }
 
 export function buildSalesBrief(
@@ -105,9 +139,16 @@ export function buildSalesBrief(
   };
 }
 
-export function formatSalesBrief(brief: SalesBrief): string {
+export function formatSalesBrief(brief: SalesBrief, opts?: { concise?: boolean }): string {
   if (brief.salesCount === 0 && brief.revenue === 0) {
-    return `Não achei venda sincronizada em ${brief.storeLabel} no período (${brief.label}: ${fmtDate(brief.from)} a ${fmtDate(brief.to)}). Vale conferir o Millennium ou alargar o período.`;
+    return `Não achei venda sincronizada em ${brief.storeLabel} (${brief.label}). Vale conferir o sync ou o filtro de filial.`;
+  }
+  // Resposta curta (voz / “quanto vendi hoje”).
+  if (opts?.concise || brief.label === "hoje") {
+    return (
+      `${brief.label === "hoje" ? "Hoje" : brief.label} em ${brief.storeLabel}: ` +
+      `${brl(brief.revenue)}, ${brief.salesCount.toLocaleString("pt-BR")} venda${brief.salesCount === 1 ? "" : "s"}.`
+    );
   }
   const ticket = brief.ticket != null ? brl(brief.ticket) : "—";
   const pa = brief.pa != null ? brief.pa.toLocaleString("pt-BR", { maximumFractionDigits: 2 }) : "—";
@@ -147,7 +188,8 @@ export async function loadSalesBrief(ctx: JarvisContext, question: string): Prom
       from: window.from,
       to: window.to,
     });
-    return formatSalesBrief(buildSalesBrief(rows, window, stores, ctx.stores));
+    const brief = buildSalesBrief(rows, window, stores, ctx.stores);
+    return formatSalesBrief(brief, { concise: window.label === "hoje" || window.label === "esta semana" });
   } catch (e) {
     console.warn("jarvis salesBrief:", e);
     return "Não consegui ler as vendas agora. Tente de novo em instantes ou abra a Visão geral.";

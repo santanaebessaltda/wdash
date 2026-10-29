@@ -240,7 +240,7 @@ Inspiração de UX: [Néctar](https://www.meu-nectar.com/) (conversa humana, res
 | **2 palmas** em qualquer página → conversa por voz | **sim** (desktop / Gestor; limiar calibrado) | **não** |
 | Wake “Ei JARVIS” contínuo | opcional / depois | **não** (limitação de SO) |
 
-**Microfone / voz (DECIDIDO — 2026-10-29, ajustado):** no Chat IA, onda = conversa e mic = REC → Whisper. **2 palmas** (desktop / Gestor) abrem a mesma conversa por voz em qualquer tela (dock se estiver fora do hub). Modal de mic na entrada pede permissão para o detector. Pedido de mic no clique do botão. **Dock flutuante** quando a voz continua fora do Chat IA. **Tab oculta** → pausa + **Retomar voz**. Conversa por voz **grava texto** no chat. **Histórico** persiste no aparelho (`localStorage`, por tenant + membership; até 80 mensagens).
+**Microfone / voz (DECIDIDO — 2026-10-29, ajustado):** no Chat IA, onda = conversa e mic = REC → Whisper. **2 palmas** (desktop / Gestor) abrem a mesma conversa por voz em qualquer tela (dock se estiver fora do hub). Modal de mic na entrada pede permissão para o detector. Pedido de mic no clique do botão. **Dock flutuante** quando a voz continua fora do Chat IA. **Tab oculta** → pausa + **Retomar voz**. Conversa por voz **grava texto** no chat. **F5 / reload** zera o chat (volta ao hub com orb); histórico só na sessão em memória. Perguntas de **vendas** (ex.: “quanto vendi hoje”) leem a base direto, alinham o filtro `period` da tela e respondem curto — sem esperar o LLM.
 
 No Néctar mobile o caminho público é modo de voz no chat (+ Watch/Alexa), não gesto global — alinhamos.
 
@@ -267,7 +267,7 @@ Leitura e **navegar entre telas** não pedem autorização. Criar/editar/apagar 
 
 **Fatia 1–5 no código (2026-10-29):** tools de leitura; Desafio / Meta / Escala com Autorizar (`challenge*` / `goal*` / `schedule*`). FAB+modal foi o shell inicial.
 
-**Fatia 6 no código (2026-10-29):** UX Néctar — menu **Chat IA** `/chat-ia`; modo voz inline (waveform + OUVINDO…) pelo botão de onda + fala inicial; ditado REC pelo mic; tom humano; intent **navegar**. Sem FAB. Sem overlay fullscreen. Palma 2× e histórico persistente religados (2026-10-29).
+**Fatia 6 no código (2026-10-29):** UX Néctar — menu **Chat IA** `/chat-ia`; modo voz inline; ditado REC; navegar; palma 2× desktop. F5 reseta o hub. Vendas “hoje” com janela de 1 dia + sync do filtro.
 
 **Fatia 7 no código (2026-10-29):** **OpenAI ligada** (chat + Whisper). Edge `jarvis-ai`. Secret `OPENAI_API_KEY` no Supabase (nunca no front). Front: `llmClient` com loop de tools (vendas/estoque/sazonal/navegar/rascunhos); fallback local se a Edge falhar. Modo voz = MediaRecorder → Whisper → fala. Autorizar de meta/desafio/escala continua no app.
 
