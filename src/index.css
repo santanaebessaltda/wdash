@@ -301,13 +301,13 @@
     height: 100%;
   }
   /* No celular, 100% segue a viewport clássica e deixa uma faixa no rodapé.
-     --tela (viewportHeight) é a altura real; 100dvh só como fallback no 1º paint. */
+     --tela (viewportHeight) é a altura real; 100lvh evita faixa quando a barra some. */
   @supports (height: 100dvh) {
     html,
     body,
     #root {
-      height: var(--tela, 100dvh);
-      min-height: var(--tela, 100dvh);
+      height: var(--tela, 100lvh);
+      min-height: var(--tela, 100lvh);
     }
   }
 
@@ -355,30 +355,36 @@
   }
 
   /* Altura da tela visível. 100vh deixa faixa no rodapé; --tela acompanha a
-     janela real (browser e PWA). 100dvh/100lvh só como fallback. */
+     janela real (browser e PWA). Com o shell aberto, position:fixed + inset
+     cola o app nas bordas da viewport e elimina a faixa morta no rodapé. */
   .tela-cheia {
     min-height: 100vh;
     height: 100%;
   }
   @supports (height: 100dvh) {
     .tela-cheia {
-      height: var(--tela, 100dvh);
-      min-height: var(--tela, 100dvh);
+      height: var(--tela, 100lvh);
+      min-height: var(--tela, 100lvh);
     }
+  }
+  html.app-shell .tela-cheia {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: auto;
+    min-height: 0;
   }
   @media (display-mode: standalone), (display-mode: fullscreen) {
     html,
     body,
-    #root,
-    .tela-cheia {
+    #root {
       height: var(--tela, 100lvh);
       min-height: var(--tela, 100lvh);
     }
   }
   html.app-instalado,
   html.app-instalado body,
-  html.app-instalado #root,
-  html.app-instalado .tela-cheia {
+  html.app-instalado #root {
     height: var(--tela, 100lvh);
     min-height: var(--tela, 100lvh);
   }

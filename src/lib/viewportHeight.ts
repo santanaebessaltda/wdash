@@ -8,16 +8,28 @@ function instalado(): boolean {
   );
 }
 
-function applyViewportHeight(): void {
+function measureHeight(): number {
   const visual = window.visualViewport;
-  const height = Math.max(window.innerHeight, visual ? visual.height + visual.offsetTop : 0);
-  document.documentElement.style.setProperty("--tela", `${Math.round(height)}px`);
+  const fromVisual = visual ? visual.height + visual.offsetTop : 0;
+  return Math.ceil(
+    Math.max(window.innerHeight, fromVisual, document.documentElement.clientHeight),
+  );
+}
+
+function applyViewportHeight(): void {
+  const height = measureHeight();
+  document.documentElement.style.setProperty("--tela", `${height}px`);
   document.documentElement.classList.toggle("app-instalado", instalado());
 }
 
 export function installViewportHeight(): void {
   applyViewportHeight();
   window.addEventListener("resize", applyViewportHeight);
-  window.addEventListener("orientationchange", applyViewportHeight);
+  window.addEventListener("pageshow", applyViewportHeight);
+  window.addEventListener("orientationchange", () => {
+    applyViewportHeight();
+    window.setTimeout(applyViewportHeight, 250);
+  });
   window.visualViewport?.addEventListener("resize", applyViewportHeight);
+  window.visualViewport?.addEventListener("scroll", applyViewportHeight);
 }
