@@ -9,10 +9,18 @@ import { OWNER_ROLES, loadStaffCaller } from "../_shared/staffAuth.ts";
 const OPENAI_URL = "https://api.openai.com/v1";
 const CHAT_MODEL = Deno.env.get("JARVIS_CHAT_MODEL")?.trim() || "gpt-4o-mini";
 const WHISPER_MODEL = "whisper-1";
-/** tts-1: barato e estável. Voz onyx = masculina profunda (assistente). */
-const TTS_MODEL = Deno.env.get("JARVIS_TTS_MODEL")?.trim() || "tts-1";
-const TTS_VOICE = Deno.env.get("JARVIS_TTS_VOICE")?.trim() || "onyx";
+/**
+ * gpt-4o-mini-tts: bem menos robótico que tts-1/onyx.
+ * Voz ash = masculina natural; instructions moldam o tom estilo Néctar.
+ * Override: JARVIS_TTS_MODEL / JARVIS_TTS_VOICE.
+ */
+const TTS_MODEL = Deno.env.get("JARVIS_TTS_MODEL")?.trim() || "gpt-4o-mini-tts";
+const TTS_VOICE = Deno.env.get("JARVIS_TTS_VOICE")?.trim() || "ash";
 const TTS_MAX_CHARS = 2000;
+const TTS_INSTRUCTIONS =
+  Deno.env.get("JARVIS_TTS_INSTRUCTIONS")?.trim() ||
+  "Fale em português do Brasil, tom caloroso e natural de sócio sênior — conversacional, próximo do Néctar, sem ritmo de robô nem de locução publicitária. Números e valores já vêm por extenso; leia fluido e confiante.";
+
 
 type ChatMessage = {
   role: "system" | "user" | "assistant" | "tool";
@@ -288,18 +296,24 @@ async function handleSpeak(openaiKey: string, body: Record<string, unknown>) {
   if (!raw) return json({ ok: false, error: "text_required" }, 400);
   const text = raw.length > TTS_MAX_CHARS ? `${raw.slice(0, TTS_MAX_CHARS - 1)}…` : raw;
 
+  const payload: Record<string, unknown> = {
+    model: TTS_MODEL,
+    voice: TTS_VOICE,
+    input: text,
+    response_format: "mp3",
+  };
+  // Só gpt-4o-mini-tts aceita instructions (tom humano).
+  if (TTS_MODEL.includes("gpt-4o-mini-tts") || TTS_MODEL.includes("gpt-4o-tts")) {
+    payload.instructions = TTS_INSTRUCTIONS;
+  }
+
   const res = await fetch(`${OPENAI_URL}/audio/speech`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${openaiKey}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({
-      model: TTS_MODEL,
-      voice: TTS_VOICE,
-      input: text,
-      response_format: "mp3",
-    }),
+    body: JSON.stringify(payload),
   });
 
   if (!res.ok) {

@@ -1,6 +1,7 @@
 /** STT / TTS — OpenAI TTS (voz JARVIS) com fallback Web Speech. */
 
 import { jarvisSpeak } from "./llmClient";
+import { forSpeech } from "./speakablePt";
 
 export interface SpeechRecognitionLike {
   lang: string;
@@ -109,8 +110,8 @@ function speakBrowser(text: string, opts?: { onEnd?: () => void }): () => void {
 }
 
 /**
- * Voz do JARVIS: OpenAI TTS (onyx) via Edge; se falhar, Web Speech.
- * Retorna cancelador síncrono (como antes).
+ * Voz do JARVIS: OpenAI TTS via Edge; se falhar, Web Speech.
+ * Números/R$ passam por `forSpeech` (milhão ≠ mil).
  */
 export function speak(text: string, opts?: { onEnd?: () => void }): () => void {
   let cancelled = false;
@@ -124,9 +125,10 @@ export function speak(text: string, opts?: { onEnd?: () => void }): () => void {
     opts?.onEnd?.();
     return () => undefined;
   }
+  const spoken = forSpeech(trimmed);
 
   void (async () => {
-    const remote = await jarvisSpeak(trimmed);
+    const remote = await jarvisSpeak(spoken);
     if (cancelled) return;
 
     if (remote.ok) {
@@ -146,7 +148,7 @@ export function speak(text: string, opts?: { onEnd?: () => void }): () => void {
         audio.onerror = () => {
           if (cancelled) return;
           stopRemoteAudio();
-          cancelBrowser = speakBrowser(trimmed, opts);
+          cancelBrowser = speakBrowser(spoken, opts);
         };
         await audio.play();
         return;
@@ -157,7 +159,7 @@ export function speak(text: string, opts?: { onEnd?: () => void }): () => void {
     }
 
     if (cancelled) return;
-    cancelBrowser = speakBrowser(trimmed, opts);
+    cancelBrowser = speakBrowser(spoken, opts);
   })();
 
   return () => {

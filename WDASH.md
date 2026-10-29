@@ -271,7 +271,7 @@ Leitura e **navegar entre telas** não pedem autorização. Criar/editar/apagar 
 
 **Fatia 7 no código (2026-10-29):** **OpenAI ligada.** Edge `jarvis-ai` (chat `gpt-4o-mini` + tools + Whisper + **TTS**). Secret `OPENAI_API_KEY` no Supabase (nunca no front). Front: `llmClient` com loop de tools (vendas/estoque/sazonal/navegar/rascunhos); fallback local se a Edge falhar. Modo voz = MediaRecorder → Whisper → fala. Autorizar de meta/desafio/escala continua no app.
 
-**Voz do JARVIS (DECIDIDO — 2026-10-29):** TTS OpenAI na Edge (`action: speak`, modelo `tts-1`, voz **`onyx`** — masculina, de assistente). Front toca o MP3; se a Edge falhar, cai no `speechSynthesis` do Chrome. Não é a voz do filme/Marvel (IP). Overrides opcionais: secrets/env `JARVIS_TTS_MODEL`, `JARVIS_TTS_VOICE`.
+**Voz do JARVIS (DECIDIDO — 2026-10-29; refinada):** TTS OpenAI na Edge (`action: speak`, modelo **`gpt-4o-mini-tts`**, voz **`ash`** + `instructions` em tom Néctar). Front aplica `forSpeech` (R$ 1.192.475 → “um milhão… reais”) antes do áudio — o chat continua com o número formatado. Fallback: `speechSynthesis` do Chrome. Overrides: `JARVIS_TTS_MODEL`, `JARVIS_TTS_VOICE`, `JARVIS_TTS_INSTRUCTIONS`.
 
 ### Alertas (DECIDIDO — 2026-09-29)
 - **Todo alerta do app usa `Alert`** (`src/components/ui/Alert.tsx`, padrão Components > Alerts do Vela — "Storage almost full" etc.): fundo suave da cor, sem borda, ícone 18px e título em negrito na cor, texto em `text-t1`. Variantes `success · warning · danger · info · accent`; `icon` troca o ícone (Spinner, RadialProgress), `action` = links/botões à direita (`AlertLink` para link de texto), `footer` = conteúdo extra (lista expandida, checkbox).
