@@ -23,7 +23,11 @@ import { cn } from "@/lib/cn";
 import { paths } from "@/router/paths";
 
 function voiceCaptureSupported(): boolean {
-  return typeof window !== "undefined" && Boolean(navigator.mediaDevices?.getUserMedia) && typeof MediaRecorder !== "undefined";
+  if (typeof window === "undefined") return false;
+  const w = window as unknown as { SpeechRecognition?: unknown; webkitSpeechRecognition?: unknown };
+  return Boolean(
+    navigator.mediaDevices?.getUserMedia || w.SpeechRecognition || w.webkitSpeechRecognition,
+  );
 }
 
 /** Chat JARVIS — casca no espírito do Chat Vela + botão de voz (Néctar / ChatGPT). */

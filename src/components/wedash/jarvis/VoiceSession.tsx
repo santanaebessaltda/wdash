@@ -3,14 +3,14 @@ import { Button } from "@/components/ui";
 import { useJarvis } from "./JarvisProvider";
 import { VoiceOrb } from "./VoiceOrb";
 
-/** Overlay de conversa por voz — grava → Whisper → responde → grava de novo. */
+/** Overlay de conversa por voz — escuta ao vivo e envia sozinho ao silenciar. */
 export function VoiceSession() {
   const { voiceOpen, closeVoice, finishVoice, mode, draftText, micHint } = useJarvis();
   if (!voiceOpen || typeof document === "undefined") return null;
 
   const status =
     mode === "listening"
-      ? "Tô te ouvindo — fala e toca em Enviar"
+      ? "Tô te ouvindo…"
       : mode === "thinking"
         ? "Entendendo…"
         : mode === "speaking"
@@ -26,31 +26,48 @@ export function VoiceSession() {
       >
         Fechar
       </button>
-      <VoiceOrb
-        state={
-          mode === "listening"
-            ? "listening"
-            : mode === "thinking"
-              ? "thinking"
-              : mode === "speaking"
-                ? "speaking"
-                : "idle"
-        }
-      />
+      <button
+        type="button"
+        onClick={() => {
+          if (mode === "listening") finishVoice();
+          else if (mode === "idle") finishVoice();
+        }}
+        className="rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-acc"
+        aria-label={mode === "listening" ? "Enviar o que falei" : "Começar a falar"}
+      >
+        <VoiceOrb
+          state={
+            mode === "listening"
+              ? "listening"
+              : mode === "thinking"
+                ? "thinking"
+                : mode === "speaking"
+                  ? "speaking"
+                  : "idle"
+          }
+        />
+      </button>
       <p className="mt-6 text-[15px] font-semibold text-t0">{status}</p>
       {draftText ? (
         <p className="mt-2 max-w-md px-6 text-center text-[13px] text-t2">“{draftText}”</p>
       ) : null}
       {micHint ? <p className="mt-3 max-w-sm px-6 text-center text-[12px] text-warn">{micHint}</p> : null}
       <div className="mt-8 flex gap-2">
-        <Button type="button" size="sm" onClick={() => finishVoice()} disabled={mode === "thinking" || mode === "speaking"}>
-          {mode === "listening" ? "Enviar" : "Falar de novo"}
+        <Button
+          type="button"
+          size="sm"
+          onClick={() => finishVoice()}
+          disabled={mode === "thinking" || mode === "speaking"}
+        >
+          {mode === "listening" ? "Enviar agora" : "Falar"}
         </Button>
         <Button type="button" size="sm" variant="outline" onClick={closeVoice}>
           Voltar ao chat
         </Button>
       </div>
-      <p className="mt-10 text-[11px] text-t2">Voz com Whisper · conversa com a OpenAI</p>
+      <p className="mt-10 max-w-sm px-6 text-center text-[11px] text-t2">
+        Fala e para — eu envio sozinho. Ou toca no orbe / Em Enviar agora.
+      </p>
     </div>,
     document.body,
   );

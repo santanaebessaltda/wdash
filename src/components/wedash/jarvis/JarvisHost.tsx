@@ -23,10 +23,13 @@ function DesktopClapBridge() {
     }
 
     let cancelled = false;
-    void startClapDetector(() => {
-      if (voiceOpenRef.current) return;
-      openVoice();
-    }).then((handle) => {
+    void startClapDetector(
+      () => {
+        if (voiceOpenRef.current) return;
+        openVoice();
+      },
+      { threshold: 0.28, minGapMs: 100, maxGapMs: 1100, cooldownMs: 2000 },
+    ).then((handle) => {
       if (cancelled || !handle) return;
       if (voiceOpenRef.current) {
         handle.stop();

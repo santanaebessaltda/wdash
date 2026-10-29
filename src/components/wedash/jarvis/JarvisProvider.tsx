@@ -45,7 +45,14 @@ import {
   validateScheduleDraft,
   type ScheduleDraft,
 } from "./scheduleDraft";
-import { speak, stopSpeaking, ttsSupported } from "./speech";
+import {
+  createSpeechRecognition,
+  speak,
+  speechRecognitionSupported,
+  stopSpeaking,
+  ttsSupported,
+  type SpeechRecognitionLike,
+} from "./speech";
 
 export type JarvisMessage = { from: "user" | "jarvis"; text: string };
 export type JarvisMode = "idle" | "listening" | "thinking" | "speaking";
@@ -140,7 +147,10 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
   const mediaRecRef = useRef<MediaRecorder | null>(null);
   const mediaChunksRef = useRef<Blob[]>([]);
   const mediaStreamRef = useRef<MediaStream | null>(null);
-  const startRecordingRef = useRef<() => void>(() => undefined);
+  const speechRecRef = useRef<SpeechRecognitionLike | null>(null);
+  const vadRafRef = useRef(0);
+  const startListeningRef = useRef<() => void>(() => undefined);
+  const finishVoiceRef = useRef<() => void>(() => undefined);
   const messagesRef = useRef<JarvisMessage[]>([OPENING]);
   messagesRef.current = messages;
 
@@ -170,14 +180,14 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
         onEnd: () => {
           setMode((cur) => (cur === "speaking" ? "idle" : cur));
           if (opts?.listenAfter && voiceOpenRef.current) {
-            window.setTimeout(() => startRecordingRef.current(), 320);
+            window.setTimeout(() => startListeningRef.current(), 400);
           }
         },
       });
     } else {
       setMode("idle");
       if (opts?.listenAfter && voiceOpenRef.current) {
-        window.setTimeout(() => startRecordingRef.current(), 320);
+        window.setTimeout(() => startListeningRef.current(), 400);
       }
     }
   }, []);
@@ -485,14 +495,78 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
     ],
   );
 
+  const stopVad = useCallback(() => {
+    if (vadRafRef.current) cancelAnimationFrame(vadRafRef.current);
+    vadRafRef.current = 0;
+  }, []);
+
   const stopMediaTracks = useCallback(() => {
+    stopVad();
+    try {
+      speechRecRef.current?.abort();
+    } catch {
+      /* ignore */
+    }
+    speechRecRef.current = null;
+    try {
+      if (mediaRecRef.current && mediaRecRef.current.state !== "inactive") mediaRecRef.current.stop();
+    } catch {
+      /* ignore */
+    }
     mediaStreamRef.current?.getTracks().forEach((t) => t.stop());
     mediaStreamRef.current = null;
     mediaRecRef.current = null;
-  }, []);
+  }, [stopVad]);
 
-  const startRecording = useCallback(async () => {
-    if (!navigator.mediaDevices?.getUserMedia) {
+  const finishMediaRecording = useCallback(() => {
+    const rec = mediaRecRef.current;
+    if (!rec || rec.state === "inactive") return;
+    stopVad();
+    rec.onstop = () => {
+      const chunks = mediaChunksRef.current;
+      const mime = rec.mimeType || "audio/webm";
+      mediaStreamRef.current?.getTracks().forEach((t) => t.stop());
+      mediaStreamRef.current = null;
+      mediaRecRef.current = null;
+      if (chunks.length === 0) {
+        setMode("idle");
+        setMicHint("Não peguei áudio. Fala um pouco mais alto e tenta de novo.");
+        if (voiceOpenRef.current) window.setTimeout(() => startListeningRef.current(), 600);
+        return;
+      }
+      const blob = new Blob(chunks, { type: mime });
+      setMode("thinking");
+      void (async () => {
+        try {
+          const b64 = await blobToBase64(blob);
+          const tr = await jarvisTranscribe(b64, mime.split(";")[0] || mime);
+          if (!tr.ok) {
+            setMode("idle");
+            setMicHint(
+              tr.reason === "openai_not_configured"
+                ? "Whisper ainda sem chave no servidor."
+                : `Não entendi o áudio (${tr.reason}). Toca em Falar de novo.`,
+            );
+            return;
+          }
+          setDraftText(tr.text);
+          reply(tr.text);
+        } catch {
+          setMode("idle");
+          setMicHint("Falhou ao enviar o áudio. Tenta de novo.");
+        }
+      })();
+    };
+    try {
+      rec.stop();
+    } catch {
+      stopMediaTracks();
+      setMode("idle");
+    }
+  }, [reply, stopMediaTracks, stopVad]);
+
+  const startMediaWithVad = useCallback(async () => {
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
       setMicHint("Sem microfone neste aparelho — usa o chat escrito.");
       setMode("idle");
       return;
@@ -500,7 +574,10 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
     try {
       stopSpeaking();
       setMicHint(null);
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      setDraftText("");
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+      });
       mediaStreamRef.current = stream;
       mediaChunksRef.current = [];
       const mime = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
@@ -520,78 +597,172 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
         setMode("idle");
         setMicHint("Falhou a gravação. Tenta de novo.");
       };
-      rec.start(250);
+      rec.start(200);
       setMode("listening");
+      setMicHint("Pode falar — paro sozinho quando você silenciar.");
+
+      const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      const source = ctx.createMediaStreamSource(stream);
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 1024;
+      source.connect(analyser);
+      const data = new Float32Array(analyser.fftSize);
+      let heardSpeech = false;
+      let silentMs = 0;
+      let lastTs = performance.now();
+      const startedAt = performance.now();
+
+      const tick = () => {
+        if (!voiceOpenRef.current || mediaRecRef.current !== rec) {
+          void ctx.close();
+          return;
+        }
+        analyser.getFloatTimeDomainData(data);
+        let peak = 0;
+        for (let i = 0; i < data.length; i++) {
+          const v = Math.abs(data[i] ?? 0);
+          if (v > peak) peak = v;
+        }
+        const now = performance.now();
+        const dt = now - lastTs;
+        lastTs = now;
+        if (peak >= 0.04) {
+          heardSpeech = true;
+          silentMs = 0;
+        } else if (heardSpeech) {
+          silentMs += dt;
+          if (silentMs >= 1100) {
+            void ctx.close();
+            finishVoiceRef.current();
+            return;
+          }
+        }
+        if (now - startedAt > 20_000) {
+          void ctx.close();
+          finishVoiceRef.current();
+          return;
+        }
+        vadRafRef.current = requestAnimationFrame(tick);
+      };
+      if (ctx.state === "suspended") void ctx.resume();
+      vadRafRef.current = requestAnimationFrame(tick);
     } catch {
       stopMediaTracks();
       setMode("idle");
       setMicHint("Preciso de permissão do microfone pra conversar por voz.");
     }
   }, [stopMediaTracks]);
-  startRecordingRef.current = () => void startRecording();
 
-  const finishVoice = useCallback(() => {
-    const rec = mediaRecRef.current;
-    if (!rec || rec.state === "inactive") {
-      void startRecording();
+  const startWebSpeech = useCallback(() => {
+    const rec = createSpeechRecognition();
+    if (!rec) {
+      void startMediaWithVad();
       return;
     }
-    rec.onstop = () => {
-      const chunks = mediaChunksRef.current;
-      const mime = rec.mimeType || "audio/webm";
-      stopMediaTracks();
-      if (chunks.length === 0) {
+    try {
+      speechRecRef.current?.abort();
+    } catch {
+      /* ignore */
+    }
+    stopSpeaking();
+    setMicHint(null);
+    setDraftText("");
+    speechRecRef.current = rec;
+    rec.continuous = false;
+    rec.interimResults = true;
+    let finalText = "";
+    rec.onresult = (event) => {
+      let interim = "";
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const row = event.results[i];
+        if (!row) continue;
+        const piece = row[0]?.transcript ?? "";
+        if (row.isFinal) finalText += piece;
+        else interim += piece;
+      }
+      const shown = (finalText || interim).trim();
+      if (shown) setDraftText(shown);
+    };
+    rec.onerror = (event) => {
+      const err = event.error;
+      if (err === "aborted") return;
+      if (err === "no-speech") {
+        setMicHint("Não ouvi nada — fala de novo.");
         setMode("idle");
-        setMicHint("Não peguei áudio. Segura um pouco e fala de novo.");
+        if (voiceOpenRef.current) window.setTimeout(() => startListeningRef.current(), 500);
         return;
       }
-      const blob = new Blob(chunks, { type: mime });
-      setMode("thinking");
-      void (async () => {
-        try {
-          const b64 = await blobToBase64(blob);
-          const tr = await jarvisTranscribe(b64, mime.split(";")[0] || mime);
-          if (!tr.ok) {
-            setMode("idle");
-            setMicHint(
-              tr.reason === "openai_not_configured"
-                ? "Whisper ainda sem chave no servidor."
-                : "Não entendi o áudio. Tenta de novo.",
-            );
-            return;
-          }
-          reply(tr.text);
-        } catch {
-          setMode("idle");
-          setMicHint("Falhou ao enviar o áudio. Tenta de novo.");
-        }
-      })();
+      if (err === "not-allowed") {
+        setMicHint("Microfone bloqueado no navegador.");
+        setMode("idle");
+        return;
+      }
+      // Fallback Whisper se o Web Speech falhar
+      void startMediaWithVad();
+    };
+    rec.onend = () => {
+      speechRecRef.current = null;
+      const said = finalText.trim();
+      if (said) {
+        setMode("thinking");
+        reply(said);
+        return;
+      }
+      if (voiceOpenRef.current) {
+        setMode("idle");
+      }
     };
     try {
-      rec.stop();
+      rec.start();
+      setMode("listening");
+      setMicHint("Pode falar — envio sozinho quando você parar.");
     } catch {
-      stopMediaTracks();
-      setMode("idle");
+      void startMediaWithVad();
     }
-  }, [reply, startRecording, stopMediaTracks]);
+  }, [reply, startMediaWithVad]);
+
+  const startListening = useCallback(() => {
+    if (!voiceOpenRef.current) return;
+    // Chrome/Edge: Web Speech ao vivo. Senão: gravação + silêncio → Whisper.
+    if (speechRecognitionSupported()) startWebSpeech();
+    else void startMediaWithVad();
+  }, [startMediaWithVad, startWebSpeech]);
+  startListeningRef.current = () => startListening();
+
+  const finishVoice = useCallback(() => {
+    if (speechRecRef.current) {
+      try {
+        speechRecRef.current.stop();
+      } catch {
+        /* ignore */
+      }
+      return;
+    }
+    if (mediaRecRef.current && mediaRecRef.current.state !== "inactive") {
+      finishMediaRecording();
+      return;
+    }
+    startListening();
+  }, [finishMediaRecording, startListening]);
+  finishVoiceRef.current = () => finishVoice();
 
   const openVoice = useCallback(() => {
     setVoiceOpen(true);
     stopSpeaking();
+    setMicHint(null);
     setMode("idle");
-    window.setTimeout(() => void startRecording(), 200);
-  }, [startRecording]);
+    // Espera o detector de palmas soltar o mic
+    window.setTimeout(() => startListening(), 450);
+  }, [startListening]);
 
   const closeVoice = useCallback(() => {
     setVoiceOpen(false);
-    try {
-      if (mediaRecRef.current && mediaRecRef.current.state !== "inactive") mediaRecRef.current.stop();
-    } catch {
-      /* ignore */
-    }
     stopMediaTracks();
     stopSpeaking();
     cancelSpeakRef.current?.();
+    setDraftText("");
     setMode("idle");
   }, [stopMediaTracks]);
 
