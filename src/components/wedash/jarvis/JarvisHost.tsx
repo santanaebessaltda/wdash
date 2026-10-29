@@ -31,7 +31,14 @@ export function JarvisHost() {
         if (voiceOpenRef.current || dictatingRef.current) return;
         openVoiceRef.current({ source: "clap" });
       },
-      { threshold: 0.48, minGapMs: 140, maxGapMs: 850, cooldownMs: 2800 },
+      {
+        threshold: 0.58,
+        snrFactor: 8,
+        minGapMs: 180,
+        maxGapMs: 700,
+        maxImpulseMs: 80,
+        cooldownMs: 3500,
+      },
     ).then((h) => {
       if (cancelled) {
         h?.stop();

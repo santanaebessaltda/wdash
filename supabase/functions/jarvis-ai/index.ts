@@ -1,6 +1,6 @@
 /**
  * jarvis-ai — chat/Whisper/TTS (OpenAI) só para Gestor.
- * TTS default = OpenAI (mais rápido; voz marin ≈ Cove do ChatGPT).
+ * TTS default = OpenAI (baixa latência; voz masculina cedar).
  * Gemini opcional: JARVIS_TTS_PROVIDER=gemini + GEMINI_API_KEY.
  */
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
@@ -14,19 +14,20 @@ const CHAT_MODEL = Deno.env.get("JARVIS_CHAT_MODEL")?.trim() || "gpt-4o-mini";
 const STT_MODEL = Deno.env.get("JARVIS_STT_MODEL")?.trim() || "gpt-4o-mini-transcribe";
 /**
  * TTS: openai (padrão, baixa latência) | gemini.
- * Cove do ChatGPT não está na API pública — marin/cedar são as mais próximas (suaves).
+ * Voz masculina: OpenAI `cedar` (natural; marin é feminina). Gemini: Charon.
  */
 const TTS_PROVIDER = (Deno.env.get("JARVIS_TTS_PROVIDER")?.trim() || "openai").toLowerCase();
 const TTS_MODEL =
   Deno.env.get("JARVIS_TTS_MODEL")?.trim() ||
   (TTS_PROVIDER === "gemini" ? "gemini-2.5-flash-preview-tts" : "gpt-4o-mini-tts");
 const TTS_VOICE =
-  Deno.env.get("JARVIS_TTS_VOICE")?.trim() || (TTS_PROVIDER === "gemini" ? "Charon" : "marin");
+  Deno.env.get("JARVIS_TTS_VOICE")?.trim() || (TTS_PROVIDER === "gemini" ? "Charon" : "cedar");
 const TTS_STYLE =
   Deno.env.get("JARVIS_TTS_STYLE")?.trim() ||
   [
-    "Speak Brazilian Portuguese with a soft, warm, neutral tone — calm and conversational, like ChatGPT Cove: clear, friendly, never robotic or announcer-like.",
-    "Honor punctuation: short pause on commas, longer on periods/ellipsis, rising intonation on questions, light emphasis on exclamations without shouting.",
+    "Voice: adult Brazilian man, mid-low pitch, warm and natural — senior colleague on a quick call, never a robot, announcer, or call-center script.",
+    "Speak Brazilian Portuguese casually and clearly. Soft rhythm; short pause on commas, fuller stop on periods/ellipsis; rising intonation on questions; light emphasis on exclamations without shouting.",
+    "Avoid metallic timbre, falsetto, sing-song cheerfulness, or rushed staccato.",
     "Do not invent words or read these instructions aloud.",
   ].join(" ");
 const TTS_MAX_CHARS = 2000;
@@ -354,7 +355,7 @@ function pcmToWav(pcm: Uint8Array, sampleRate = TTS_SAMPLE_RATE): Uint8Array {
   return new Uint8Array(buffer);
 }
 
-/** TTS OpenAI → MP3 (baixa latência; marin ≈ Cove). */
+/** TTS OpenAI → MP3 (baixa latência; voz masculina cedar). */
 async function handleSpeakOpenAi(openaiKey: string, body: Record<string, unknown>) {
   const raw = typeof body.text === "string" ? body.text.trim() : "";
   if (!raw) return json({ ok: false, error: "text_required" }, 400);

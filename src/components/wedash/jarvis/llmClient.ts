@@ -123,7 +123,7 @@ export async function jarvisTranscribe(audioBase64: string, mime: string): Promi
   return { ok: true, text: payload.text };
 }
 
-/** TTS via Edge (default OpenAI marin; Gemini se JARVIS_TTS_PROVIDER=gemini). */
+/** TTS via Edge (default OpenAI cedar masculina; Gemini se JARVIS_TTS_PROVIDER=gemini). */
 export async function jarvisSpeak(
   text: string,
 ): Promise<{ ok: true; audioBase64: string; mime: string } | { ok: false; reason: string }> {
