@@ -51,7 +51,9 @@ export function VoiceSession() {
       {draftText ? (
         <p className="mt-2 max-w-md px-6 text-center text-[13px] text-t2">“{draftText}”</p>
       ) : null}
-      {micHint ? <p className="mt-3 max-w-sm px-6 text-center text-[12px] text-warn">{micHint}</p> : null}
+      {micHint ? (
+        <p className="mt-3 max-w-md px-6 text-center text-[12px] leading-snug text-warn">{micHint}</p>
+      ) : null}
       <div className="mt-8 flex gap-2">
         <Button
           type="button"

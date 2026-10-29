@@ -565,95 +565,126 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
     }
   }, [reply, stopMediaTracks, stopVad]);
 
-  const startMediaWithVad = useCallback(async () => {
-    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
-      setMicHint("Sem microfone neste aparelho — usa o chat escrito.");
-      setMode("idle");
-      return;
-    }
+  const MIC_DENIED_HINT =
+    "Microfone bloqueado. No Chrome: cadeado ao lado da URL → Configurações do site → Microfone → Permitir → recarrega a página.";
+
+  /** Dispara o prompt nativo do navegador (getUserMedia). Sem isso o Web Speech só falha com not-allowed. */
+  const ensureMicPermission = useCallback(async (): Promise<"granted" | "denied" | "unavailable"> => {
+    if (!navigator.mediaDevices?.getUserMedia) return "unavailable";
     try {
-      stopSpeaking();
-      setMicHint(null);
-      setDraftText("");
+      // Se já foi concedido, resolve na hora. Se ainda não, o Chrome mostra o popup.
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
       });
-      mediaStreamRef.current = stream;
-      mediaChunksRef.current = [];
-      const mime = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
-        ? "audio/webm;codecs=opus"
-        : MediaRecorder.isTypeSupported("audio/webm")
-          ? "audio/webm"
-          : MediaRecorder.isTypeSupported("audio/mp4")
-            ? "audio/mp4"
-            : "";
-      const rec = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream);
-      mediaRecRef.current = rec;
-      rec.ondataavailable = (ev) => {
-        if (ev.data.size > 0) mediaChunksRef.current.push(ev.data);
-      };
-      rec.onerror = () => {
-        stopMediaTracks();
+      stream.getTracks().forEach((t) => t.stop());
+      return "granted";
+    } catch (err) {
+      const name = err instanceof DOMException ? err.name : "";
+      if (name === "NotAllowedError" || name === "PermissionDeniedError" || name === "SecurityError") {
+        return "denied";
+      }
+      return "unavailable";
+    }
+  }, []);
+
+  const startMediaWithVad = useCallback(
+    async (existingStream?: MediaStream) => {
+      if ((!navigator.mediaDevices?.getUserMedia && !existingStream) || typeof MediaRecorder === "undefined") {
+        setMicHint("Sem microfone neste aparelho — usa o chat escrito.");
         setMode("idle");
-        setMicHint("Falhou a gravação. Tenta de novo.");
-      };
-      rec.start(200);
-      setMode("listening");
-      setMicHint("Pode falar — paro sozinho quando você silenciar.");
+        return;
+      }
+      try {
+        stopSpeaking();
+        setMicHint(null);
+        setDraftText("");
+        const stream =
+          existingStream ??
+          (await navigator.mediaDevices.getUserMedia({
+            audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+          }));
+        mediaStreamRef.current = stream;
+        mediaChunksRef.current = [];
+        const mime = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+          ? "audio/webm;codecs=opus"
+          : MediaRecorder.isTypeSupported("audio/webm")
+            ? "audio/webm"
+            : MediaRecorder.isTypeSupported("audio/mp4")
+              ? "audio/mp4"
+              : "";
+        const rec = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream);
+        mediaRecRef.current = rec;
+        rec.ondataavailable = (ev) => {
+          if (ev.data.size > 0) mediaChunksRef.current.push(ev.data);
+        };
+        rec.onerror = () => {
+          stopMediaTracks();
+          setMode("idle");
+          setMicHint("Falhou a gravação. Tenta de novo.");
+        };
+        rec.start(200);
+        setMode("listening");
+        setMicHint("Pode falar — paro sozinho quando você silenciar.");
 
-      const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-      if (!AudioCtx) return;
-      const ctx = new AudioCtx();
-      const source = ctx.createMediaStreamSource(stream);
-      const analyser = ctx.createAnalyser();
-      analyser.fftSize = 1024;
-      source.connect(analyser);
-      const data = new Float32Array(analyser.fftSize);
-      let heardSpeech = false;
-      let silentMs = 0;
-      let lastTs = performance.now();
-      const startedAt = performance.now();
+        const AudioCtx =
+          window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+        if (!AudioCtx) return;
+        const ctx = new AudioCtx();
+        const source = ctx.createMediaStreamSource(stream);
+        const analyser = ctx.createAnalyser();
+        analyser.fftSize = 1024;
+        source.connect(analyser);
+        const data = new Float32Array(analyser.fftSize);
+        let heardSpeech = false;
+        let silentMs = 0;
+        let lastTs = performance.now();
+        const startedAt = performance.now();
 
-      const tick = () => {
-        if (!voiceOpenRef.current || mediaRecRef.current !== rec) {
-          void ctx.close();
-          return;
-        }
-        analyser.getFloatTimeDomainData(data);
-        let peak = 0;
-        for (let i = 0; i < data.length; i++) {
-          const v = Math.abs(data[i] ?? 0);
-          if (v > peak) peak = v;
-        }
-        const now = performance.now();
-        const dt = now - lastTs;
-        lastTs = now;
-        if (peak >= 0.04) {
-          heardSpeech = true;
-          silentMs = 0;
-        } else if (heardSpeech) {
-          silentMs += dt;
-          if (silentMs >= 1100) {
+        const tick = () => {
+          if (!voiceOpenRef.current || mediaRecRef.current !== rec) {
+            void ctx.close();
+            return;
+          }
+          analyser.getFloatTimeDomainData(data);
+          let peak = 0;
+          for (let i = 0; i < data.length; i++) {
+            const v = Math.abs(data[i] ?? 0);
+            if (v > peak) peak = v;
+          }
+          const now = performance.now();
+          const dt = now - lastTs;
+          lastTs = now;
+          if (peak >= 0.04) {
+            heardSpeech = true;
+            silentMs = 0;
+          } else if (heardSpeech) {
+            silentMs += dt;
+            if (silentMs >= 1100) {
+              void ctx.close();
+              finishVoiceRef.current();
+              return;
+            }
+          }
+          if (now - startedAt > 20_000) {
             void ctx.close();
             finishVoiceRef.current();
             return;
           }
-        }
-        if (now - startedAt > 20_000) {
-          void ctx.close();
-          finishVoiceRef.current();
-          return;
-        }
+          vadRafRef.current = requestAnimationFrame(tick);
+        };
+        if (ctx.state === "suspended") void ctx.resume();
         vadRafRef.current = requestAnimationFrame(tick);
-      };
-      if (ctx.state === "suspended") void ctx.resume();
-      vadRafRef.current = requestAnimationFrame(tick);
-    } catch {
-      stopMediaTracks();
-      setMode("idle");
-      setMicHint("Preciso de permissão do microfone pra conversar por voz.");
-    }
-  }, [stopMediaTracks]);
+      } catch (err) {
+        stopMediaTracks();
+        setMode("idle");
+        const name = err instanceof DOMException ? err.name : "";
+        setMicHint(
+          name === "NotAllowedError" || name === "PermissionDeniedError" ? MIC_DENIED_HINT : "Não consegui abrir o microfone.",
+        );
+      }
+    },
+    [stopMediaTracks],
+  );
 
   const startWebSpeech = useCallback(() => {
     const rec = createSpeechRecognition();
@@ -694,12 +725,7 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
         if (voiceOpenRef.current) window.setTimeout(() => startListeningRef.current(), 500);
         return;
       }
-      if (err === "not-allowed") {
-        setMicHint("Microfone bloqueado no navegador.");
-        setMode("idle");
-        return;
-      }
-      // Fallback Whisper se o Web Speech falhar
+      // not-allowed / network / etc.: tenta gravação (já pedimos getUserMedia antes)
       void startMediaWithVad();
     };
     rec.onend = () => {
@@ -725,10 +751,25 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
 
   const startListening = useCallback(() => {
     if (!voiceOpenRef.current) return;
-    // Chrome/Edge: Web Speech ao vivo. Senão: gravação + silêncio → Whisper.
-    if (speechRecognitionSupported()) startWebSpeech();
-    else void startMediaWithVad();
-  }, [startMediaWithVad, startWebSpeech]);
+    void (async () => {
+      setMicHint("Pedindo acesso ao microfone…");
+      const perm = await ensureMicPermission();
+      if (!voiceOpenRef.current) return;
+      if (perm === "denied") {
+        setMode("idle");
+        setMicHint(MIC_DENIED_HINT);
+        return;
+      }
+      if (perm === "unavailable") {
+        setMode("idle");
+        setMicHint("Sem microfone neste aparelho — usa o chat escrito.");
+        return;
+      }
+      // Chrome/Edge: Web Speech ao vivo. Senão / se falhar: Whisper.
+      if (speechRecognitionSupported()) startWebSpeech();
+      else void startMediaWithVad();
+    })();
+  }, [ensureMicPermission, startMediaWithVad, startWebSpeech]);
   startListeningRef.current = () => startListening();
 
   const finishVoice = useCallback(() => {
