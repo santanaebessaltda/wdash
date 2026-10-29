@@ -14,7 +14,6 @@ import {
 import { StorePicker } from "@/pages/dashboard/StorePicker";
 import { useScope } from "@/pages/dashboard/useScope";
 import { TopbarRefresh } from "./TopbarRefresh";
-import { ShareBoardButton } from "@/pages/board/ShareBoardButton";
 import { refreshSalesPush } from "@/push/salesPush";
 
 const ICON_PERFIL = "M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8";
@@ -98,6 +97,7 @@ export function Topbar({ onOpenMobileNav, collapsed, onToggleCollapse }: { onOpe
     location.pathname === paths.live.root ||
     location.pathname.startsWith(paths.live.root + "/") ||
     covers(location.pathname, paths.goals) ||
+    covers(location.pathname, paths.boardLinks) ||
     covers(location.pathname, paths.management.challenges) ||
     location.pathname === paths.stock.inventory ||
     location.pathname.startsWith("/stock/") ||
@@ -149,15 +149,7 @@ export function Topbar({ onOpenMobileNav, collapsed, onToggleCollapse }: { onOpe
       )}
 
       <div className="ml-auto flex shrink-0 items-center gap-1.5 sm:gap-2.5">
-        {/* Placar em todas as telas do gestor e do gerente. Atualizar só onde a tela depende do Millennium. */}
-        {session.role !== "SELLER" && (
-          <ShareBoardButton
-            stores={(scope.storeIds.length === 0 ? listStores : listStores.filter((store) => scope.storeIds.includes(store.id))).map((store) => ({
-              id: store.id,
-              tradeName: store.tradeName,
-            }))}
-          />
-        )}
+        {/* Atualizar só onde a tela depende do Millennium. O link do placar fica em Performance > Placar. */}
         {showsRefresh(location.pathname) && <TopbarRefresh storeIds={scope.storeIds} />}
 
         <Dropdown

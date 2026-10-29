@@ -46,6 +46,8 @@ export const paths = {
   boardShare: (token: string) => `/board/s/${token}`,
   /** Performance > Metas. `/goals`, `/metas` e `/management/goals` redirecionam. */
   goals: "/performance/goals",
+  /** Performance > Placar — links públicos por filial (sem consolidador). */
+  boardLinks: "/performance/board",
   goalNew: "/performance/goals/new",
   goalDetail: (id: string) => `/performance/goals/${id}`,
   goalEdit: (id: string) => `/performance/goals/${id}/edit`,

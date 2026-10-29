@@ -82,7 +82,11 @@ const SECTION_PAGES: Record<SectionName, Array<() => Promise<unknown>>> = {
   Equipe: [() => import("@/pages/management/StaffPage")],
   Escala: [() => import("@/pages/management/SchedulePage")],
   "Pedido de compra": [() => import("@/pages/stock/PurchaseOrderPage")],
-  Performance: [() => import("@/pages/goals/GoalsPage"), () => import("@/pages/management/ChallengesPage")],
+  Performance: [
+    () => import("@/pages/goals/GoalsPage"),
+    () => import("@/pages/management/ChallengesPage"),
+    () => import("@/pages/board/BoardLinksPage"),
+  ],
   Financeiro: [
     () => import("@/pages/cash-close/CashClosePage"),
     () => import("@/pages/management/CashDropPage"),

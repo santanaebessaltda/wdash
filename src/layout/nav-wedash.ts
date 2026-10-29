@@ -68,7 +68,7 @@ const purchaseOrder: NavSingle = {
   to: paths.management.purchaseOrder,
 };
 
-/** Metas e desafios. */
+/** Metas, desafios e link do placar. */
 const performance: NavGroup = {
   label: "Performance",
   description: "Administre as metas e os desafios da equipe.",
@@ -76,6 +76,7 @@ const performance: NavGroup = {
   items: [
     { label: "Metas", to: paths.goals },
     { label: "Desafios", to: paths.management.challenges },
+    { label: "Placar", to: paths.boardLinks },
   ],
 };
 

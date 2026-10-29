@@ -6,7 +6,8 @@ import { RedirectTo } from "@/router/RedirectTo";
 import { OWNER_ROLES } from "@/layout/nav-wedash";
 import { RequireRole } from "@/session/RequireSession";
 import GoalsPage from "./GoalsPage";
-/* Performance > Metas sync — cabeçalho na hora; só os cards em skeleton. */
+import BoardLinksPage from "@/pages/board/BoardLinksPage";
+/* Performance > Metas / Placar sync — cabeçalho na hora; só os cards em skeleton. */
 
 const GoalDetailPage = lazyPage(() => import("./GoalDetailPage"), "default");
 const GoalEditorPage = lazyPage(() => import("./GoalEditorPage"), "default");
@@ -23,6 +24,7 @@ export const goalRoutes: RouteObject[] = [
     element: <RequireRole roles={["OWNER", "MANAGER", "ADMIN_GLOBAL"]} />,
     children: [
       { path: paths.goals, element: <GoalsPage /> },
+      { path: paths.boardLinks, element: <BoardLinksPage /> },
       { path: `${paths.goals}/:id`, element: <GoalDetailPage /> },
       { path: paths.legacy.management.goals, element: <RedirectTo to={paths.goals} /> },
       { path: `${paths.legacy.management.goals}/new`, element: <RedirectTo to={paths.goalNew} /> },

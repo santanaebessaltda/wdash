@@ -47,6 +47,7 @@ const ALIASES: Record<string, string> = {
   meta: paths.goals,
   desafios: paths.management.challenges,
   desafio: paths.management.challenges,
+  placar: paths.boardLinks,
   fechamento: paths.management.cashClose,
   sangrias: paths.management.cashDrop,
   carteira: paths.management.wallet,
