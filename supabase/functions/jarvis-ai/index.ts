@@ -12,14 +12,19 @@ const CHAT_MODEL = Deno.env.get("JARVIS_CHAT_MODEL")?.trim() || "gpt-4o-mini";
 /** STT rápido; fallback whisper-1 se o modelo novo falhar. */
 const STT_MODEL = Deno.env.get("JARVIS_STT_MODEL")?.trim() || "gpt-4o-mini-transcribe";
 /**
- * Gemini TTS — voz fixa do JARVIS (= Jarvis clássico / Neutro do Néctar → Charon).
- * Override só via secret: JARVIS_TTS_MODEL / JARVIS_TTS_VOICE.
+ * Gemini TTS — voz fixa do JARVIS (Charon / suave-neutro).
+ * Override: JARVIS_TTS_MODEL / JARVIS_TTS_VOICE / JARVIS_TTS_STYLE.
  */
 const TTS_MODEL = Deno.env.get("JARVIS_TTS_MODEL")?.trim() || "gemini-2.5-flash-preview-tts";
 const TTS_VOICE = Deno.env.get("JARVIS_TTS_VOICE")?.trim() || "Charon";
+/** Estilo fixo: mesma entrega na saudação e nas respostas. */
 const TTS_STYLE =
   Deno.env.get("JARVIS_TTS_STYLE")?.trim() ||
-  "neutro, claro e natural em português do Brasil; respeite vírgulas e pausas; sem ritmo de robô";
+  [
+    "Fale em português do Brasil, voz suave e neutra, calma e conversacional — nunca robótica nem de locutor.",
+    "Respeite a pontuação do texto: vírgula = pausa curta; ponto ou reticências = pausa maior; interrogação = entonação de pergunta; exclamação = leve ênfase, sem gritar.",
+    "Não invente palavras, não resuma e não leia estas instruções em voz alta — fale apenas o texto pedido.",
+  ].join(" ");
 const TTS_MAX_CHARS = 2000;
 const TTS_SAMPLE_RATE = 24000;
 
@@ -220,7 +225,7 @@ async function handleChat(openaiKey: string, body: Record<string, unknown>) {
       : "";
   const voiceMode = body.voiceMode === true;
   const voiceHint = voiceMode
-    ? "\n\nModo voz ativo: responda como papo ao vivo — 1 a 3 frases, sem markdown, sem listas. Use vírgulas naturais (ex.: “Pronto, Romeu — tô na Visão geral”)."
+    ? "\n\nModo voz ativo: responda como papo ao vivo — 1 a 3 frases, sem markdown, sem listas. Pontuação clara para TTS: vírgulas e pontos no lugar certo; pergunta termina com ?; (ex.: “Pronto, Romeu. Quer ver a Visão geral?”)."
     : "";
 
   const messages: ChatMessage[] = [
@@ -341,7 +346,7 @@ function pcmToWav(pcm: Uint8Array, sampleRate = TTS_SAMPLE_RATE): Uint8Array {
   return new Uint8Array(buffer);
 }
 
-/** TTS Gemini → WAV em base64. Voz/tom fixos (sem picker no app). */
+/** TTS Gemini → WAV em base64. Mesma voz/estilo na saudação e nas respostas. */
 async function handleSpeak(geminiKey: string, body: Record<string, unknown>) {
   const raw = typeof body.text === "string" ? body.text.trim() : "";
   if (!raw) return json({ ok: false, error: "text_required" }, 400);
@@ -349,15 +354,17 @@ async function handleSpeak(geminiKey: string, body: Record<string, unknown>) {
   const voice = TTS_VOICE;
   const useSpeechMeta = TTS_MODEL.includes("3.8") || TTS_MODEL.includes("gemini-3");
 
-  const part: Record<string, unknown> = { text };
-  if (useSpeechMeta) {
-    part.speechMetadata = { style: TTS_STYLE };
-  } else {
-    // Prompt curto: evita “Diga exatamente” (soava mais robótico que o Néctar).
-    part.text = `(${TTS_STYLE})\n${text}`;
-  }
+  const part: Record<string, unknown> = useSpeechMeta
+    ? { text, speechMetadata: { style: TTS_STYLE } }
+    : {
+        // Texto puro no content; estilo só no systemInstruction (evita o modelo “ler” o prompt).
+        text,
+      };
 
-  const payload = {
+  const payload: Record<string, unknown> = {
+    systemInstruction: {
+      parts: [{ text: TTS_STYLE }],
+    },
     contents: [{ role: "user", parts: [part] }],
     generationConfig: {
       responseModalities: ["AUDIO"],

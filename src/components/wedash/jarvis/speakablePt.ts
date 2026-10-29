@@ -162,8 +162,12 @@ export function forSpeech(text: string): string {
     return integerToPtBr(Math.round(v * 1000));
   });
 
-  // Normaliza espaços sem apagar pontuação; reforça pausa após vírgula.
+  // Normaliza espaços sem apagar pontuação; reforça pausa após vírgula / ? / !.
   out = out.replace(/\s+/g, " ").trim();
   out = out.replace(/,([^\s])/g, ", $1");
+  out = out.replace(/\?([^\s])/g, "? $1");
+  out = out.replace(/!([^\s])/g, "! $1");
+  // Evita “JARVIS.” grudado sem pausa antes do próximo trecho.
+  out = out.replace(/\.([^\s.])/g, ". $1");
   return out;
 }

@@ -18,7 +18,7 @@ describe("firstNameFrom", () => {
 
 describe("voiceStandbyLine", () => {
   it("monta a fala inicial estilo Néctar", () => {
-    expect(voiceStandbyLine("Romeu")).toBe("JARVIS à disposição Romeu.");
-    expect(voiceStandbyLine("")).toBe("JARVIS à disposição Gestor.");
+    expect(voiceStandbyLine("Romeu")).toBe("JARVIS à disposição, Romeu.");
+    expect(voiceStandbyLine("")).toBe("JARVIS à disposição, Gestor.");
   });
 });

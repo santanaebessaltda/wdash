@@ -110,8 +110,9 @@ function speakBrowser(text: string, opts?: { onEnd?: () => void }): () => void {
 }
 
 /**
- * Voz do JARVIS: Gemini TTS via Edge (Charon / Neutro, fixo); se falhar, Web Speech.
- * Números/R$ passam por `forSpeech` (milhão ≠ mil).
+ * Voz do JARVIS: Gemini TTS via Edge (Charon / suave-neutro).
+ * Uma falha transitória → 1 retry (evita saudação no Web Speech e resposta no Gemini).
+ * Números/R$ passam por `forSpeech`.
  */
 export function speak(text: string, opts?: { onEnd?: () => void }): () => void {
   let cancelled = false;
@@ -128,7 +129,11 @@ export function speak(text: string, opts?: { onEnd?: () => void }): () => void {
   const spoken = forSpeech(trimmed);
 
   void (async () => {
-    const remote = await jarvisSpeak(spoken);
+    let remote = await jarvisSpeak(spoken);
+    if (!remote.ok && !cancelled) {
+      await new Promise((r) => setTimeout(r, 280));
+      if (!cancelled) remote = await jarvisSpeak(spoken);
+    }
     if (cancelled) return;
 
     if (remote.ok) {
@@ -148,16 +153,20 @@ export function speak(text: string, opts?: { onEnd?: () => void }): () => void {
         audio.onerror = () => {
           if (cancelled) return;
           stopRemoteAudio();
-          cancelBrowser = speakBrowser(spoken, opts);
+          // Sem fallback de navegador no erro de play — mantém a mesma voz Gemini no próximo turno.
+          opts?.onEnd?.();
         };
         await audio.play();
         return;
       } catch {
         if (cancelled) return;
         stopRemoteAudio();
+        opts?.onEnd?.();
+        return;
       }
     }
 
+    // Só cai no Web Speech se o Gemini falhou de verdade (duas tentativas).
     if (cancelled) return;
     cancelBrowser = speakBrowser(spoken, opts);
   })();
