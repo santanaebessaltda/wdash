@@ -60,21 +60,37 @@ export function sold30FromAggs(aggs: Pick<SalesProductDayAgg, "productCode" | "i
   return out;
 }
 
-/** Pedidos em aberto por loja x código, e quando cada loja buscou o saldo futuro pela última vez. */
+/**
+ * Saldo Atual e Futuro por loja x código (variantes somadas): saldo, a receber e total do relatório,
+ * e quando cada loja buscou pela última vez.
+ */
 export async function fetchIncomingQty(
   tenantId: string,
   storeIds: string[],
-): Promise<{ qty: Map<string, number>; syncedAt: Map<string, string | null> }> {
+): Promise<{
+  qty: Map<string, number>;
+  balance: Map<string, number>;
+  total: Map<string, number>;
+  syncedAt: Map<string, string | null>;
+}> {
   const qty = new Map<string, number>();
+  const balance = new Map<string, number>();
+  const total = new Map<string, number>();
   const syncedAt = new Map<string, string | null>(storeIds.map((id) => [id, null]));
-  if (storeIds.length === 0) return { qty, syncedAt };
+  if (storeIds.length === 0) return { qty, balance, total, syncedAt };
   const q = from("store_purchase_stock");
   const storeQ = from("store");
-  if (!q || !storeQ) return { qty, syncedAt };
+  if (!q || !storeQ) return { qty, balance, total, syncedAt };
   const [rows, stores] = await Promise.all([
-    fetchAllPages<{ store_id: string; product_code: string; open_order: number | string | null }>(
+    fetchAllPages<{
+      store_id: string;
+      product_code: string;
+      open_order: number | string | null;
+      balance: number | string | null;
+      total: number | string | null;
+    }>(
       q
-        .select("store_id, product_code, open_order")
+        .select("store_id, product_code, open_order, balance, total")
         .eq("tenant_id", tenantId)
         .in("store_id", storeIds)
         .order("store_id")
@@ -91,8 +107,10 @@ export async function fetchIncomingQty(
     if (!code) continue;
     const key = `${r.store_id}|${code}`;
     qty.set(key, (qty.get(key) ?? 0) + num(r.open_order));
+    balance.set(key, (balance.get(key) ?? 0) + num(r.balance));
+    total.set(key, (total.get(key) ?? 0) + num(r.total));
   }
-  return { qty, syncedAt };
+  return { qty, balance, total, syncedAt };
 }
 
 export async function fetchPurchaseStock(

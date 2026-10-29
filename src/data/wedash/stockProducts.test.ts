@@ -127,6 +127,48 @@ describe("buildStockProductsView", () => {
     ]);
   });
 
+  it("com Saldo Atual e Futuro, PONTO DE VENDA / Total / Total geral usam SALDO e TOTAL do relatório (não o ESTOQUEPORLOCAL)", () => {
+    const view = buildStockProductsView({
+      stores: [store({ id: "a", tradeName: "LOJAWEPINK.CENTRO.CAMPOGRANDE" })],
+      catalog: new Map([["WP024", { code: "WP024", name: "PRODUTO", category: "PERFUMARIA" }]]),
+      stock: [{ storeId: "a", code: "WP024", qty: 10, locations: { "PONTO DE VENDA": 10 } }],
+      costPrices: new Map(),
+      salePrices: new Map(),
+      saleTableId: null,
+      charged: [],
+      incoming: new Map([["a|WP024", 24]]),
+      purchaseBalance: new Map([["a|WP024", 7]]),
+      purchaseTotal: new Map([["a|WP024", 31]]),
+      incomingKnown: new Set(["a"]),
+    });
+    const p = view.rows.find((r) => r.code === "WP024")!;
+    expect(p.stock).toBe(7);
+    expect(p.aReceive).toBe(24);
+    expect(p.totalGeral).toBe(31);
+    expect(p.storeRows[0].locations).toEqual([{ name: "PONTO DE VENDA", qty: 7 }]);
+  });
+
+  it("código só no ESTOQUEPORLOCAL (fora do Saldo Atual e Futuro) mantém o saldo por local", () => {
+    const view = buildStockProductsView({
+      stores: [store({ id: "a" })],
+      catalog: new Map(),
+      stock: [{ storeId: "a", code: "SO-LOCAL", qty: 4, locations: { "PONTO DE VENDA": 4 } }],
+      costPrices: new Map(),
+      salePrices: new Map(),
+      saleTableId: null,
+      charged: [],
+      incoming: new Map(),
+      purchaseBalance: new Map(),
+      purchaseTotal: new Map(),
+      incomingKnown: new Set(["a"]),
+    });
+    const p = view.rows.find((r) => r.code === "SO-LOCAL")!;
+    expect(p.stock).toBe(4);
+    expect(p.aReceive).toBe(0);
+    expect(p.totalGeral).toBe(4);
+    expect(p.storeRows[0].locations).toEqual([{ name: "PONTO DE VENDA", qty: 4 }]);
+  });
+
   it("local negativo com outro local positivo = transferência; total = soma dos locais", () => {
     const view = buildStockProductsView({
       stores: [store({ id: "a" })],

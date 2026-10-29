@@ -23,6 +23,13 @@ export type StockInput = {
   charged: Array<{ storeId: string; code: string; revenueCents: number; items: number }>;
   /** Pedidos em aberto (Saldo Atual e Futuro), chave `loja|codigo`. */
   incoming?: Map<string, number>;
+  /**
+   * Saldo (SALDO) e Total do Saldo Atual e Futuro, chave `loja|codigo`.
+   * Quando a loja ja buscou o relatorio, o Estoque usa esses numeros (e nao so o ESTOQUEPORLOCAL)
+   * para PONTO DE VENDA / Total / Total geral baterem com o Millennium.
+   */
+  purchaseBalance?: Map<string, number>;
+  purchaseTotal?: Map<string, number>;
   /** Lojas cujo saldo futuro ja foi buscado. Sem todas, A receber fica vazio. */
   incomingKnown?: Set<string>;
 };
@@ -249,6 +256,8 @@ export function buildStockProductsView(input: StockInput): StockProductsView {
     chargedBy.set(k, acc);
   }
   const incoming = input.incoming ?? new Map<string, number>();
+  const purchaseBalance = input.purchaseBalance ?? new Map<string, number>();
+  const purchaseTotal = input.purchaseTotal ?? new Map<string, number>();
   const incomingKnown = input.incomingKnown ?? new Set<string>();
   const allIncomingKnown = input.stores.length > 0 && input.stores.every((s) => incomingKnown.has(s.id));
   const storeIds = new Set(input.stores.map((s) => s.id));
@@ -257,11 +266,13 @@ export function buildStockProductsView(input: StockInput): StockProductsView {
     if (storeIds.has(s.storeId) && (s.qty !== 0 || Object.values(s.locations ?? {}).some((q) => q !== 0))) codes.add(s.code);
   }
   if (allIncomingKnown) {
-    for (const [key, q] of incoming) {
-      if (q === 0) continue;
-      const cut = key.indexOf("|");
-      if (cut < 0 || !storeIds.has(key.slice(0, cut))) continue;
-      codes.add(key.slice(cut + 1));
+    for (const map of [incoming, purchaseBalance]) {
+      for (const [key, q] of map) {
+        if (q === 0) continue;
+        const cut = key.indexOf("|");
+        if (cut < 0 || !storeIds.has(key.slice(0, cut))) continue;
+        codes.add(key.slice(cut + 1));
+      }
     }
   }
   const rows: StockProductRow[] = [];
@@ -272,20 +283,28 @@ export function buildStockProductsView(input: StockInput): StockProductsView {
     const name = cat?.name || code;
     const priceCents = prices.get(code) ?? null;
     const storeRows: StockStoreDetail[] = input.stores.map((store) => {
-      const stock = stockBy.get(`${store.id}|${code}`) ?? 0;
-      const locations = Object.entries(locationsBy.get(`${store.id}|${code}`) ?? {})
+      const key = `${store.id}|${code}`;
+      const localStock = stockBy.get(key) ?? 0;
+      let locations = Object.entries(locationsBy.get(key) ?? {})
         .filter(([, q]) => q !== 0)
-        .map(([name, q]) => ({ name, qty: q }))
+        .map(([locName, q]) => ({ name: locName, qty: q }))
         .sort((a, b) => b.qty - a.qty);
+      // Saldo Atual e Futuro manda no total quando a loja ja buscou o relatorio e o codigo esta nele.
+      const fromReport = incomingKnown.has(store.id) && purchaseBalance.has(key);
+      const stock = fromReport ? (purchaseBalance.get(key) ?? 0) : localStock;
+      if (fromReport && locations.length <= 1) {
+        const locName = locations[0]?.name ?? STOCK_SALES_LOCATION;
+        locations = stock === 0 ? [] : [{ name: locName, qty: stock }];
+      }
       const costCents = costCentsFor(input.costPrices, store, code);
       const composition = composePrice(store, code, priceCents, costCents);
-      const ch = chargedBy.get(`${store.id}|${code}`);
+      const ch = chargedBy.get(key);
       let praticado: StockStoreDetail["praticado"] = null;
       if (ch && ch.items > 0 && ch.revenueCents > 0) {
         const p = composePrice(store, code, Math.round(ch.revenueCents / ch.items), costCents);
         praticado = { price: ch.revenueCents / ch.items / 100, items: ch.items, profit: p.profit, marginPct: p.marginPct };
       }
-      const aReceive = incomingKnown.has(store.id) ? (incoming.get(`${store.id}|${code}`) ?? 0) : null;
+      const aReceive = incomingKnown.has(store.id) ? (incoming.get(key) ?? 0) : null;
       return { store, stock, locations, transferencias: stockTransfers(locations), composition, praticado, vendidos30d: ch?.items ?? 0, aReceive };
     });
 
@@ -301,6 +320,15 @@ export function buildStockProductsView(input: StockInput): StockProductsView {
     };
     const stock = storeRows.reduce((s, l) => s + l.stock, 0);
     const aReceive = allIncomingKnown ? input.stores.reduce((s, store) => s + (incoming.get(`${store.id}|${code}`) ?? 0), 0) : null;
+    const totalGeral =
+      aReceive == null
+        ? null
+        : input.stores.reduce((s, store) => {
+            const key = `${store.id}|${code}`;
+            if (incomingKnown.has(store.id) && purchaseTotal.has(key)) return s + (purchaseTotal.get(key) ?? 0);
+            const detail = storeRows.find((l) => l.store.id === store.id);
+            return s + (detail?.stock ?? 0) + (incomingKnown.has(store.id) ? (incoming.get(key) ?? 0) : 0);
+          }, 0);
     const varies = comp.length > 1 && !same(comp.map((c) => c.profit ?? c.costAquisicao));
     const ch = storeRows.filter((l) => l.praticado);
     const itemsPracticed = ch.reduce((s, l) => s + l.praticado!.items, 0);
@@ -315,7 +343,7 @@ export function buildStockProductsView(input: StockInput): StockProductsView {
       category: cat?.category || "Sem categoria",
       stock,
       aReceive,
-      totalGeral: aReceive == null ? null : stock + aReceive,
+      totalGeral,
       transfer: storeRows.reduce((s, l) => s + l.transferencias.reduce((t, x) => t + x.qty, 0), 0),
       cost: pick((c) => c.cost),
       franchiseRent: pick((c) => c.franchiseRent),

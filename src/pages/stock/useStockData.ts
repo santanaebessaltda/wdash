@@ -18,6 +18,8 @@ type StockLoaded = {
   costPrices: Map<number, Map<string, number>>;
   syncedAt: Map<string, string | null>;
   incoming: Map<string, number>;
+  purchaseBalance: Map<string, number>;
+  purchaseTotal: Map<string, number>;
   incomingSyncedAt: Map<string, string | null>;
 };
 
@@ -28,6 +30,8 @@ type StockCache = {
   costPrices: Array<[number, Array<[string, number]>]>;
   syncedAt: Array<[string, string | null]>;
   incoming: Array<[string, number]>;
+  purchaseBalance: Array<[string, number]>;
+  purchaseTotal: Array<[string, number]>;
   incomingSyncedAt: Array<[string, string | null]>;
 };
 
@@ -38,6 +42,8 @@ function toCache(d: StockLoaded): StockCache {
     costPrices: [...d.costPrices.entries()].map(([id, prices]) => [id, [...prices.entries()]]),
     syncedAt: [...d.syncedAt.entries()],
     incoming: [...d.incoming.entries()],
+    purchaseBalance: [...d.purchaseBalance.entries()],
+    purchaseTotal: [...d.purchaseTotal.entries()],
     incomingSyncedAt: [...d.incomingSyncedAt.entries()],
   };
 }
@@ -49,6 +55,8 @@ function fromCache(c: StockCache): StockLoaded {
     costPrices: new Map(c.costPrices.map(([id, prices]) => [id, new Map(prices)])),
     syncedAt: new Map(c.syncedAt),
     incoming: new Map(c.incoming),
+    purchaseBalance: new Map(c.purchaseBalance ?? []),
+    purchaseTotal: new Map(c.purchaseTotal ?? []),
     incomingSyncedAt: new Map(c.incomingSyncedAt),
   };
 }
@@ -81,7 +89,16 @@ async function loadAll(tenantId: string, storeRows: Store[]): Promise<StockLoade
     fetchCostPrices(tableIds),
     fetchIncomingQty(tenantId, storeIds),
   ]);
-  return { catalog, stock: stock.rows, costPrices, syncedAt: stock.syncedAt, incoming: incoming.qty, incomingSyncedAt: incoming.syncedAt };
+  return {
+    catalog,
+    stock: stock.rows,
+    costPrices,
+    syncedAt: stock.syncedAt,
+    incoming: incoming.qty,
+    purchaseBalance: incoming.balance,
+    purchaseTotal: incoming.total,
+    incomingSyncedAt: incoming.syncedAt,
+  };
 }
 
 /** Estoque das lojas do escopo. Pacote + settle como o Dashboard; busca Millennium se >30 min. */
@@ -202,6 +219,8 @@ export function useStockData() {
             stock: data.stock,
             costPrices: data.costPrices,
             incoming: data.incoming,
+            purchaseBalance: data.purchaseBalance,
+            purchaseTotal: data.purchaseTotal,
             incomingKnown: new Set([...data.incomingSyncedAt].filter(([, at]) => at != null).map(([id]) => id)),
             salePrices: new Map(),
             saleTableId: null,
