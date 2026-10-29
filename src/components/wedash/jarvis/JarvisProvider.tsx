@@ -55,7 +55,12 @@ import {
   warmJarvisTts,
   type SpeechRecognitionLike,
 } from "./speech";
-import { scrollAppMain } from "./pageChrome";
+import {
+  applyScrollFromQuestion,
+  formatScrollReply,
+  looksLikeScroll,
+  scrollAppMain,
+} from "./pageChrome";
 import { searchWithPeriodFromQuestion, syncScopePeriodFromQuestion } from "./syncPeriod";
 
 const VOICE_READ_KEY = "wedash.jarvis.voiceRead";
@@ -612,6 +617,12 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
         .normalize("NFD")
         .replace(/\p{M}/gu, "");
 
+      if (intent === "scroll" || looksLikeScroll(q)) {
+        const kind = applyScrollFromQuestion(q) ?? "down";
+        finish(formatScrollReply(kind));
+        return;
+      }
+
       if (intent === "navigate" || looksLikeNavigate(q)) {
         const target = resolveNavigate(q, session!.role);
         if (target) {
@@ -742,6 +753,13 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
           return;
         }
         finish("Não tenho rascunho pendente. Manda um desafio, uma meta ou a escala que a gente monta.");
+        return;
+      }
+
+      // Rolagem de página — nunca passa pelo LLM (evita responder vendas “do nada”).
+      if (intent === "scroll" || looksLikeScroll(q)) {
+        const kind = applyScrollFromQuestion(q) ?? "down";
+        finish(formatScrollReply(kind));
         return;
       }
 

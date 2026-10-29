@@ -13,6 +13,7 @@ export type JarvisIntent =
   | "goal"
   | "schedule"
   | "navigate"
+  | "scroll"
   | "authorize"
   | "unknown";
 
@@ -27,6 +28,14 @@ export function classifyIntent(raw: string): JarvisIntent {
     return "capability";
   }
   if (/autorizo|pode criar|pode gravar|confirma|pode seguir|fechado pode/.test(p)) return "authorize";
+  // Antes de navigate/vendas — “rolar a página” não é abrir tela nem faturamento.
+  if (
+    /rolar|rola\b|scroll|desce(r)?( a pagina)?|sobe(r)?( a pagina)?|pro topo|pro final|fim da pagina|pra baixo|pra cima/.test(
+      p,
+    )
+  ) {
+    return "scroll";
+  }
   if (/(abre|abrir|entra|entrar|vai (pra|pro|para)|vamos (pra|pro|para)|mostra|mostrar|me leva|abre a tela)/.test(p)) {
     return "navigate";
   }
@@ -67,9 +76,11 @@ export function jarvisReply(question: string): string {
       return "Na escala eu uso o mesmo motor do montador. Me diz a filial e o mês — proponho o rascunho e só gero de verdade com o seu OK.";
     case "navigate":
       return "Pode falar tipo: abre Visão geral, vai pro Financeiro, abre Escala…";
+    case "scroll":
+      return "Posso rolar a página — sobe, desce, topo ou final.";
     case "authorize":
       return "Ainda não tenho rascunho pra gravar. Quando a gente montar algo, eu peço seu OK.";
     default:
-      return "Manda aí — vendas, estoque, desafio, meta, escala, ou “abre Visão geral”. Se for criar, a gente fecha o detalhe e eu só gravo com autorização.";
+      return "Manda aí — vendas, estoque, desafio, meta, escala, rolar a página, ou “abre Visão geral”. Se for criar, a gente fecha o detalhe e eu só gravo com autorização.";
   }
 }

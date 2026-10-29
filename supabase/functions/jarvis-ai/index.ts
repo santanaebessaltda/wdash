@@ -62,7 +62,9 @@ Regras:
 - Nunca invente faturamento, estoque, meta, comissão ou qualquer número. Use as tools de análise.
 - Meta, desafio e escala: você só discute e pede rascunho via tool. Gravar de verdade é o Gestor no botão Autorizar — nunca diga que já gravou sozinho.
 - Navegação: use a tool navigate quando pedirem para abrir uma tela.
-- Se faltar dado da tool, fale que faltou — não chute.`;
+- Rolagem (“rolar a página”, sobe, desce, topo): o app faz isso no cliente — NÃO chame analyze_sales nem invente números. Responda só confirmando a rolagem.
+- Se faltar dado da tool, fale que faltou — não chute.
+- Não reenvie análise de vendas se o gestor pediu outra coisa (rolar, abrir tela, oi).`;
 
 const TOOLS = [
   {

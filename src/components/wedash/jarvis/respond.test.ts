@@ -6,11 +6,13 @@ describe("classifyIntent", () => {
     expect(classifyIntent("Oi JARVIS")).toBe("greeting");
   });
 
-  it("reconhece desafio, meta, escala e navegação", () => {
+  it("reconhece desafio, meta, escala, navegação e rolagem", () => {
     expect(classifyIntent("Quero criar um desafio de body splash")).toBe("challenge");
     expect(classifyIntent("Vamos montar a meta de março")).toBe("goal");
     expect(classifyIntent("Gerar a escala de novembro 6x1")).toBe("schedule");
     expect(classifyIntent("Abre a Visão geral")).toBe("navigate");
+    expect(classifyIntent("Rolar a página")).toBe("scroll");
+    expect(classifyIntent("Sobe um pouco")).toBe("scroll");
   });
 
   it("reconhece estoque e vendas", () => {
