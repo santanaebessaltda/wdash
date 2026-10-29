@@ -225,7 +225,9 @@ Inspiração de UX: [Néctar](https://www.meu-nectar.com/) (conversa humana, res
 
 **Onde roda:** app web e **PWA** (mic no gesto do REC).
 
-**Tom:** informal, humano — curto, confirma o que fez, sem jargão de produto. **Contexto (2026-10-29):** opinião/follow-up (“atinge?”, “reduzir a meta?”) vai pelo LLM com histórico; brief direto só na 1ª pergunta factual — evita bot de palavra-chave. **Nível desafio / +10% / “igual outubro”** = escada da **Meta** (`draft_goal`), não o CRUD Desafios.
+**Tom:** informal, humano — curto, confirma o que fez, sem jargão de produto.
+
+**Roteamento (DECIDIDO — 2026-10-29, LLM-first):** com IA no ar, o turno vai quase sempre pelo LLM (histórico + “rascunho aberto” no contexto da sessão). Tools (`analyze_*` / `draft_*`) são as mãos; a IA interpreta ligação entre mensagens (ex.: “desafio 10%” no meio de uma meta). Keywords/`classifyIntent` ficam para Autorizar, descartar, “abre tela” e **fallback local** se a Edge falhar. Sem brief seco por palavra-chave.
 
 **Superfície (DECIDIDO — 2026-10-29):**
 - **Botão flutuante** no canto inferior direito (só Gestor) — painel no estilo Apps > Chat do Vela (thread + composer); mic = ditado; **Limpar**; F5 zera histórico (sessão). **Fora do menu.** `/chat-ia` e `/jarvis` redirecionam para Visão geral. **Filial:** Topbar.

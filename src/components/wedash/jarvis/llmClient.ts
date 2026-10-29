@@ -23,19 +23,43 @@ export type LlmSideEffect =
   | { kind: "draft_goal"; request: string }
   | { kind: "draft_schedule"; request: string };
 
-function contextNote(ctx: JarvisContext): string {
+/** Estado do app que a IA precisa para continuar o fio (sem keyword routing). */
+export type JarvisLlmSession = {
+  goalDraftSummary?: string | null;
+  challengeDraftSummary?: string | null;
+  scheduleDraftSummary?: string | null;
+};
+
+function contextNote(ctx: JarvisContext, session?: JarvisLlmSession | null): string {
   const stores =
     ctx.stores.length === 0
       ? "nenhuma filial no escopo"
       : ctx.stores.map((s) => `${s.tradeName || s.name} (${s.code || s.id})`).join("; ");
-  return `Hoje: ${ctx.today}. Filiais no escopo: ${stores}. Tenant: ${ctx.tenantId}.`;
+  const lines = [
+    `Hoje: ${ctx.today}. Filiais no escopo: ${stores}. Tenant: ${ctx.tenantId}.`,
+    "Interprete a intenção pelo histórico + mensagem atual. Não roteie por palavra isolada.",
+  ];
+  if (session?.goalDraftSummary) {
+    lines.push(`Rascunho de META aberto no app: ${session.goalDraftSummary}. Continuação (nível, %, outubro, valor) = draft_goal, não draft_challenge.`);
+  }
+  if (session?.challengeDraftSummary) {
+    lines.push(`Rascunho de DESAFIO (produto/disputa) aberto: ${session.challengeDraftSummary}.`);
+  }
+  if (session?.scheduleDraftSummary) {
+    lines.push(`Rascunho de ESCALA aberto: ${session.scheduleDraftSummary}.`);
+  }
+  if (!session?.goalDraftSummary && !session?.challengeDraftSummary && !session?.scheduleDraftSummary) {
+    lines.push("Nenhum rascunho aberto no app agora.");
+  }
+  return lines.join("\n");
 }
 
-/** Um turno com loop de tools (máx. 3). Side effects (navegar / rascunho) o caller aplica. */
+/** Um turno com loop de tools (máx. 3). Side effects (rascunho) o caller aplica. */
 export async function jarvisLlmTurn(
   history: LlmChatMessage[],
   ctx: JarvisContext,
   userText: string,
+  session?: JarvisLlmSession | null,
 ): Promise<LlmTurnResult> {
   const sb = getSupabase();
   if (!sb) return { ok: false, reason: "supabase_missing" };
@@ -49,7 +73,7 @@ export async function jarvisLlmTurn(
       body: {
         action: "chat",
         messages,
-        contextNote: contextNote(ctx),
+        contextNote: contextNote(ctx, session),
       },
     });
 

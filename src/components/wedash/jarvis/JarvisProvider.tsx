@@ -29,15 +29,16 @@ import {
   validateGoalDraft,
   type GoalDraft,
 } from "./goalDraft";
-import { blobToBase64, jarvisLlmTurn, jarvisTranscribe, type LlmChatMessage } from "./llmClient";
-import { loadGoalBrief } from "./goalBrief";
+import {
+  blobToBase64,
+  jarvisLlmTurn,
+  jarvisTranscribe,
+  type JarvisLlmSession,
+  type LlmChatMessage,
+} from "./llmClient";
 import {
   classifyIntent,
-  looksLikeGoalAdvice,
-  looksLikeGoalLadderTalk,
   looksLikeLeaveChatRequest,
-  looksLikeOpinionOrCounsel,
-  looksLikeSalesQuery,
   STAY_IN_CHAT_REPLY,
 } from "./respond";
 import { commitSchedule } from "./scheduleCommit";
@@ -48,7 +49,6 @@ import {
   validateScheduleDraft,
   type ScheduleDraft,
 } from "./scheduleDraft";
-import { loadSalesBrief } from "./salesBrief";
 import { syncScopePeriodFromQuestion } from "./syncPeriod";
 
 export type JarvisMessage = { from: "user" | "jarvis"; text: string };
@@ -595,39 +595,15 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
         return;
       }
 
+      // “Abre tela / rola” — resposta fixa; o resto a IA interpreta (histórico + rascunho aberto).
       if (intent === "stay_in_chat" || looksLikeLeaveChatRequest(q)) {
         finish(STAY_IN_CHAT_REPLY);
         return;
       }
 
-      // Alinha período da pergunta no storage (Dashboard depois); sem sair do chat.
       const applyPeriodHint = () => {
         syncScopePeriodFromQuestion(q, location.pathname, location.search, navigate);
       };
-
-      // Brief direto só em 1ª pergunta factual. Com histórico ou opinião (“acha?”, “reduzir?”)
-      // vai pro LLM — senão vira bot de palavra-chave e ignora o contexto.
-      const priorTurns = messagesRef.current.length;
-      const briefOk =
-        priorTurns === 0 && !looksLikeOpinionOrCounsel(q) && !looksLikeGoalAdvice(q);
-
-      if (intent === "analyze_goal" && briefOk) {
-        applyPeriodHint();
-        void loadGoalBrief(ctx, q).then((answer) => {
-          if (gen !== replyGen.current) return;
-          finish(answer);
-        });
-        return;
-      }
-
-      if (intent === "analyze_sales" && briefOk && looksLikeSalesQuery(q)) {
-        applyPeriodHint();
-        void loadSalesBrief(ctx, q).then((answer) => {
-          if (gen !== replyGen.current) return;
-          finish(answer);
-        });
-        return;
-      }
 
       const history: LlmChatMessage[] = messagesRef.current
         .slice(-12)
@@ -636,8 +612,22 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
           content: m.text,
         }));
 
+      const llmSession = (): JarvisLlmSession => {
+        const g = goalDraftRef.current?.form;
+        const c = challengeDraftRef.current?.form;
+        const s = scheduleDraftRef.current?.form;
+        return {
+          goalDraftSummary: g
+            ? `${g.name || "sem nome"} · alvo ${g.target ?? "?"} · ${g.startsOn ?? "?"} a ${g.endsOn ?? "?"} · ${g.tiers.length} níveis · modo ${g.tierMode}`
+            : null,
+          challengeDraftSummary: c ? `${c.name || "sem nome"} · modo ${c.mode} · métrica ${c.metric}` : null,
+          scheduleDraftSummary: s ? `${s.monthStart || "?"} · loja ${s.storeId || "?"}` : null,
+        };
+      };
+
       void (async () => {
-        const llm = await jarvisLlmTurn(history, ctx, q);
+        // LLM-first: a IA escolhe tools e liga ao contexto; keywords só no fallback local.
+        const llm = await jarvisLlmTurn(history, ctx, q, llmSession());
         if (gen !== replyGen.current) return;
 
         if (!llm.ok) {
@@ -649,20 +639,10 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
           return;
         }
 
+        applyPeriodHint();
+
         for (const effect of llm.sideEffects) {
-          // “Nível desafio / +10% / config de outubro” = escada da META, não CRUD Desafio.
-          const qNorm = q
-            .toLowerCase()
-            .normalize("NFD")
-            .replace(/\p{M}/gu, "");
-          const asGoalLadder =
-            effect.kind === "draft_challenge" &&
-            (looksLikeGoalLadderTalk(effect.request || q) ||
-              looksLikeGoalLadderTalk(q) ||
-              (Boolean(goalDraftRef.current) &&
-                /desafio/.test(qNorm) &&
-                !/produto|body|estoque|disputa|splash|kit\b/.test(qNorm)));
-          if (effect.kind === "draft_challenge" && !asGoalLadder) {
+          if (effect.kind === "draft_challenge") {
             setGoalDraft(null);
             goalDraftRef.current = null;
             setScheduleDraft(null);
@@ -672,7 +652,7 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
             setChallengeDraft(draft);
             challengeDraftRef.current = draft;
             setCreatedItem(null);
-          } else if (effect.kind === "draft_goal" || asGoalLadder) {
+          } else if (effect.kind === "draft_goal") {
             setChallengeDraft(null);
             challengeDraftRef.current = null;
             setScheduleDraft(null);
