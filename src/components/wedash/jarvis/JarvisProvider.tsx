@@ -98,9 +98,14 @@ type JarvisApi = {
   /** Leitura em voz das respostas (TTS). Ligada/desligada. */
   voiceRead: boolean;
   toggleVoiceRead: () => void;
-  /** Microfone → transcreve no campo de texto (não abre modo voz). */
+  /** Microfone → grava → Whisper no campo (UI REC estilo Néctar). */
   dictating: boolean;
-  toggleDictate: () => void;
+  dictateBusy: boolean;
+  dictateSeconds: number;
+  dictateLevels: number[];
+  startDictate: () => void;
+  finishDictate: () => void;
+  cancelDictate: () => void;
   /** `button` = clique (pede mic). `clap` = palmas (só ouve se já tiver permissão). */
   openVoice: (opts?: { source?: "button" | "clap" }) => void;
   closeVoice: () => void;
@@ -144,6 +149,9 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
   const [voiceOpen, setVoiceOpen] = useState(false);
   const [voiceRead, setVoiceRead] = useState(readStoredVoiceRead);
   const [dictating, setDictating] = useState(false);
+  const [dictateBusy, setDictateBusy] = useState(false);
+  const [dictateSeconds, setDictateSeconds] = useState(0);
+  const [dictateLevels, setDictateLevels] = useState<number[]>(() => Array.from({ length: 40 }, () => 0.12));
 
   const endRef = useRef<HTMLDivElement>(null);
   const cancelSpeakRef = useRef<(() => void) | null>(null);
@@ -153,8 +161,14 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
   const replyGen = useRef(0);
   const voiceOpenRef = useRef(false);
   const voiceReadRef = useRef(voiceRead);
-  const dictateRecRef = useRef<SpeechRecognitionLike | null>(null);
   const dictateBaseRef = useRef("");
+  const dictateRecRef = useRef<MediaRecorder | null>(null);
+  const dictateStreamRef = useRef<MediaStream | null>(null);
+  const dictateChunksRef = useRef<Blob[]>([]);
+  const dictateDiscardRef = useRef(false);
+  const dictateRafRef = useRef(0);
+  const dictateTimerRef = useRef(0);
+  const dictateAudioCtxRef = useRef<AudioContext | null>(null);
   const mediaRecRef = useRef<MediaRecorder | null>(null);
   const mediaChunksRef = useRef<Blob[]>([]);
   const mediaStreamRef = useRef<MediaStream | null>(null);
@@ -220,116 +234,220 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
-  const stopDictate = useCallback(() => {
-    const rec = dictateRecRef.current;
-    dictateRecRef.current = null;
-    if (rec) {
-      try {
-        rec.onresult = null;
-        rec.onerror = null;
-        rec.onend = null;
-        rec.stop();
-      } catch {
-        try {
-          rec.abort();
-        } catch {
-          /* ignore */
-        }
+  const tearDownDictateHardware = useCallback(() => {
+    if (dictateRafRef.current) cancelAnimationFrame(dictateRafRef.current);
+    dictateRafRef.current = 0;
+    if (dictateTimerRef.current) window.clearInterval(dictateTimerRef.current);
+    dictateTimerRef.current = 0;
+    try {
+      if (dictateRecRef.current && dictateRecRef.current.state !== "inactive") {
+        dictateRecRef.current.onstop = null;
+        dictateRecRef.current.stop();
       }
+    } catch {
+      /* ignore */
     }
-    setDictating(false);
-    setMicHint(null);
+    dictateRecRef.current = null;
+    dictateStreamRef.current?.getTracks().forEach((t) => t.stop());
+    dictateStreamRef.current = null;
+    if (dictateAudioCtxRef.current) {
+      void dictateAudioCtxRef.current.close().catch(() => undefined);
+      dictateAudioCtxRef.current = null;
+    }
+    dictateChunksRef.current = [];
   }, []);
 
-  /** Microfone do composer: fala → texto no campo (não abre overlay). */
-  const toggleDictate = useCallback(() => {
-    if (dictateRecRef.current || dictating) {
-      stopDictate();
+  const cancelDictate = useCallback(() => {
+    dictateDiscardRef.current = true;
+    tearDownDictateHardware();
+    setDictating(false);
+    setDictateBusy(false);
+    setDictateSeconds(0);
+    setDictateLevels(Array.from({ length: 40 }, () => 0.12));
+    setMicHint(null);
+  }, [tearDownDictateHardware]);
+
+  const finishDictate = useCallback(() => {
+    const rec = dictateRecRef.current;
+    if (!rec || rec.state === "inactive") {
+      cancelDictate();
       return;
     }
-    if (voiceOpenRef.current) return;
-    if (!navigator.mediaDevices?.getUserMedia && !speechRecognitionSupported()) {
+    dictateDiscardRef.current = false;
+    setDictateBusy(true);
+    setMicHint("Transcrevendo…");
+    if (dictateRafRef.current) cancelAnimationFrame(dictateRafRef.current);
+    dictateRafRef.current = 0;
+    if (dictateTimerRef.current) window.clearInterval(dictateTimerRef.current);
+    dictateTimerRef.current = 0;
+
+    rec.onstop = () => {
+      const chunks = dictateChunksRef.current.slice();
+      const mime = rec.mimeType || "audio/webm";
+      dictateStreamRef.current?.getTracks().forEach((t) => t.stop());
+      dictateStreamRef.current = null;
+      dictateRecRef.current = null;
+      if (dictateAudioCtxRef.current) {
+        void dictateAudioCtxRef.current.close().catch(() => undefined);
+        dictateAudioCtxRef.current = null;
+      }
+      dictateChunksRef.current = [];
+
+      if (dictateDiscardRef.current) {
+        setDictating(false);
+        setDictateBusy(false);
+        setDictateSeconds(0);
+        setMicHint(null);
+        return;
+      }
+      if (chunks.length === 0) {
+        setDictating(false);
+        setDictateBusy(false);
+        setDictateSeconds(0);
+        setMicHint("Não peguei áudio. Tenta de novo.");
+        return;
+      }
+
+      const blob = new Blob(chunks, { type: mime });
+      void (async () => {
+        try {
+          const b64 = await blobToBase64(blob);
+          const tr = await jarvisTranscribe(b64, mime.split(";")[0] || mime);
+          if (!tr.ok) {
+            setDictating(false);
+            setDictateBusy(false);
+            setDictateSeconds(0);
+            setMicHint(
+              tr.reason === "openai_not_configured"
+                ? "Whisper ainda sem chave no servidor."
+                : "Não entendi o áudio. Tenta de novo.",
+            );
+            return;
+          }
+          const base = dictateBaseRef.current.trim();
+          const next = base ? `${base} ${tr.text}`.trim() : tr.text.trim();
+          setDraftText(next);
+          setDictating(false);
+          setDictateBusy(false);
+          setDictateSeconds(0);
+          setDictateLevels(Array.from({ length: 40 }, () => 0.12));
+          setMicHint(null);
+        } catch {
+          setDictating(false);
+          setDictateBusy(false);
+          setDictateSeconds(0);
+          setMicHint("Falhou ao transcrever. Tenta de novo.");
+        }
+      })();
+    };
+
+    try {
+      rec.stop();
+    } catch {
+      cancelDictate();
+    }
+  }, [cancelDictate]);
+
+  /**
+   * Microfone do composer: grava no gesto do clique (pede permissão),
+   * UI REC + waveform; ao parar, Whisper → texto no campo.
+   */
+  const startDictate = useCallback(() => {
+    if (dictating || dictateBusy || voiceOpenRef.current) return;
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
       setMicHint("Sem microfone neste aparelho — digita no campo.");
       return;
     }
 
     stopSpeaking();
     cancelSpeakRef.current?.();
+    dictateDiscardRef.current = false;
+    dictateBaseRef.current = draftText;
     setMicHint("Pedindo acesso ao microfone…");
+    setDictateSeconds(0);
 
-    const beginRecognition = () => {
-      const rec = createSpeechRecognition();
-      if (!rec) {
-        setMicHint("Transcrição não disponível neste navegador.");
-        setDictating(false);
-        return;
-      }
-      dictateBaseRef.current = draftText.trim();
-      rec.continuous = true;
-      rec.interimResults = true;
-      let finalChunk = "";
-      rec.onresult = (event) => {
-        let interim = "";
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-          const row = event.results[i];
-          if (!row) continue;
-          const piece = row[0]?.transcript ?? "";
-          if (row.isFinal) finalChunk += `${piece} `;
-          else interim += piece;
-        }
-        const base = dictateBaseRef.current;
-        const spoken = `${finalChunk}${interim}`.trim();
-        setDraftText(base ? (spoken ? `${base} ${spoken}` : base) : spoken);
-      };
-      rec.onerror = (event) => {
-        if (event.error === "aborted") return;
-        if (event.error === "not-allowed") {
-          setMicHint(null);
-          stopDictate();
+    void navigator.mediaDevices
+      .getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+        video: false,
+      })
+      .then((stream) => {
+        dictateStreamRef.current = stream;
+        dictateChunksRef.current = [];
+
+        const mime = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+          ? "audio/webm;codecs=opus"
+          : MediaRecorder.isTypeSupported("audio/webm")
+            ? "audio/webm"
+            : "";
+        const rec = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream);
+        dictateRecRef.current = rec;
+        rec.ondataavailable = (ev) => {
+          if (ev.data.size > 0) dictateChunksRef.current.push(ev.data);
+        };
+        try {
+          rec.start(200);
+        } catch {
+          stream.getTracks().forEach((t) => t.stop());
+          dictateStreamRef.current = null;
+          dictateRecRef.current = null;
+          setMicHint("Não consegui gravar o áudio.");
           return;
         }
-        if (event.error === "no-speech") return;
-        setMicHint("Não consegui transcrever. Tenta de novo.");
-        stopDictate();
-      };
-      rec.onend = () => {
-        dictateRecRef.current = null;
-        setDictating(false);
-        setMicHint(null);
-      };
-      try {
-        dictateRecRef.current = rec;
-        setDictating(true);
-        setMicHint("Ouvindo… fala que eu escrevo no campo.");
-        rec.start();
-      } catch {
-        dictateRecRef.current = null;
-        setDictating(false);
-        setMicHint("Não consegui abrir a transcrição.");
-      }
-    };
 
-    // Gesto do clique: pede mic agora (Chrome), depois sobe o STT.
-    if (navigator.mediaDevices?.getUserMedia) {
-      void navigator.mediaDevices
-        .getUserMedia({ audio: true, video: false })
-        .then((stream) => {
-          stream.getTracks().forEach((t) => t.stop());
-          beginRecognition();
-        })
-        .catch((err) => {
-          const name = err instanceof DOMException ? err.name : "";
-          if (name === "NotAllowedError" || name === "PermissionDeniedError" || name === "SecurityError") {
-            setMicHint(null);
-          } else {
-            setMicHint("Não consegui abrir o microfone.");
+        // Waveform ao vivo
+        try {
+          const AudioCtx =
+            window.AudioContext ||
+            (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+          if (AudioCtx) {
+            const ctx = new AudioCtx();
+            dictateAudioCtxRef.current = ctx;
+            const source = ctx.createMediaStreamSource(stream);
+            const analyser = ctx.createAnalyser();
+            analyser.fftSize = 256;
+            analyser.smoothingTimeConstant = 0.55;
+            source.connect(analyser);
+            const data = new Uint8Array(analyser.frequencyBinCount);
+            const tick = () => {
+              analyser.getByteFrequencyData(data);
+              const bars = 40;
+              const step = Math.max(1, Math.floor(data.length / bars));
+              const next: number[] = [];
+              for (let i = 0; i < bars; i++) {
+                let sum = 0;
+                for (let j = 0; j < step; j++) sum += data[i * step + j] ?? 0;
+                next.push(Math.min(1, sum / step / 180));
+              }
+              setDictateLevels(next);
+              dictateRafRef.current = requestAnimationFrame(tick);
+            };
+            if (ctx.state === "suspended") void ctx.resume();
+            dictateRafRef.current = requestAnimationFrame(tick);
           }
-          setDictating(false);
-        });
-      return;
-    }
-    beginRecognition();
-  }, [dictating, draftText, stopDictate]);
+        } catch {
+          /* waveform opcional */
+        }
+
+        dictateTimerRef.current = window.setInterval(() => {
+          setDictateSeconds((s) => s + 1);
+        }, 1000);
+
+        setDictating(true);
+        setDictateBusy(false);
+        setMicHint(null);
+      })
+      .catch((err) => {
+        const name = err instanceof DOMException ? err.name : "";
+        if (name === "NotAllowedError" || name === "PermissionDeniedError" || name === "SecurityError") {
+          setMicHint("Microfone bloqueado neste site. Libera no cadeado da URL e tenta de novo.");
+        } else {
+          setMicHint("Não consegui abrir o microfone.");
+        }
+        setDictating(false);
+        setDictateBusy(false);
+      });
+  }, [dictateBusy, dictating, draftText]);
 
   const authorizeChallenge = useCallback(async () => {
     if (!session || !challengeDraftRef.current || commitBusy) return;
@@ -961,7 +1079,7 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
   const openVoice = useCallback(
     (opts?: { source?: "button" | "clap" }) => {
       const source = opts?.source ?? "button";
-      stopDictate();
+      cancelDictate();
       setVoiceOpen(true);
       stopSpeaking();
       setDraftText("");
@@ -982,7 +1100,7 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
       // Clique no botão de voz: pedir mic AGORA (mesmo gesto).
       requestMicFromUserGesture();
     },
-    [beginListenAfterMicOk, micAlreadyGranted, requestMicFromUserGesture, stopDictate],
+    [beginListenAfterMicOk, cancelDictate, micAlreadyGranted, requestMicFromUserGesture],
   );
 
   const closeVoice = useCallback(() => {
@@ -999,7 +1117,7 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
     cancelSpeakRef.current?.();
     stopSpeaking();
     stopMediaTracks();
-    stopDictate();
+    cancelDictate();
     setVoiceOpen(false);
     setMessages([]);
     setDraftText("");
@@ -1013,15 +1131,16 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
     scheduleDraftRef.current = null;
     setCreatedItem(null);
     setCommitBusy(false);
-  }, [stopDictate, stopMediaTracks]);
+  }, [cancelDictate, stopMediaTracks]);
 
   useEffect(() => {
     return () => {
       cancelSpeakRef.current?.();
       stopSpeaking();
       stopMediaTracks();
+      cancelDictate();
     };
-  }, [stopMediaTracks]);
+  }, [cancelDictate, stopMediaTracks]);
 
   const api = useMemo<JarvisApi>(
     () => ({
@@ -1040,7 +1159,12 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
       voiceRead,
       toggleVoiceRead,
       dictating,
-      toggleDictate,
+      dictateBusy,
+      dictateSeconds,
+      dictateLevels,
+      startDictate,
+      finishDictate,
+      cancelDictate,
       openVoice,
       closeVoice,
       finishVoice,
@@ -1072,13 +1196,18 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
       authorizeChallenge,
       authorizeGoal,
       authorizeSchedule,
+      cancelDictate,
       challengeDraft,
       clearChat,
       closeVoice,
       commitBusy,
       createdItem,
+      dictateBusy,
+      dictateLevels,
+      dictateSeconds,
       dictating,
       draftText,
+      finishDictate,
       finishVoice,
       goalDraft,
       messages,
@@ -1088,8 +1217,8 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
       reply,
       scheduleDraft,
       speakAnswer,
+      startDictate,
       storeNameFor,
-      toggleDictate,
       toggleVoiceRead,
       voiceOpen,
       voiceRead,

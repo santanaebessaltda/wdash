@@ -228,7 +228,7 @@ Inspiração de UX: [Néctar](https://www.meu-nectar.com/) (conversa humana, res
 - Composer (estilo Néctar) com 3 ações + **Enviar**:
   - **Leitura em voz** (alto-falante) — ligada/desligada; quando ligada, respostas usam TTS. Preferência em `localStorage`.
   - **Conversar por voz** (ondas) — abre o overlay de modo voz (orbe; ouvir → falar → ouvir). Clique = gesto → permissão de mic.
-  - **Microfone** — fala e **transcreve no campo de texto** (não abre o overlay). Clique de novo para parar.
+  - **Microfone** — UI REC (waveform + timer + cancelar/parar); grava no gesto do clique (pede permissão); ao parar, **Whisper** coloca o texto no campo (não abre o overlay de conversa).
 - Orbe: CSS/canvas reativo ao mic/TTS (estados idle / listening / thinking / speaking). Lottie/WebM só se o orbe não bastar.
 - **Navegação por comando:** “abre Visão geral”, “vai pro Financeiro…” — `navigate` nas rotas do papel do Gestor + fala confirmando. Não pede Autorizar.
 
