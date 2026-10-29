@@ -14,7 +14,7 @@ const POLL_MS = 60 * 1000;
 function BoardFrame({ theme, children }: { theme: BoardTheme; children: ReactNode }) {
   return (
     <div data-board-theme={theme} className="tela-cheia relative overflow-hidden bg-bg-0 text-t0">
-      <JarvisHubBackdrop />
+      <JarvisHubBackdrop sphere={false} />
       {children}
     </div>
   );

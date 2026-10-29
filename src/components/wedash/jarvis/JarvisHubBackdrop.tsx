@@ -2,11 +2,12 @@ import { useEffect, useRef } from "react";
 
 type Point3 = { x: number; y: number; z: number };
 
-/** Esfera geodésica / rede neural em canvas — cores via --acc da paleta Vela. */
-export function JarvisHubBackdrop() {
+/** Fundo em accent (rosa). Com `sphere`, desenha a esfera geodésica animada. */
+export function JarvisHubBackdrop({ sphere = true }: { sphere?: boolean } = {}) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
+    if (!sphere) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
@@ -120,7 +121,7 @@ export function JarvisHubBackdrop() {
       cancelAnimationFrame(raf);
       window.removeEventListener("resize", resize);
     };
-  }, []);
+  }, [sphere]);
 
   return (
     <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
@@ -131,7 +132,7 @@ export function JarvisHubBackdrop() {
             "radial-gradient(ellipse 70% 55% at 50% 42%, color-mix(in srgb, var(--acc) 14%, transparent), transparent 70%), linear-gradient(180deg, color-mix(in srgb, var(--bg-0) 88%, var(--acc) 12%), var(--bg-0))",
         }}
       />
-      <canvas ref={canvasRef} className="absolute inset-0 h-full w-full opacity-90" />
+      {sphere ? <canvas ref={canvasRef} className="absolute inset-0 h-full w-full opacity-90" /> : null}
     </div>
   );
 }
