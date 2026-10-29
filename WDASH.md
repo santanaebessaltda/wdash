@@ -231,7 +231,7 @@ Inspiração de UX: [Néctar](https://www.meu-nectar.com/) (conversa humana, res
 - Menu **Chat IA** (`/chat-ia`) — hub Néctar; composer + mic + Enviar; **Limpar chat**; F5 zera histórico (só memória de sessão). **Filial:** Topbar.
 - Sem navegação/rolagem por comando.
 
-**Leituras no chat:** vendas, estoque parado, sazonal — resposta no thread (período da pergunta pode gravar em sessionStorage para o Dashboard se o Gestor abrir depois).
+**Leituras no chat:** vendas, **meta cadastrada** (valor-alvo ≠ faturamento), estoque parado, sazonal — resposta no thread (período da pergunta pode gravar em sessionStorage para o Dashboard se o Gestor abrir depois). Pedido “quanto é a meta?” usa `analyze_goal` / `loadGoalBrief`, não `analyze_sales`.
 
 **Fluxo obrigatório de escrita:**
 `Pedir no chat → Analisar se precisar → Discutir → Rascunho (card) → Autorizar → APIs do CRUD → Confirmar no chat (+ link opcional).`

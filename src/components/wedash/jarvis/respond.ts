@@ -8,6 +8,7 @@ export type JarvisIntent =
   | "greeting"
   | "capability"
   | "analyze_sales"
+  | "analyze_goal"
   | "analyze_stock"
   | "seasonal"
   | "challenge"
@@ -24,15 +25,33 @@ function normalizeIntentText(raw: string): string {
     .replace(/\p{M}/gu, "");
 }
 
-/**
- * Pedido de meta / sugestão / reajuste — não pode cair no atalho de “vendas de hoje”
- * só porque a frase cita “valores vendidos”.
- */
-export function looksLikeGoalAdvice(raw: string): boolean {
+/** Leitura: “quanto é a meta / como está a meta deste mês”. */
+export function looksLikeGoalRead(raw: string): boolean {
   const p = normalizeIntentText(raw);
-  return /meta|comissao|premiacao|escada|reajust|sugest|novo valor|valor sugerido|valor da meta|posso (baixar|subir|mudar|alterar)|vai bater|nao vai bater|ating(ir|imento)|proponha|propor (um |o )?valor/.test(
+  if (!/\bmeta\b/.test(p)) return false;
+  if (looksLikeGoalWrite(p)) return false;
+  return /quanto|qual (e |eh )?|de quanto|como (esta|ta)|esta com|ta com|valor da meta|meta (deste|desse|do|da|este|esse|atual)|tem meta|qual a meta|a meta .*quanto|saber.*(a )?meta|ver.*(a )?meta|consultar.*(a )?meta|me (fala|diga|diz).*(a )?meta/.test(
     p,
   );
+}
+
+/** Escrita / sugestão / reajuste — rascunho + Autorizar. */
+export function looksLikeGoalWrite(raw: string): boolean {
+  const p = normalizeIntentText(raw);
+  return /reajust|suger|criar.*meta|montar.*meta|nova meta|novo valor|valor sugerido|alterar (a )?meta|mudar (a )?meta|baixar (a )?meta|subir (a )?meta|propor|proponha|quero (uma |a )?meta|vamos (a |na )?meta|meta de \d|comissao|premiacao|escada|posso (baixar|subir|mudar|alterar)|vai bater|nao vai bater/.test(
+    p,
+  );
+}
+
+/** Alias: escrita ou menção genérica a meta que não é leitura pura. */
+export function looksLikeGoalAdvice(raw: string): boolean {
+  const p = normalizeIntentText(raw);
+  if (looksLikeGoalRead(p)) return false;
+  return looksLikeGoalWrite(p) || (/\bmeta\b/.test(p) && !looksLikeSalesQueryLoose(p));
+}
+
+function looksLikeSalesQueryLoose(p: string): boolean {
+  return /vendi\b|vendeu\b|faturamento|quanto vend/.test(p);
 }
 
 /** Pergunta clara de leitura de vendas (atalho loadSalesBrief). */
@@ -83,6 +102,7 @@ export function classifyIntent(raw: string): JarvisIntent {
   if (/autorizo|pode criar|pode gravar|confirma|pode seguir|fechado pode/.test(p)) return "authorize";
   if (looksLikeLeaveChatRequest(p)) return "stay_in_chat";
   if (looksLikeChallengeAdvice(p)) return "challenge";
+  if (looksLikeGoalRead(p)) return "analyze_goal";
   if (looksLikeGoalAdvice(p)) return "goal";
   if (/escala|folga|6\s*[x×]\s*1|plantao|turno/.test(p)) return "schedule";
   if (/sazonal|dia das maes|black friday|natal|pascoa|namorados|datas comemorativas/.test(p)) return "seasonal";
@@ -100,6 +120,8 @@ export function jarvisReply(question: string): string {
       return "No chat eu leio a base, monto e ajusto meta, desafio e escala, e passo números. Gravar só depois do seu Autorizar no card — sem te mandar pra outra tela.";
     case "analyze_sales":
       return "Deixa eu olhar as vendas aí…";
+    case "analyze_goal":
+      return "Deixa eu ver a meta cadastrada…";
     case "analyze_stock":
       return "Vou cruzar estoque com as vendas dos últimos 30 dias pra achar o que tá parado.";
     case "seasonal":

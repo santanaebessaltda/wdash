@@ -30,6 +30,7 @@ import {
   type GoalDraft,
 } from "./goalDraft";
 import { blobToBase64, jarvisLlmTurn, jarvisTranscribe, type LlmChatMessage } from "./llmClient";
+import { loadGoalBrief } from "./goalBrief";
 import {
   classifyIntent,
   looksLikeGoalAdvice,
@@ -601,6 +602,16 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
       const applyPeriodHint = () => {
         syncScopePeriodFromQuestion(q, location.pathname, location.search, navigate);
       };
+
+      // Meta cadastrada: brief direto — não misturar com faturamento nem com rascunho.
+      if (intent === "analyze_goal") {
+        applyPeriodHint();
+        void loadGoalBrief(ctx, q).then((answer) => {
+          if (gen !== replyGen.current) return;
+          finish(answer);
+        });
+        return;
+      }
 
       // Vendas: brief direto só em pergunta clara de leitura — nunca em sugestão/reajuste de meta.
       if (intent === "analyze_sales" && looksLikeSalesQuery(q) && !looksLikeGoalAdvice(q)) {

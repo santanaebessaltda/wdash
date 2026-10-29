@@ -1,4 +1,5 @@
 import type { JarvisContext } from "./context";
+import { loadGoalBrief } from "./goalBrief";
 import { loadSalesBrief } from "./salesBrief";
 import { loadSeasonalBrief } from "./seasonalBrief";
 import { loadStockStalledBrief } from "./stockStalled";
@@ -6,6 +7,7 @@ import type { LlmSideEffect } from "./llmClient";
 
 export type JarvisToolName =
   | "analyze_sales"
+  | "analyze_goal"
   | "analyze_stock"
   | "analyze_seasonal"
   | "draft_challenge"
@@ -23,6 +25,8 @@ export async function runJarvisTool(
   switch (name) {
     case "analyze_sales":
       return { content: await loadSalesBrief(ctx, question) };
+    case "analyze_goal":
+      return { content: await loadGoalBrief(ctx, question) };
     case "analyze_stock":
       return { content: await loadStockStalledBrief(ctx, question) };
     case "analyze_seasonal":

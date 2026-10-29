@@ -23,6 +23,13 @@ describe("classifyIntent", () => {
     expect(classifyIntent("E em todas as filiais?")).toBe("analyze_sales");
   });
 
+  it("leitura de meta não vira faturamento nem rascunho", () => {
+    expect(classifyIntent("A meta deste mês está com meta de quanto?")).toBe("analyze_goal");
+    expect(classifyIntent("Quanto é a meta?")).toBe("analyze_goal");
+    expect(classifyIntent("Qual a meta da loja este mês?")).toBe("analyze_goal");
+    expect(classifyIntent("Como está a meta deste mês?")).toBe("analyze_goal");
+  });
+
   it("sugestão/reajuste de meta não vira atalho de vendas", () => {
     expect(
       classifyIntent(
@@ -30,6 +37,7 @@ describe("classifyIntent", () => {
       ),
     ).toBe("goal");
     expect(classifyIntent("Posso reajustar a meta de outubro?")).toBe("goal");
+    expect(classifyIntent("Vamos montar a meta de março")).toBe("goal");
   });
 
   it("reconhece autorização sem rascunho", () => {

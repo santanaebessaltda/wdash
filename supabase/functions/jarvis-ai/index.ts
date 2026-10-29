@@ -59,22 +59,38 @@ Estilo:
 - Se precisar de tool, chame na hora, sem enrolação antes.
 
 O que você faz (100% no chat — NÃO redirecione o Gestor para outras telas):
+- Ler META cadastrada (“quanto é a meta?”, “meta deste mês”): analyze_goal. Meta ≠ faturamento — NÃO use analyze_sales para isso. O brief já traz o valor da meta e, se houver, o realizado.
 - Criar, reajustar ou sugerir META e DESAFIO: draft_goal / draft_challenge. Vale criar, ajustar rascunho e sugerir valor (ex.: com base no vendido até hoje). No request descreva o pedido completo. Escala: draft_schedule.
-- Sugestão de valor de meta: se precisar de números, analyze_sales e depois sugestão e/ou draft_goal — não responda só repetindo o faturamento do dia.
-- Números (“quanto vendi hoje?”, “e em todas as filiais?”): analyze_*. Nunca invente números.
+- Sugestão de valor de meta: se precisar do vendido, analyze_sales e/ou analyze_goal e depois sugestão e/ou draft_goal — não responda só repetindo o faturamento do dia.
+- Números de venda (“quanto vendi hoje?”, “e em todas as filiais?”): analyze_sales. Nunca invente números.
 - Se pedirem “abre Visão geral / Financeiro / rola a página”: diga que resolve aqui no chat e pergunte o que quer ver (vendas, meta…). Não existe tool de navegação.
 
 Regras:
 - Rascunhos viram cards. Gravar só com Autorizar no app. Nunca diga que já gravou sozinho.
 - Se faltar dado, diga o que faltou e pergunte. Não chute.
-- Não reenvie só análise de vendas se o pedido era outra coisa (meta, sugestão, oi).`;
+- Não responda faturamento quando o pedido era a meta (valor-alvo). Não reenvie só análise de vendas se o pedido era outra coisa (meta, sugestão, oi).`;
 
 const TOOLS = [
   {
     type: "function",
     function: {
       name: "analyze_sales",
-      description: "Consulta vendas/faturamento/ticket/P.A. na base do WDash (período e filial do contexto ou do pedido).",
+      description: "Consulta vendas/faturamento/ticket/P.A. na base do WDash (período e filial do contexto ou do pedido). NÃO use para perguntar o valor da meta cadastrada.",
+      parameters: {
+        type: "object",
+        properties: {
+          question: { type: "string", description: "Pedido do gestor em português" },
+        },
+        required: ["question"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "analyze_goal",
+      description:
+        "Lê a meta de faturamento cadastrada (valor-alvo) no período/filial. Use quando perguntarem quanto é a meta, qual a meta do mês, se tem meta. Opcionalmente inclui realizado vs meta.",
       parameters: {
         type: "object",
         properties: {

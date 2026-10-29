@@ -1,4 +1,5 @@
 import type { JarvisContext } from "./context";
+import { loadGoalBrief } from "./goalBrief";
 import { classifyIntent, jarvisReply } from "./respond";
 import { loadSalesBrief } from "./salesBrief";
 import { loadSeasonalBrief } from "./seasonalBrief";
@@ -13,6 +14,8 @@ export async function jarvisAnswer(question: string, ctx: JarvisContext): Promis
   switch (intent) {
     case "analyze_sales":
       return loadSalesBrief(ctx, question);
+    case "analyze_goal":
+      return loadGoalBrief(ctx, question);
     case "analyze_stock":
       return loadStockStalledBrief(ctx, question);
     case "seasonal":
