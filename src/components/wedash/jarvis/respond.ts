@@ -129,7 +129,13 @@ export function classifyIntent(raw: string): JarvisIntent {
   if (/o que (voce|vc) (faz|pode)|como (voce|vc) funciona|suas habilidades|no que (voce|vc) ajuda/.test(p)) {
     return "capability";
   }
-  if (/autorizo|pode criar|pode gravar|confirma|pode seguir|fechado pode/.test(p)) return "authorize";
+  if (
+    /autorizo|pode criar|pode gravar|confirma|pode seguir|fechado pode|vamos criar|cria(r)? (essa |a )?meta|ok(,| )?vamos criar|salva(r)? (o )?rascunho/.test(
+      p,
+    )
+  ) {
+    return "authorize";
+  }
   if (looksLikeLeaveChatRequest(p)) return "stay_in_chat";
   if (looksLikeChallengeAdvice(p)) return "challenge";
   if (looksLikeGoalLadderTalk(p)) return "goal";

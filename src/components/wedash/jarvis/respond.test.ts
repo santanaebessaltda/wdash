@@ -58,6 +58,8 @@ describe("classifyIntent", () => {
 
   it("reconhece autorização sem rascunho", () => {
     expect(classifyIntent("Autorizo")).toBe("authorize");
+    expect(classifyIntent("Ok vamos criar essa meta")).toBe("authorize");
+    expect(classifyIntent("cria a meta")).toBe("authorize");
   });
 });
 

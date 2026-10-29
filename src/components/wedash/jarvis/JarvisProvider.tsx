@@ -54,8 +54,12 @@ import { syncScopePeriodFromQuestion } from "./syncPeriod";
 export type JarvisMessage = { from: "user" | "jarvis"; text: string };
 export type JarvisMode = "idle" | "thinking";
 export type JarvisCreated =
-  | { kind: "challenge" | "goal"; id: string; name: string }
+  | { kind: "challenge"; id: string; name: string }
+  | { kind: "goal"; id: string; name: string; asDraft?: boolean }
   | { kind: "schedule"; name: string };
+
+const CHAT_HISTORY_KEY = "wedash.jarvis.chat";
+const CHAT_HISTORY_MAX = 40;
 
 function readTopbarStoreIds(): string[] {
   try {
@@ -64,6 +68,36 @@ function readTopbarStoreIds(): string[] {
     return raw.split(",").map((id) => id.trim()).filter(Boolean);
   } catch {
     return [];
+  }
+}
+
+function loadChatHistory(): JarvisMessage[] {
+  try {
+    const raw = sessionStorage.getItem(CHAT_HISTORY_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter(
+        (m): m is JarvisMessage =>
+          Boolean(m) &&
+          typeof m === "object" &&
+          (m as JarvisMessage).from !== undefined &&
+          ((m as JarvisMessage).from === "user" || (m as JarvisMessage).from === "jarvis") &&
+          typeof (m as JarvisMessage).text === "string" &&
+          (m as JarvisMessage).text.trim().length > 0,
+      )
+      .slice(-CHAT_HISTORY_MAX);
+  } catch {
+    return [];
+  }
+}
+
+function persistChatHistory(messages: JarvisMessage[]) {
+  try {
+    sessionStorage.setItem(CHAT_HISTORY_KEY, JSON.stringify(messages.slice(-CHAT_HISTORY_MAX)));
+  } catch {
+    /* quota / private mode */
   }
 }
 
@@ -113,7 +147,7 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
   const location = useLocation();
   const allowed = Boolean(session && isOwner(session.role));
 
-  const [messages, setMessages] = useState<JarvisMessage[]>([]);
+  const [messages, setMessages] = useState<JarvisMessage[]>(() => loadChatHistory());
   const [mode, setMode] = useState<JarvisMode>("idle");
   const [micHint, setMicHint] = useState<string | null>(null);
   const [draftText, setDraftText] = useState("");
@@ -140,12 +174,16 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
   const dictateRafRef = useRef(0);
   const dictateTimerRef = useRef(0);
   const dictateAudioCtxRef = useRef<AudioContext | null>(null);
-  const messagesRef = useRef<JarvisMessage[]>([]);
+  const messagesRef = useRef<JarvisMessage[]>(messages);
   messagesRef.current = messages;
 
   challengeDraftRef.current = challengeDraft;
   goalDraftRef.current = goalDraft;
   scheduleDraftRef.current = scheduleDraft;
+
+  useEffect(() => {
+    persistChatHistory(messages);
+  }, [messages]);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -419,7 +457,8 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
     }
     setCommitBusy(true);
     setMode("thinking");
-    const res = await commitGoal(session.tenantId, draft.form);
+    // Meta no chat grava como rascunho — Gestor revisa/publica em Performance > Metas.
+    const res = await commitGoal(session.tenantId, draft.form, { published: false });
     setCommitBusy(false);
     if (!res.ok) {
       speakAnswer(res.reason);
@@ -427,8 +466,10 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
     }
     setGoalDraft(null);
     goalDraftRef.current = null;
-    setCreatedItem({ kind: "goal", id: res.id, name: res.name });
-    speakAnswer(`Fechado — meta “${res.name}” criada. Link embaixo.`);
+    setCreatedItem({ kind: "goal", id: res.id, name: res.name, asDraft: true });
+    speakAnswer(
+      `Pronto — rascunho “${res.name}” gravado em Metas. Abre o link pra revisar e publicar quando quiser.`,
+    );
   }, [commitBusy, session, speakAnswer]);
 
   const authorizeSchedule = useCallback(async () => {
@@ -591,6 +632,33 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
           void authorizeSchedule();
           return;
         }
+        // "Ok vamos criar essa meta" sem card: monta pelo historico do chat e grava rascunho em Metas.
+        if (/\bmeta\b/.test(n) || /vamos criar|cria(r)? |monta(r)? /.test(n)) {
+          void (async () => {
+            if (gen !== replyGen.current) return;
+            const historyBlob = [...messagesRef.current, { from: "user", text: q }]
+              .slice(-12)
+              .map((m) => `${m.from}: ${m.text}`)
+              .join("\n");
+            const { draft } = await discussGoal(historyBlob || q, ctx, goalDraftRef.current);
+            if (gen !== replyGen.current) return;
+            setGoalDraft(draft);
+            goalDraftRef.current = draft;
+            setChallengeDraft(null);
+            challengeDraftRef.current = null;
+            setScheduleDraft(null);
+            scheduleDraftRef.current = null;
+            setCreatedItem(null);
+            if (!goalDraftReady(draft.form)) {
+              finish(
+                `Quase — ainda falta ${missingGoalLabels(validateGoalDraft(draft.form)).join(", ")} pra eu gravar o rascunho.`,
+              );
+              return;
+            }
+            await authorizeGoal();
+          })();
+          return;
+        }
         finish("Não tenho rascunho pendente. Manda um desafio, uma meta ou a escala que a gente monta.");
         return;
       }
@@ -641,6 +709,7 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
 
         applyPeriodHint();
 
+        let goalSavedAsDraft = false;
         for (const effect of llm.sideEffects) {
           if (effect.kind === "draft_challenge") {
             setGoalDraft(null);
@@ -662,6 +731,24 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
             setGoalDraft(draft);
             goalDraftRef.current = draft;
             setCreatedItem(null);
+            // Confirmacao com draft pronto → rascunho em Metas, sem depender do card.
+            if (classifyIntent(q) === "authorize" && goalDraftReady(draft.form) && !commitBusy) {
+              setCommitBusy(true);
+              const res = await commitGoal(session.tenantId, draft.form, { published: false });
+              setCommitBusy(false);
+              if (gen !== replyGen.current) return;
+              if (res.ok) {
+                setGoalDraft(null);
+                goalDraftRef.current = null;
+                setCreatedItem({ kind: "goal", id: res.id, name: res.name, asDraft: true });
+                goalSavedAsDraft = true;
+                finish(
+                  `Pronto — rascunho “${res.name}” gravado em Metas. Abre o link pra revisar e publicar quando quiser.`,
+                );
+              } else {
+                finish(res.reason);
+              }
+            }
           } else if (effect.kind === "draft_schedule") {
             setChallengeDraft(null);
             challengeDraftRef.current = null;
@@ -677,13 +764,14 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
 
         applyPeriodHint();
 
-        finish(llm.content);
+        if (!goalSavedAsDraft) finish(llm.content);
       })();
     },
     [
       authorizeChallenge,
       authorizeGoal,
       authorizeSchedule,
+      commitBusy,
       location.pathname,
       location.search,
       navigate,
@@ -697,6 +785,7 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
     replyGen.current += 1;
     cancelDictate();
     setMessages([]);
+    persistChatHistory([]);
     setDraftText("");
     setMicHint(null);
     setMode("idle");

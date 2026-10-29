@@ -177,7 +177,9 @@ export function JarvisFloat() {
                     <div className="rounded-[14px] border border-ok/30 bg-ok-soft/40 px-3.5 py-3 text-[13px]">
                       <p className="font-semibold text-t0">
                         {j.createdItem.kind === "goal"
-                          ? `Meta criada: ${j.createdItem.name}`
+                          ? j.createdItem.asDraft
+                            ? `Rascunho da meta: ${j.createdItem.name}`
+                            : `Meta criada: ${j.createdItem.name}`
                           : j.createdItem.kind === "challenge"
                             ? `Desafio criado: ${j.createdItem.name}`
                             : `Escala gerada: ${j.createdItem.name}`}
@@ -185,7 +187,9 @@ export function JarvisFloat() {
                       <Link
                         to={
                           j.createdItem.kind === "goal"
-                            ? paths.goalDetail(j.createdItem.id)
+                            ? j.createdItem.asDraft
+                              ? paths.goalEdit(j.createdItem.id)
+                              : paths.goalDetail(j.createdItem.id)
                             : j.createdItem.kind === "challenge"
                               ? paths.management.challengeDetail(j.createdItem.id)
                               : paths.management.schedule
@@ -195,7 +199,9 @@ export function JarvisFloat() {
                       >
                         Abrir{" "}
                         {j.createdItem.kind === "goal"
-                          ? "meta"
+                          ? j.createdItem.asDraft
+                            ? "rascunho"
+                            : "meta"
                           : j.createdItem.kind === "challenge"
                             ? "desafio"
                             : "escala"}

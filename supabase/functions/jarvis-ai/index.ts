@@ -70,7 +70,8 @@ Domínio (não misture):
 - “Abre Visão geral / rola a página”: resolve no chat; sem navegação.
 
 Regras:
-- Rascunho vira card; gravar só com Autorizar no app. Nunca diga que já gravou sozinho.
+- META: “ok vamos criar”, “cria a meta”, “autorizo” → SEMPRE chame draft_goal (com o pedido completo do histórico). O app grava RASCUNHO em Performance > Metas; o Gestor revisa/publica lá. NÃO diga que a meta foi montada/criada sem chamar draft_goal.
+- Desafio/escala: rascunho vira card no chat; gravar só com Autorizar. Nunca diga que já gravou sozinho.
 - Se faltar dado, pergunte. Não invente número.
 - No request de draft_*, descreva o pedido completo + o que já foi combinado no histórico.`;
 
@@ -146,7 +147,7 @@ const TOOLS = [
     function: {
       name: "draft_goal",
       description:
-        "Cria ou ajusta o rascunho de META (escada, modo, valor, período, nível desafio/+10%, copiar config de outro mês). Use para editar o rascunho atual; descreva o pedido completo em request. O app mostra o card Autorizar.",
+        "Cria ou ajusta a META (escada, modo, valor, período, nível desafio/+10%, copiar config). Em confirmação (criar/autorizar) o app grava RASCUNHO em Metas. Descreva o pedido completo em request.",
       parameters: {
         type: "object",
         properties: {

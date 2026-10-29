@@ -38,7 +38,7 @@ export async function runJarvisTool(
       };
     case "draft_goal":
       return {
-        content: "Rascunho de meta será montado no app; o Gestor precisa autorizar para gravar.",
+        content: "Rascunho de meta sera montado; se o pedido for confirmar/criar e estiver completo, o app grava em Metas como rascunho.",
         sideEffect: { kind: "draft_goal", request: question },
       };
     case "draft_schedule":

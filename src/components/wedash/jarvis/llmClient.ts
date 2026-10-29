@@ -40,7 +40,7 @@ function contextNote(ctx: JarvisContext, session?: JarvisLlmSession | null): str
     "Interprete a intenção pelo histórico + mensagem atual. Não roteie por palavra isolada.",
   ];
   if (session?.goalDraftSummary) {
-    lines.push(`Rascunho de META aberto no app: ${session.goalDraftSummary}. Continuação (nível, %, outubro, valor) = draft_goal, não draft_challenge.`);
+    lines.push(`Rascunho de META aberto no chat: ${session.goalDraftSummary}. Continuacao (nivel, %, outubro, valor) = draft_goal, nao draft_challenge. Confirmacao (criar/autorizar) = draft_goal; o app grava rascunho em Metas.`);
   }
   if (session?.challengeDraftSummary) {
     lines.push(`Rascunho de DESAFIO (produto/disputa) aberto: ${session.challengeDraftSummary}.`);

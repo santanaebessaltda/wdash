@@ -230,15 +230,18 @@ Inspiração de UX: [Néctar](https://www.meu-nectar.com/) (conversa humana, res
 **Roteamento (DECIDIDO — 2026-10-29, LLM-first):** com IA no ar, o turno vai quase sempre pelo LLM (histórico + “rascunho aberto” no contexto da sessão). Tools (`analyze_*` / `draft_*`) são as mãos; a IA interpreta ligação entre mensagens (ex.: “desafio 10%” no meio de uma meta). Keywords/`classifyIntent` ficam para Autorizar, descartar, “abre tela” e **fallback local** se a Edge falhar. Sem brief seco por palavra-chave.
 
 **Superfície (DECIDIDO — 2026-10-29):**
-- **Botão flutuante** no canto inferior direito (só Gestor) — painel no estilo Apps > Chat do Vela (thread + composer); mic = ditado; **Limpar**; F5 zera histórico (sessão). **Fora do menu.** `/chat-ia` e `/jarvis` redirecionam para Visão geral. **Filial:** Topbar.
+- **Botão flutuante** no canto inferior direito (só Gestor) — painel no estilo Apps > Chat do Vela (thread + composer); mic = ditado; **Limpar** zera o thread; histórico da conversa fica em `sessionStorage` (sobrevive a F5 no mesmo separador). **Fora do menu.** `/chat-ia` e `/jarvis` redirecionam para Visão geral. **Filial:** Topbar.
 - Sem navegação/rolagem por comando.
 
 **Leituras no chat:** vendas, **meta cadastrada** (valor-alvo ≠ faturamento), estoque parado, sazonal — resposta no painel flutuante (período da pergunta pode gravar em sessionStorage para o Dashboard se o Gestor abrir depois). Pedido “quanto é a meta?” usa `analyze_goal` / `loadGoalBrief`, não `analyze_sales`.
 
 **Fluxo obrigatório de escrita:**
-`Pedir no chat → Analisar se precisar → Discutir → Rascunho (card) → Autorizar → APIs do CRUD → Confirmar no chat (+ link opcional).`
+`Pedir no chat → Analisar se precisar → Discutir → Confirmar → gravar.`
 
-Leitura **não** pede Autorizar. Criar/editar/apagar **sempre** pede.
+- **Meta:** confirmação (“cria a meta” / Autorizo) grava **rascunho** (`published_at` null) em Performance > Metas; link no chat para revisar/publicar. Sem depender do card de proposta no chat.
+- **Desafio / Escala:** ainda usam card no chat → Autorizar → grava.
+
+Leitura **não** pede confirmação. Escrita **sempre** pede.
 
 **Escopo:** Metas, Desafios, Escala, Estoque (consulta), números — tudo via chat. Dashboard continua **100% leitura** no menu; o JARVIS não manda o Gestor pra lá.
 
@@ -246,7 +249,7 @@ Leitura **não** pede Autorizar. Criar/editar/apagar **sempre** pede.
 - O JARVIS não fica preso a um atalho (ex.: só “estoque parado”). Ele **discute e monta junto** com o Gestor, cobrindo **todos os cenários** que a UI já permite.
 - **Desafios:** modos (Disputa / Mínimo), métricas (quantidade, valor, P.A., ticket, índice), escopos (tudo / produtos / categorias), piso de vendas, prêmios (dinheiro / item / pódio), gerência, datas, loja(s) — o mesmo modelo do editor atual. Origem da ideia pode ser estoque parado, sazonalidade, histórico de vendas, pedido do Gestor, etc.; o fechamento dos campos é conversa + card de proposta.
 - **Metas:** loja/período/equipe, níveis, premiação, rateio, competência — mesmos campos do CRUD; o JARVIS sugere com base em histórico + sazonalidade e só grava após OK.
-- Card de proposta mostra os campos fechados (loja, datas, métrica, alvo, prêmio…) com **Autorizar / Ajustar / Descartar**.
+- **Desafio/Escala:** card de proposta no chat (Autorizar / Descartar). **Meta:** rascunho direto em Metas após confirmação (+ link no chat).
 
 **Análises (leitura, sem OK):** vendas dos últimos meses; produtos parados no estoque (insumo para desafio); datas sazonais (Dia das Mães, Black Friday, Natal…); comparação entre filiais; o que os números da tela ainda não dizem (evolução do `insight.ts` / EQUIP-06, com LLM quando houver backend).
 
@@ -257,6 +260,8 @@ Leitura **não** pede Autorizar. Criar/editar/apagar **sempre** pede.
 **Ordem de build:** (1) shell chat; (2) leitura; (3) Desafio; (4) Meta; (5) Escala; (6) chat + ditado; (7) editar meta/desafio no chat; sem navigate.
 
 **Fatia 8–9 (2026-10-29):** sem voz contínua; chat-first; **sem redirecionar páginas** — tools/prompt só no chat.
+
+**Meta = rascunho em Metas (2026-10-29):** ao confirmar criar meta no chat, o JARVIS grava rascunho (não publica). Histórico do chat persiste em sessionStorage até Limpar.
 
 ### Alertas (DECIDIDO — 2026-09-29)
 - **Todo alerta do app usa `Alert`** (`src/components/ui/Alert.tsx`, padrão Components > Alerts do Vela — "Storage almost full" etc.): fundo suave da cor, sem borda, ícone 18px e título em negrito na cor, texto em `text-t1`. Variantes `success · warning · danger · info · accent`; `icon` troca o ícone (Spinner, RadialProgress), `action` = links/botões à direita (`AlertLink` para link de texto), `footer` = conteúdo extra (lista expandida, checkbox).

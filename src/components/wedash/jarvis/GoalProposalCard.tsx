@@ -63,11 +63,11 @@ export function GoalProposalCard({
       {!ready && missing.length > 0 ? (
         <p className="mt-2 text-[12px] text-warn">Falta: {missing.join(", ")}.</p>
       ) : (
-        <p className="mt-2 text-[12px] text-t2">Nada é gravado até você autorizar.</p>
+        <p className="mt-2 text-[12px] text-t2">Grava como rascunho em Metas — voce revisa e publica la.</p>
       )}
       <div className="mt-3 flex flex-wrap gap-2">
         <Button type="button" size="sm" onClick={onAuthorize} disabled={!ready || busy}>
-          {busy ? "Gravando…" : "Autorizar"}
+          {busy ? "Gravando…" : "Salvar rascunho"}
         </Button>
         <Button type="button" size="sm" variant="outline" onClick={onDiscard} disabled={busy}>
           Descartar
