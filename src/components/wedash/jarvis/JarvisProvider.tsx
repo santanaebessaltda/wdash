@@ -89,6 +89,9 @@ type JarvisApi = {
   createdItem: JarvisCreated | null;
   commitBusy: boolean;
   voiceOpen: boolean;
+  /** Tab/janela oculta: áudio pausado até "Retomar voz". */
+  voicePaused: boolean;
+  resumeVoice: () => void;
   /** Leitura em voz das respostas (TTS). Ligada/desligada. */
   voiceRead: boolean;
   toggleVoiceRead: () => void;
@@ -143,6 +146,7 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
   const [commitBusy, setCommitBusy] = useState(false);
   const [createdItem, setCreatedItem] = useState<JarvisCreated | null>(null);
   const [voiceOpen, setVoiceOpen] = useState(false);
+  const [voicePaused, setVoicePaused] = useState(false);
   const [voiceRead, setVoiceRead] = useState(readStoredVoiceRead);
   const [dictating, setDictating] = useState(false);
   const [dictateBusy, setDictateBusy] = useState(false);
@@ -157,6 +161,7 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
   const scheduleDraftRef = useRef<ScheduleDraft | null>(null);
   const replyGen = useRef(0);
   const voiceOpenRef = useRef(false);
+  const voicePausedRef = useRef(false);
   const voiceReadRef = useRef(voiceRead);
   /** Sync no clique — evita palma abrir voz antes do re-render do `dictating`. */
   const dictatingRef = useRef(false);
@@ -183,6 +188,7 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
   goalDraftRef.current = goalDraft;
   scheduleDraftRef.current = scheduleDraft;
   voiceOpenRef.current = voiceOpen;
+  voicePausedRef.current = voicePaused;
   voiceReadRef.current = voiceRead;
   dictatingRef.current = dictating;
   dictateBusyRef.current = dictateBusy;
@@ -190,6 +196,27 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, mode, challengeDraft, goalDraft, scheduleDraft, createdItem]);
+
+  /** Waveform sintético enquanto JARVIS fala / pensa (estilo Néctar). */
+  useEffect(() => {
+    if (!voiceOpen || voicePaused) return;
+    if (mode !== "speaking" && mode !== "thinking") return;
+    let raf = 0;
+    let t = 0;
+    const amp = mode === "speaking" ? 0.62 : 0.28;
+    const tick = () => {
+      t += mode === "speaking" ? 0.22 : 0.1;
+      setVoiceLevels(
+        Array.from({ length: 40 }, (_, i) => {
+          const wave = 0.12 + amp * Math.abs(Math.sin(t + i * 0.38));
+          return Math.min(1, wave);
+        }),
+      );
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [mode, voiceOpen, voicePaused]);
 
   const storeNameFor = useCallback(
     (storeId: string) => {
@@ -203,12 +230,14 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
     setMessages((m) => [...m, { from: "jarvis", text: answer }]);
     const finish = () => {
       setMode((cur) => (cur === "speaking" ? "idle" : cur));
-      if (opts?.listenAfter && voiceOpenRef.current) {
-        window.setTimeout(() => startListeningRef.current(), 400);
+      if (opts?.listenAfter && voiceOpenRef.current && !voicePausedRef.current) {
+        window.setTimeout(() => startListeningRef.current(), 120);
       }
     };
     // Modo voz sempre fala; no chat, só se "Leitura em voz" estiver ligada.
-    const shouldSpeak = voiceOpenRef.current || voiceReadRef.current;
+    // Tab oculta: não gasta TTS — só deixa o texto no chat.
+    const shouldSpeak =
+      !voicePausedRef.current && (voiceOpenRef.current || voiceReadRef.current);
     if (shouldSpeak && ttsSupported()) {
       setMode("speaking");
       cancelSpeakRef.current?.();
@@ -809,7 +838,9 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
       if (chunks.length === 0) {
         setMode("idle");
         setMicHint("Não peguei áudio. Fala um pouco mais alto e tenta de novo.");
-        if (voiceOpenRef.current) window.setTimeout(() => startListeningRef.current(), 600);
+        if (voiceOpenRef.current && !voicePausedRef.current) {
+          window.setTimeout(() => startListeningRef.current(), 250);
+        }
         return;
       }
       const blob = new Blob(chunks, { type: mime });
@@ -827,7 +858,8 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
             );
             return;
           }
-          setDraftText(tr.text);
+          // Texto da fala entra no chat via `reply` (user + resposta JARVIS).
+          setDraftText("");
           reply(tr.text);
         } catch {
           setMode("idle");
@@ -864,6 +896,7 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
 
   const startMediaWithVad = useCallback(
     async (existingStream?: MediaStream) => {
+      if (voicePausedRef.current) return;
       if ((!navigator.mediaDevices?.getUserMedia && !existingStream) || typeof MediaRecorder === "undefined") {
         setMicHint("Sem microfone neste aparelho — usa o chat escrito.");
         setMode("idle");
@@ -878,6 +911,10 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
           (await navigator.mediaDevices.getUserMedia({
             audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
           }));
+        if (voicePausedRef.current || !voiceOpenRef.current) {
+          stream.getTracks().forEach((t) => t.stop());
+          return;
+        }
         mediaStreamRef.current = stream;
         mediaChunksRef.current = [];
         const mime = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
@@ -897,7 +934,7 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
           setMode("idle");
           setMicHint("Falhou a gravação. Tenta de novo.");
         };
-        rec.start(200);
+        rec.start(100);
         setMode("listening");
         setMicHint(null);
 
@@ -907,8 +944,8 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
         const ctx = new AudioCtx();
         const source = ctx.createMediaStreamSource(stream);
         const analyser = ctx.createAnalyser();
-        analyser.fftSize = 1024;
-        analyser.smoothingTimeConstant = 0.55;
+        analyser.fftSize = 512;
+        analyser.smoothingTimeConstant = 0.45;
         source.connect(analyser);
         const timeData = new Float32Array(analyser.fftSize);
         const freqData = new Uint8Array(analyser.frequencyBinCount);
@@ -918,7 +955,7 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
         const startedAt = performance.now();
 
         const tick = () => {
-          if (!voiceOpenRef.current || mediaRecRef.current !== rec) {
+          if (!voiceOpenRef.current || voicePausedRef.current || mediaRecRef.current !== rec) {
             void ctx.close();
             return;
           }
@@ -935,25 +972,26 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
           for (let i = 0; i < bars; i++) {
             let sum = 0;
             for (let j = 0; j < step; j++) sum += freqData[i * step + j] ?? 0;
-            next.push(Math.min(1, sum / step / 180));
+            next.push(Math.min(1, sum / step / 160));
           }
           setVoiceLevels(next);
 
           const now = performance.now();
           const dt = now - lastTs;
           lastTs = now;
-          if (peak >= 0.04) {
+          // Silêncio curto depois de falar → envia mais rápido (estilo Néctar).
+          if (peak >= 0.035) {
             heardSpeech = true;
             silentMs = 0;
           } else if (heardSpeech) {
             silentMs += dt;
-            if (silentMs >= 1100) {
+            if (silentMs >= 650) {
               void ctx.close();
               finishVoiceRef.current();
               return;
             }
           }
-          if (now - startedAt > 20_000) {
+          if (now - startedAt > 18_000) {
             void ctx.close();
             finishVoiceRef.current();
             return;
@@ -978,9 +1016,40 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
 
   /** Já com mic liberado: Whisper + waveform (mesmo path do botão de onda). */
   const beginListenAfterMicOk = useCallback(() => {
-    if (!voiceOpenRef.current) return;
+    if (!voiceOpenRef.current || voicePausedRef.current) return;
     void startMediaWithVad();
   }, [startMediaWithVad]);
+
+  const pauseVoiceSession = useCallback(() => {
+    if (!voiceOpenRef.current || voicePausedRef.current) return;
+    voicePausedRef.current = true;
+    setVoicePaused(true);
+    cancelSpeakRef.current?.();
+    stopSpeaking();
+    stopMediaTracks();
+    setMode("idle");
+    setMicHint(null);
+    setVoiceLevels(Array.from({ length: 40 }, () => 0.08));
+  }, [stopMediaTracks]);
+
+  /** Clique em "Retomar voz" (gesto → mic de novo). */
+  const resumeVoice = useCallback(() => {
+    if (!voiceOpenRef.current) return;
+    voicePausedRef.current = false;
+    setVoicePaused(false);
+    setMicHint(null);
+    void startMediaWithVad();
+  }, [startMediaWithVad]);
+
+  useEffect(() => {
+    const onVis = () => {
+      if (document.visibilityState === "hidden" && voiceOpenRef.current) {
+        pauseVoiceSession();
+      }
+    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
+  }, [pauseVoiceSession]);
 
   /**
    * Clique no botão de onda: pede mic no gesto → fala inicial → escuta.
@@ -1029,7 +1098,7 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
   }, [session?.name, startMediaWithVad]);
 
   const startListening = useCallback(() => {
-    if (!voiceOpenRef.current) return;
+    if (!voiceOpenRef.current || voicePausedRef.current) return;
     // Reinício após TTS / silêncio: só se já tiver permissão (sem gesto).
     void (async () => {
       if (await micAlreadyGranted()) {
@@ -1043,6 +1112,7 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
   startListeningRef.current = () => startListening();
 
   const finishVoice = useCallback(() => {
+    if (voicePausedRef.current) return;
     if (speechRecRef.current) {
       try {
         speechRecRef.current.stop();
@@ -1055,9 +1125,9 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
       finishMediaRecording();
       return;
     }
-    // Clique em Falar / orbe com idle → pede mic no gesto do usuário.
-    requestMicFromUserGesture();
-  }, [finishMediaRecording, requestMicFromUserGesture]);
+    // Idle no modo voz: volta a ouvir (sem repetir a fala inicial).
+    void startMediaWithVad();
+  }, [finishMediaRecording, startMediaWithVad]);
   finishVoiceRef.current = () => finishVoice();
 
   const openVoice = useCallback(
@@ -1067,6 +1137,8 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
       if (source === "clap" && (dictatingRef.current || dictateBusyRef.current)) return;
 
       cancelDictate();
+      voicePausedRef.current = false;
+      setVoicePaused(false);
       setVoiceOpen(true);
       stopSpeaking();
       setDraftText("");
@@ -1091,6 +1163,8 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
   );
 
   const closeVoice = useCallback(() => {
+    voicePausedRef.current = false;
+    setVoicePaused(false);
     setVoiceOpen(false);
     stopMediaTracks();
     stopSpeaking();
@@ -1107,6 +1181,8 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
     stopSpeaking();
     stopMediaTracks();
     cancelDictate();
+    voicePausedRef.current = false;
+    setVoicePaused(false);
     setVoiceOpen(false);
     setMessages([]);
     setDraftText("");
@@ -1145,6 +1221,8 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
       createdItem,
       commitBusy,
       voiceOpen,
+      voicePaused,
+      resumeVoice,
       voiceRead,
       toggleVoiceRead,
       dictating,
@@ -1205,6 +1283,7 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
       mode,
       openVoice,
       reply,
+      resumeVoice,
       scheduleDraft,
       speakAnswer,
       startDictate,
@@ -1212,6 +1291,7 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
       toggleVoiceRead,
       voiceLevels,
       voiceOpen,
+      voicePaused,
       voiceRead,
     ],
   );

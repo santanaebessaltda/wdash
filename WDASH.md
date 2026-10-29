@@ -240,7 +240,7 @@ Inspiração de UX: [Néctar](https://www.meu-nectar.com/) (conversa humana, res
 | **2 palmas** em qualquer página → mesmo overlay de voz | **não** (só botões do Chat IA — palmas geravam falso positivo) | **não** |
 | Wake “Ei JARVIS” contínuo | opcional / depois | **não** (limitação de SO) |
 
-**Microfone / voz (DECIDIDO — 2026-10-29, ajustado):** voz e ditado (REC) **só pelos botões** do Chat IA (onda = conversa; mic = REC → Whisper). Palmas e modal de mic na entrada **desligados** — abriam sozinhos com falso positivo. Pedido de mic no clique do botão (gesto do Chrome).
+**Microfone / voz (DECIDIDO — 2026-10-29, ajustado):** voz e ditado (REC) **só pelos botões** do Chat IA (onda = conversa; mic = REC → Whisper). Palmas e modal de mic na entrada **desligados**. Pedido de mic no clique. **Dock flutuante** (estilo Néctar) quando a voz continua após navegar para outra tela. **Tab oculta** → pausa TTS/mic + botão **Retomar voz** (não gasta token). Conversa por voz **sempre grava texto** no chat (user + JARVIS).
 
 No Néctar mobile o caminho público é modo de voz no chat (+ Watch/Alexa), não gesto global — alinhamos.
 

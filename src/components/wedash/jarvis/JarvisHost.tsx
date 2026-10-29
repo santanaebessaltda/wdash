@@ -1,7 +1,6 @@
-/**
- * Antes: overlay fullscreen + palmas.
- * Modo voz agora vive no próprio Chat IA (waveform + OUVINDO…), estilo Néctar.
- */
+import { VoiceDock } from "./VoiceDock";
+
+/** Dock de voz global (fora do Chat IA) — estilo Néctar. */
 export function JarvisHost() {
-  return null;
+  return <VoiceDock />;
 }

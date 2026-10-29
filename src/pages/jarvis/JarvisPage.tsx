@@ -239,18 +239,31 @@ export function JarvisPage() {
                     key={i}
                     className="w-[3px] shrink-0 rounded-full bg-acc/90 transition-[height] duration-75"
                     style={{
-                      height: `${Math.max(
-                        4,
-                        Math.round(4 + (j.mode === "listening" ? lvl : 0.15 + (i % 5) * 0.04) * 36),
-                      )}px`,
-                      opacity: j.mode === "listening" ? 0.85 + lvl * 0.15 : 0.45,
+                      height: `${Math.max(4, Math.round(4 + lvl * 36))}px`,
+                      opacity:
+                        j.voicePaused
+                          ? 0.3
+                          : j.mode === "listening" || j.mode === "speaking"
+                            ? 0.85 + lvl * 0.15
+                            : 0.45,
                     }}
                   />
                 ))}
               </div>
-              <div className="flex items-center gap-3">
-                <span className="text-[11px] font-semibold tracking-[0.28em] text-acc">{voiceStatus}</span>
+              <div className="flex flex-wrap items-center justify-center gap-3">
+                <span className="text-[11px] font-semibold tracking-[0.28em] text-acc">
+                  {j.voicePaused ? "ÁUDIO PAUSADO" : voiceStatus}
+                </span>
                 {j.micHint ? <span className="max-w-[12rem] text-[11px] text-warn">{j.micHint}</span> : null}
+                {j.voicePaused ? (
+                  <button
+                    type="button"
+                    onClick={j.resumeVoice}
+                    className="rounded-full border border-acc/50 px-3 py-1.5 text-[12px] font-semibold text-acc hover:bg-acc/10"
+                  >
+                    Retomar voz
+                  </button>
+                ) : null}
                 <button
                   type="button"
                   onClick={j.closeVoice}
@@ -260,16 +273,18 @@ export function JarvisPage() {
                 >
                   <CloseIcon />
                 </button>
-                <button
-                  type="button"
-                  onClick={() => j.finishVoice()}
-                  disabled={j.mode === "thinking" || j.mode === "speaking"}
-                  aria-label={j.mode === "listening" ? "Enviar agora" : "Continuar ouvindo"}
-                  title={j.mode === "listening" ? "Enviar agora" : "Continuar"}
-                  className="flex h-10 w-10 items-center justify-center rounded-full text-acc hover:bg-acc/10 disabled:opacity-40"
-                >
-                  <MicIcon />
-                </button>
+                {!j.voicePaused ? (
+                  <button
+                    type="button"
+                    onClick={() => j.finishVoice()}
+                    disabled={j.mode === "thinking" || j.mode === "speaking"}
+                    aria-label={j.mode === "listening" ? "Enviar agora" : "Continuar ouvindo"}
+                    title={j.mode === "listening" ? "Enviar agora" : "Continuar"}
+                    className="flex h-10 w-10 items-center justify-center rounded-full text-acc hover:bg-acc/10 disabled:opacity-40"
+                  >
+                    <MicIcon />
+                  </button>
+                ) : null}
               </div>
             </div>
           ) : (
