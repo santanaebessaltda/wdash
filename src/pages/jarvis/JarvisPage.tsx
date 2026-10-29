@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { Avatar, Dropdown } from "@/components/ui";
+import { Avatar } from "@/components/ui";
 import { validateChallengeForm } from "@/data/wedash/challengeForm";
 import { ChallengeProposalCard } from "@/components/wedash/jarvis/ChallengeProposalCard";
 import { GoalProposalCard } from "@/components/wedash/jarvis/GoalProposalCard";
@@ -24,7 +24,7 @@ import { useJarvis } from "@/components/wedash/jarvis/JarvisProvider";
 import { cn } from "@/lib/cn";
 import { paths } from "@/router/paths";
 import { useSession } from "@/session/SessionProvider";
-import { MoreIcon, SendIcon } from "@/pages/apps/icons";
+import { SendIcon } from "@/pages/apps/icons";
 
 function voiceCaptureSupported(): boolean {
   if (typeof window === "undefined") return false;
@@ -34,7 +34,7 @@ function voiceCaptureSupported(): boolean {
   );
 }
 
-/** Hub JARVIS — estilo Néctar: saudação, esfera, composer central (não é chat Slack). */
+/** Hub JARVIS — full-bleed no miolo (sem card), estilo Néctar. */
 export function JarvisPage() {
   const j = useJarvis();
   const { session } = useSession();
@@ -60,48 +60,31 @@ export function JarvisPage() {
   const busy = j.mode === "listening" || j.mode === "thinking" || j.mode === "speaking";
 
   return (
-    <div className="relative flex h-[calc(100vh-120px)] min-h-[560px] flex-col overflow-hidden rounded-[22px] border border-line/60 bg-bg-0 shadow-[var(--shadow-vela)]">
+    <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-bg-0">
       <JarvisHubBackdrop />
 
-      <div className="relative z-10 flex items-center justify-end px-4 py-3 sm:px-5">
-        <Dropdown
-          align="right"
-          trigger={
-            <button
-              type="button"
-              className="flex h-9 w-9 items-center justify-center rounded-full border border-line/70 bg-bg-2/50 text-t1 backdrop-blur-sm hover:bg-bg-3 hover:text-t0"
-              aria-label="Mais opções"
-            >
-              <MoreIcon size={16} />
-            </button>
-          }
-          items={[
-            {
-              label: "Limpar conversa",
-              onClick: j.clearChat,
-              disabled: empty,
-            },
-          ]}
-        />
-      </div>
-
-      <div className="relative z-10 flex min-h-0 flex-1 flex-col items-center px-4 pb-5 sm:px-8">
+      <div
+        className="relative z-10 flex min-h-0 flex-1 flex-col items-center px-3 pt-2 sm:px-6 sm:pt-4"
+        style={{ paddingBottom: "max(12px, env(safe-area-inset-bottom, 0px))" }}
+      >
         {empty ? (
-          <div className="flex flex-1 flex-col items-center justify-center text-center">
+          <div className="flex min-h-0 flex-1 flex-col items-center justify-center px-2 text-center">
             <p className="text-[11px] font-semibold tracking-[0.22em] text-acc">{hello}</p>
-            <h1 className="mt-2 text-[clamp(2.4rem,6vw,3.6rem)] font-light leading-none tracking-tight text-t0">
+            <h1 className="mt-2 max-w-full truncate text-[clamp(2rem,9vw,3.6rem)] font-light leading-none tracking-tight text-t0">
               {name}
             </h1>
           </div>
         ) : (
-          <div className="mb-4 w-full max-w-2xl flex-1 overflow-y-auto pt-2">
-            <div className="flex flex-col gap-4">
+          <div className="mb-3 w-full max-w-2xl min-h-0 flex-1 overflow-y-auto overscroll-contain pt-1">
+            <div className="flex flex-col gap-3 sm:gap-4">
               {j.messages.map((m, i) => (
                 <div key={i} className={cn("flex gap-2.5", m.from === "user" && "flex-row-reverse")}>
-                  {m.from === "jarvis" ? <Avatar name="JARVIS" size="sm" className="mt-0.5" /> : null}
+                  {m.from === "jarvis" ? (
+                    <Avatar name="JARVIS" size="sm" className="mt-0.5 hidden sm:block" />
+                  ) : null}
                   <div
                     className={cn(
-                      "flex max-w-[85%] flex-col sm:max-w-[78%]",
+                      "flex max-w-[92%] flex-col sm:max-w-[78%]",
                       m.from === "user" ? "items-end" : "items-start",
                     )}
                   >
@@ -123,7 +106,6 @@ export function JarvisPage() {
               ))}
               {j.mode === "listening" || j.mode === "thinking" ? (
                 <div className="flex gap-2.5">
-                  <Avatar name="JARVIS" size="sm" className="mt-0.5" />
                   <div className="rounded-[4px_16px_16px_16px] border border-line/50 bg-bg-2/70 px-3.5 py-2.5 text-[13px] text-t2">
                     {j.mode === "listening" ? "Ouvindo…" : j.commitBusy ? "Gravando…" : "Pensando…"}
                   </div>
@@ -196,9 +178,9 @@ export function JarvisPage() {
           </div>
         )}
 
-        <div className={cn("w-full max-w-2xl", empty ? "mt-2 mb-10" : "mt-auto")}>
+        <div className={cn("w-full max-w-2xl shrink-0", empty ? "mt-4 mb-2 sm:mb-6" : "mt-auto")}>
           {j.micHint ? <p className="mb-2 text-center text-[12px] text-t2">{j.micHint}</p> : null}
-          <div className="rounded-2xl border border-line/70 bg-bg-2/75 p-3 shadow-[0_12px_40px_-20px_rgba(0,0,0,0.55)] backdrop-blur-md">
+          <div className="rounded-2xl border border-line/70 bg-bg-2/80 p-2.5 shadow-[0_12px_40px_-20px_rgba(0,0,0,0.55)] backdrop-blur-md sm:p-3">
             <input
               value={j.draftText}
               onChange={(e) => j.setDraftText(e.target.value)}
@@ -207,9 +189,9 @@ export function JarvisPage() {
               }}
               placeholder="Como posso te ajudar?"
               disabled={j.mode === "listening" || j.dictating}
-              className="h-11 w-full bg-transparent px-2 text-[15px] text-t0 outline-none placeholder:text-t2 disabled:opacity-60"
+              className="h-10 w-full bg-transparent px-2 text-[15px] text-t0 outline-none placeholder:text-t2 disabled:opacity-60 sm:h-11"
             />
-            <div className="mt-2 flex items-center justify-between gap-2 px-1">
+            <div className="mt-1.5 flex items-center justify-between gap-2 px-0.5 sm:mt-2">
               <div className="flex items-center gap-0.5">
                 <button
                   type="button"
@@ -257,7 +239,7 @@ export function JarvisPage() {
                 type="button"
                 onClick={() => j.reply(j.draftText)}
                 disabled={!j.draftText.trim() || j.mode === "listening" || j.mode === "thinking" || j.dictating}
-                className="flex h-10 items-center gap-1.5 rounded-full bg-acc px-4 text-[13px] font-bold text-white hover:bg-acc-2 disabled:opacity-50"
+                className="flex h-10 shrink-0 items-center gap-1.5 rounded-full bg-acc px-3.5 text-[13px] font-bold text-white hover:bg-acc-2 disabled:opacity-50 sm:px-4"
                 aria-label="Enviar"
               >
                 <SendIcon size={16} />

@@ -224,7 +224,7 @@ Inspiração de UX: [Néctar](https://www.meu-nectar.com/) (conversa humana, res
 **Tom de voz:** linguajar **humano**, informal, no estilo Néctar — curto, confirma o que fez (“Pronto — tô na Visão geral”), sem jargão de produto. Não soa como manual.
 
 **Superfície (DECIDIDO):**
-- Item de menu **Chat IA** (`/jarvis`) — hub do JARVIS estilo **Néctar** (não é chat Slack): saudação **BOM DIA / BOA TARDE / BOA NOITE** + primeiro nome do Gestor; composer centralizado; fundo na paleta (`--acc` / `--bg-0`) com esfera geodésica em canvas. Ícone do menu: balão com … (Lucide MessageSquareMore). **Sem botão flutuante.**
+- Item de menu **Chat IA** (`/jarvis`) — hub do JARVIS estilo **Néctar** (não é chat Slack): saudação **BOM DIA / BOA TARDE / BOA NOITE** + primeiro nome do Gestor; composer centralizado; **full-bleed** no miolo (sem card; AppShell zera o padding nessa rota); fundo na paleta (`--acc` / `--bg-0`) com esfera geodésica em canvas. Ícone do menu: balão com … (Lucide MessageSquareMore). **Sem botão flutuante.** Sem limpar conversa na fase atual.
 - Composer (estilo Néctar) com 3 ações + **Enviar**:
   - **Leitura em voz** (alto-falante) — ligada/desligada; quando ligada, respostas usam TTS. Preferência em `localStorage`.
   - **Conversar por voz** (ondas) — abre o overlay de modo voz (orbe; ouvir → falar → ouvir). Clique = gesto → permissão de mic.

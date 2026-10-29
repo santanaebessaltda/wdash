@@ -1,6 +1,8 @@
 import { Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { padBottom } from "@/lib/safeArea";
+import { cn } from "@/lib/cn";
 import { Outlet, useLocation } from "react-router-dom";
+import { paths } from "@/router/paths";
 import { Sidebar } from "./Sidebar";
 import { MobileDrawer } from "./MobileDrawer";
 import { Topbar } from "./Topbar";
@@ -23,6 +25,8 @@ export function AppShell() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const location = useLocation();
+  /** Chat IA: miolo sem padding — hub full-bleed. */
+  const jarvisHub = location.pathname === paths.jarvis;
   const mainRef = useRef<HTMLElement | null>(null);
   const setScroller = useCallback((node: HTMLElement | null) => {
     mainRef.current = node;
@@ -115,12 +119,23 @@ export function AppShell() {
           </div>
           <main
             ref={setScroller}
-            className="relative flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto overscroll-y-contain px-4 pt-5 sm:px-8 sm:pt-6 print:overflow-visible print:p-0"
+            className={cn(
+              "relative flex min-h-0 flex-1 flex-col overflow-x-hidden overscroll-y-contain print:overflow-visible print:p-0",
+              jarvisHub
+                ? "overflow-hidden p-0"
+                : "overflow-y-auto px-4 pt-5 sm:px-8 sm:pt-6",
+            )}
           >
             <ProfilePhotosProvider>
               <ChunkErrorBoundary key={location.pathname}>
                 <Suspense fallback={<PageLoader />}>
-                  <div className="pad-base vela-page-enter min-w-0 print:pb-0" style={padBottom("32px")}>
+                  <div
+                    className={cn(
+                      "min-w-0 print:pb-0",
+                      jarvisHub ? "flex min-h-0 flex-1 flex-col" : "pad-base vela-page-enter",
+                    )}
+                    style={jarvisHub ? undefined : padBottom("32px")}
+                  >
                     <Outlet />
                   </div>
                 </Suspense>
