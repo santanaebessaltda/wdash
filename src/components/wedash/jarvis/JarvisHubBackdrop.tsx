@@ -36,7 +36,8 @@ export function JarvisHubBackdrop() {
     };
 
     const accent = () => {
-      const raw = getComputedStyle(document.documentElement).getPropertyValue("--acc").trim() || "#14b8a6";
+      /* Lê do canvas: no placar --acc vem de [data-board-theme], não do <html>. */
+      const raw = getComputedStyle(canvas).getPropertyValue("--acc").trim() || "#14b8a6";
       return raw;
     };
 

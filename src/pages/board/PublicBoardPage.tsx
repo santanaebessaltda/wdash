@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { useParams } from "react-router-dom";
 import { BoardSkeleton } from "@/components/wedash/LoadingSkeletons";
 import { ProfilePhotosProvider } from "@/components/wedash/PersonAvatar";
+import { JarvisHubBackdrop } from "@/components/wedash/jarvis/JarvisHubBackdrop";
 import { calendarTodayIso } from "@/data/wedash/clock";
 import { readBoardShare, type PublicBoardPack } from "@/data/wedash/boardShare";
 import { effectiveWeekHours, parseWeekHours } from "@/data/wedash/storeHours";
@@ -13,6 +14,7 @@ const POLL_MS = 60 * 1000;
 function BoardFrame({ theme, children }: { theme: BoardTheme; children: ReactNode }) {
   return (
     <div data-board-theme={theme} className="tela-cheia relative overflow-hidden bg-bg-0 text-t0">
+      <JarvisHubBackdrop />
       {children}
     </div>
   );
