@@ -32,7 +32,7 @@ Remediação do security audit (standard):
 - **Worker:** sessão Millennium só em memória (+ coluna `millennium_session`); claim de `sync_job` = UPDATE atômico QUEUED→RUNNING; Actions/CLI pinados por SHA/versão; `verify_jwt=true` em todas as Edges no `config.toml`.
 - **Senha do ERP no onboarding:** só na memória do separador (F5 pede de novo). Não vai para `sessionStorage`.
 - **CORS das Edges:** só `APP_ORIGIN` e localhost (`CORS_ORIGINS`).
-- **Headers do site:** `public/_headers` (nosniff, frame, HSTS, CSP). O vídeo do Guia prático é servido pelo Supabase, então `media-src` inclui `blob:` e `https://*.supabase.co`. O PDF abre num frame do mesmo endereço, então `frame-src` e `object-src` também incluem `blob:` e `https://*.supabase.co`. Sem isso o navegador bloqueia o play e o PDF. **Mic do Chat IA / palmas:** `Permissions-Policy` precisa de `microphone=(self)` — com `microphone=()` o Chrome nega `getUserMedia` sem perguntar, mesmo com o cadeado da URL em “permitido”.
+- **Headers do site:** `public/_headers` (nosniff, frame, HSTS, CSP). O vídeo do Guia prático é servido pelo Supabase, então `media-src` inclui `blob:` e `https://*.supabase.co`. O PDF abre num frame do mesmo endereço, então `frame-src` e `object-src` também incluem `blob:` e `https://*.supabase.co`. Sem isso o navegador bloqueia o play e o PDF. **Mic do Chat IA (ditado):** `Permissions-Policy` precisa de `microphone=(self)` — com `microphone=()` o Chrome nega `getUserMedia` sem perguntar, mesmo com o cadeado da URL em “permitido”.
 - **Tabelas de venda:** `erp-stock-sync` só grava catálogo global para Gestor. Gerente continua no estoque e no saldo das lojas dele.
 - **HTTP do Millennium:** o host `:6017` não completa TLS. O esquema fica `http` até o ERP oferecer HTTPS. Cooldown do Atualizar continua desligado (decisão de produto: o gestor clica de novo quando quiser).
 - **Escrita por loja:** meta, desafio, turno, horário/fuso da loja e flags da vendedora passam por `staff_can_write_store` (migration `20261008120000_manager_store_writes`). Gerente sem vínculo escreve em todas; com vínculo, só nas lojas ligadas.
@@ -211,43 +211,39 @@ Sem esses 4 elementos, o número é "dado jogado na tela" — não serve para de
 
 ### Específicos de produto (`src/components/wedash/`)
 - `WedashBrand` — marca WDash (símbolo + nome); sem marca por empresa
-- ~~`AiChat`~~ **removido (2026-10-07)**: o balão saiu do `AppShell` em 2026-09-28 e o componente `ChatIA` não era importado em lugar nenhum. **Substituído pelo JARVIS** (abaixo) — assistente por voz do Gestor; o mock antigo não volta.
+- ~~`AiChat`~~ **removido (2026-10-07)**: o balão saiu do `AppShell` em 2026-09-28 e o componente `ChatIA` não era importado em lugar nenhum. **Substituído pelo JARVIS** (abaixo).
 
-### JARVIS — assistente por voz do Gestor (DECIDIDO — 2026-10-29; UX chat/voz — 2026-10-29)
+### JARVIS — Chat IA do Gestor (DECIDIDO — 2026-10-29; **chat + ditado** — 2026-10-29)
 
-Inspiração de UX: [Néctar](https://www.meu-nectar.com/) (conversa humana, resolve com contexto, gesto + voz). No WDash o nome na tela é **JARVIS**. Papel: sócio sênior em Vendas, Comercial e Administração — discute, analisa e propõe; **nunca grava sozinho**.
+Inspiração de UX: [Néctar](https://www.meu-nectar.com/) (conversa humana, resolve com contexto). No WDash o nome na tela é **JARVIS**. Papel: sócio sênior em Vendas, Comercial e Administração — discute, analisa e propõe; **nunca grava sozinho**.
+
+**Decisão de produto (2026-10-29):** **sem conversa por voz contínua**. Sai TTS obrigatório, onda “OUVINDO…”, 2 palmas, dock flutuante e wake word. Fica **chat texto** + **microfone = transcrição** (Whisper → campo → o Gestor envia). Motivo: qualidade/custo da voz e falsos positivos; no desktop o Gestor lê e autoriza melhor no chat. Prompt e tools preparados para **criar/editar meta, criar/editar desafio, escala, números e navegação** pelo chat.
 
 **Quem vê:** só visão **Gestor** (`OWNER` / `ADMIN_GLOBAL`). Gerente e Vendedor não têm JARVIS na fase 1.
 
-**Onde roda:** app web e **PWA instalado** (mesmo shell; mic e permissões no aparelho).
+**Onde roda:** app web e **PWA instalado** (mesmo shell; mic no gesto do REC).
 
-**Tom de voz:** linguajar **humano**, informal, no estilo Néctar — curto, confirma o que fez (“Pronto — tô na Visão geral”), sem jargão de produto. Não soa como manual.
+**Tom:** linguajar **humano**, informal, no estilo Néctar — curto, confirma o que fez (“Pronto — tô na Visão geral”), sem jargão de produto.
 
 **Superfície (DECIDIDO):**
-- Item de menu **Chat IA** (`/chat-ia`; `/jarvis` redireciona) — hub do JARVIS estilo **Néctar** (não é chat Slack): saudação **BOM DIA / BOA TARDE / BOA NOITE** + primeiro nome do Gestor; composer centralizado; **full-bleed** no miolo (sem card; AppShell zera o padding nessa rota; o hub usa o mesmo `px` das outras telas para não colar no menu). Fundo: degradê na paleta; **esfera geodésica só no hub vazio** — com conversa aberta, só o degradê (como Néctar). Ícone do menu: balão com … (Lucide MessageSquareMore). **Sem botão flutuante.** **Filial:** seletor no **Topbar**.
-- Composer (estilo Néctar) com 3 ações + **Enviar**:
-  - **Leitura em voz** (alto-falante) — ligada/desligada; quando ligada, respostas usam TTS. Preferência em `localStorage`.
-  - **Conversar por voz** (ondas) — no hub (estilo Néctar): fala inicial “JARVIS à disposição {nome}”, waveform + **OUVINDO…** no lugar do composer (sem overlay fullscreen). Clique = gesto → mic.
-  - **Microfone** — UI REC (waveform + timer + cancelar/parar); grava no gesto do clique (pede permissão); ao parar, **Whisper** coloca o texto no campo (não abre o overlay de conversa).
-- Orbe: CSS/canvas reativo ao mic/TTS (estados idle / listening / thinking / speaking). Lottie/WebM só se o orbe não bastar.
-- **Navegação por comando:** “abre Visão geral”, “vai pro Financeiro…” — `navigate` nas rotas do papel do Gestor + fala confirmando. Não pede Autorizar.
+- Item de menu **Chat IA** (`/chat-ia`; `/jarvis` redireciona) — hub estilo **Néctar**: saudação **BOM DIA / BOA TARDE / BOA NOITE** + primeiro nome; composer centralizado; **full-bleed**; esfera geodésica **só no hub vazio**. Ícone: Lucide MessageSquareMore. **Sem botão flutuante.** **Filial:** Topbar.
+- Composer: campo de texto + **Microfone** (REC → Whisper no campo) + **Enviar**. Sem alto-falante / onda de conversa.
+- **Navegação / rolagem por comando** no chat (“abre Visão geral”, “rola a página”) — sem Autorizar.
+- **F5** zera o chat (hub + orb); histórico só em memória na sessão.
 
-**Acionamento por aparelho:**
+**Acionamento:**
 | | Desktop | Mobile / PWA |
 |---|---|---|
-| Menu **JARVIS** + chat | sim | sim (entrada principal) |
-| Botão de onda no chat → modo voz | sim | sim |
-| **2 palmas** em qualquer página → conversa por voz | **sim** (desktop / Gestor; limiar calibrado) | **não** |
-| Wake “Ei JARVIS” contínuo | opcional / depois | **não** (limitação de SO) |
+| Menu **Chat IA** + chat | sim | sim |
+| Mic → transcrição no campo | sim | sim |
+| Conversa por voz / 2 palmas / dock | **não** | **não** |
 
-**Microfone / voz (DECIDIDO — 2026-10-29, ajustado):** no Chat IA, onda = conversa e mic = REC → Whisper. **2 palmas** (desktop / Gestor) abrem a mesma conversa por voz em qualquer tela (dock se estiver fora do hub). Modal de mic na entrada pede permissão para o detector. Pedido de mic no clique do botão. **Dock flutuante** quando a voz continua fora do Chat IA. **Tab oculta** → pausa + **Retomar voz**. Conversa por voz **grava texto** no chat. **F5 / reload** zera o chat (volta ao hub com orb); histórico só na sessão em memória. Perguntas de **vendas** (ex.: “quanto vendi hoje” / “vendi” / “vendeu”) leem a base direto, alinham o filtro `period` da URL + sessionStorage (hoje → `today`, etc.), sobem o miolo para o filtro ficar visível e respondem curto — sem esperar o LLM. Navegação (Visão geral, etc.) também sobe a página. **Rolar a página** (sobe/desce/topo/final) é ação de UI no cliente — não passa pelo LLM e não dispara brief de vendas.
-
-No Néctar mobile o caminho público é modo de voz no chat (+ Watch/Alexa), não gesto global — alinhamos.
+**Leituras no chat:** vendas (ex. “quanto vendi hoje”) alinham `period` + sobem o miolo; estoque parado; sazonal. **Rolar** é UI no cliente — não dispara brief de vendas.
 
 **Fluxo obrigatório de escrita:**
-`Ouvir → Analisar (só leitura) → Discutir detalhes com o Gestor → Propor rascunho → Autorizar (voz “autorizo” / botão) → Executar nas mesmas APIs do CRUD → Confirmar na tela (toast + link).`
+`Pedir no chat → Analisar (só leitura se precisar) → Discutir detalhes → Propor rascunho (card) → Autorizar (botão ou “autorizo” no chat) → Executar nas mesmas APIs do CRUD → Confirmar (toast + link).`
 
-Leitura e **navegar entre telas** não pedem autorização. Criar/editar/apagar **sempre** pede.
+Leitura e navegar **não** pedem autorização. Criar/editar/apagar **sempre** pede.
 
 **Escopo de ação (todas as telas em que o Gestor já age):** Metas, Desafios, Escala, Estoque (consulta + ideias), Pedido de compra, Financeiro (leitura primeiro; escrita só depois que o domínio estiver maduro). Dashboard continua **100% leitura** — o JARVIS não inventa botão de CRUD dentro do Dashboard; grava via repositórios/Edges já existentes. Abrir uma tela do menu = navegação, não escrita.
 
@@ -261,19 +257,15 @@ Leitura e **navegar entre telas** não pedem autorização. Criar/editar/apagar 
 
 **Números:** só da camada de métricas / repos WDash — não inventa faturamento, estoque nem meta. Se faltar dado, fala que falta.
 
-**Fora de escopo na fase 1:** Gerente/Vendedor; gravação sem autorização; palmas/wake no mobile; wake com o app fechado no iPhone; clone visual pixel-perfect do Néctar (padrão de produto + tom + modo voz).
+**Fora de escopo na fase 1:** Gerente/Vendedor; gravação sem autorização; conversa por voz contínua / palmas / wake; clone visual pixel-perfect do Néctar.
 
-**Ordem de build:** (1) shell + voz; (2) leitura; (3) Desafio; (4) Meta; (5) Escala; (6) **chat no menu + modo voz + palmas desktop + navegar**; (7) demais escritas e proatividade.
+**Ordem de build:** (1) shell chat; (2) leitura; (3) Desafio; (4) Meta; (5) Escala; (6) chat no menu + ditado + navegar; (7) editar meta/desafio pelo chat + demais escritas.
 
-**Fatia 1–5 no código (2026-10-29):** tools de leitura; Desafio / Meta / Escala com Autorizar (`challenge*` / `goal*` / `schedule*`). FAB+modal foi o shell inicial.
+**Fatia 1–5 no código (2026-10-29):** tools de leitura; Desafio / Meta / Escala com Autorizar.
 
-**Fatia 6 no código (2026-10-29):** UX Néctar — menu **Chat IA** `/chat-ia`; modo voz inline; ditado REC; navegar; palma 2× desktop. F5 reseta o hub. Vendas “hoje” com janela de 1 dia + sync do filtro.
+**Fatia 6–7:** Chat IA + OpenAI + Whisper ditado + navegar/rolar/vendas.
 
-**Fatia 7 no código (2026-10-29):** **OpenAI ligada** (chat + Whisper). Edge `jarvis-ai`. Secret `OPENAI_API_KEY` no Supabase (nunca no front). Front: `llmClient` com loop de tools (vendas/estoque/sazonal/navegar/rascunhos); fallback local se a Edge falhar. Modo voz = MediaRecorder → Whisper → fala. Autorizar de meta/desafio/escala continua no app.
-
-**Voz do JARVIS (DECIDIDO — 2026-10-29; masculina 2026-10-29):** TTS default = **OpenAI** `gpt-4o-mini-tts` + voz **`cedar`** (masculina/natural — `marin` é feminina e soava artificial). Estilo via `instructions` (tom de colega, não locutor). Override: `JARVIS_TTS_VOICE` / `JARVIS_TTS_STYLE`. Gemini opcional: `JARVIS_TTS_PROVIDER=gemini` + `GEMINI_API_KEY` (default Charon). Cove do ChatGPT não é voz pública na Speech API. Latência tipo Advanced Voice exigiria Realtime API — fora desta fatia. Saudação: `JARVIS à disposição, Nome.`. STT conversa = Web Speech; REC = Whisper. Chat = OpenAI.
-
-**Palmas 2× (2026-10-29):** detector exige impulso curto + energia aguda + SNR acima do ambiente (sem AGC). Barulho contínuo não deve abrir a voz — só duas palmas distintas.
+**Fatia 8 (2026-10-29):** corte do modo voz contínuo; chat-first; prompt para criar/ajustar meta e desafio pelo texto.
 
 ### Alertas (DECIDIDO — 2026-09-29)
 - **Todo alerta do app usa `Alert`** (`src/components/ui/Alert.tsx`, padrão Components > Alerts do Vela — "Storage almost full" etc.): fundo suave da cor, sem borda, ícone 18px e título em negrito na cor, texto em `text-t1`. Variantes `success · warning · danger · info · accent`; `icon` troca o ícone (Spinner, RadialProgress), `action` = links/botões à direita (`AlertLink` para link de texto), `footer` = conteúdo extra (lista expandida, checkbox).

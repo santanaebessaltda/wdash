@@ -52,7 +52,7 @@ export function syncScopePeriodFromQuestion(
     /* private mode */
   }
 
-  // URL ao vivo (evita search/pathname defasado do VoiceDock / closure).
+  // URL ao vivo (evita search/pathname defasado da closure do chat).
   const livePath =
     typeof window !== "undefined" && window.location.pathname
       ? window.location.pathname

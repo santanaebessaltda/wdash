@@ -37,14 +37,13 @@ export async function jarvisLlmTurn(
   history: LlmChatMessage[],
   ctx: JarvisContext,
   userText: string,
-  opts?: { voiceMode?: boolean },
 ): Promise<LlmTurnResult> {
   const sb = getSupabase();
   if (!sb) return { ok: false, reason: "supabase_missing" };
 
   const messages: LlmChatMessage[] = [...history, { role: "user", content: userText }];
   const sideEffects: LlmSideEffect[] = [];
-  const maxRounds = opts?.voiceMode ? 3 : 4;
+  const maxRounds = 4;
 
   for (let round = 0; round < maxRounds; round++) {
     const { data, error } = await sb.functions.invoke("jarvis-ai", {
@@ -52,7 +51,6 @@ export async function jarvisLlmTurn(
         action: "chat",
         messages,
         contextNote: contextNote(ctx),
-        voiceMode: Boolean(opts?.voiceMode),
       },
     });
 

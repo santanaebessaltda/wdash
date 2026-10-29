@@ -59,9 +59,9 @@ export function jarvisReply(question: string): string {
   const intent = classifyIntent(question);
   switch (intent) {
     case "greeting":
-      return "E aí. Tô aqui — vendas, estoque, meta, desafio, escala, ou te levo pra uma tela. Por onde vamos?";
+      return "E aí. Tô no chat — vendas, estoque, meta, desafio, escala, ou te levo pra uma tela. Por onde vamos?";
     case "capability":
-      return "Eu leio a mesma base do Dashboard, aponto sazonal e monto meta, desafio e escala com você. Também abro telas se você pedir. Gravar só depois do seu Autorizar.";
+      return "No chat eu leio a base do Dashboard, monto e ajusto meta, desafio e escala com você, e abro telas se pedir. Gravar só depois do seu Autorizar no card.";
     case "analyze_sales":
       return "Deixa eu olhar as vendas aí…";
     case "analyze_stock":

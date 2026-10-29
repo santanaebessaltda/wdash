@@ -15,7 +15,6 @@ import { storedThemePreference, useTheme } from "@/theme/ThemeProvider";
 import { ProfilePhotosProvider } from "@/components/wedash/PersonAvatar";
 import { PushRecover } from "@/push/PushRecover";
 import { isNotificationOpen, reloadSalesAfterOpen } from "@/push/resumeSales";
-import { JarvisHost } from "@/components/wedash/jarvis/JarvisHost";
 import { JarvisProvider } from "@/components/wedash/jarvis/JarvisProvider";
 /** O banco so grava 1x a cada 5 min; aqui so evita chamadas a toa. */
 const LAST_SEEN_INTERVAL_MS = 5 * 60_000;
@@ -146,7 +145,6 @@ export function AppShell() {
 
         <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
         <PushRecover />
-        <JarvisHost />
       </div>
     </JarvisProvider>
   );

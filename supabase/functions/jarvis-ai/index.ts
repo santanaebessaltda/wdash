@@ -48,23 +48,26 @@ type ToolCall = {
   function: { name: string; arguments: string };
 };
 
-const SYSTEM_PROMPT = `Você é o JARVIS, sócio sênior do Gestor no WDash (rede de franquias WEPINK/WPINK).
+const SYSTEM_PROMPT = `Você é o JARVIS, assistente de chat do Gestor no WDash (rede de franquias WEPINK/WPINK). A conversa é só por texto no app (o Gestor pode ditar no microfone, mas o que chega pra você é sempre texto).
 
-Tom: português do Brasil, informal e humano — como o Néctar. Papo de quem resolve, não de manual.
+Tom: português do Brasil, informal e humano. Papo de quem resolve, não de manual.
 
-Velocidade e naturalidade:
-- Respostas CURTAS: em geral 1 a 3 frases. Vai direto ao ponto.
-- Números: cite o essencial (ex.: “um milhão e cento e noventa e dois mil”); sem relatório.
+Estilo:
+- Respostas curtas: em geral 1 a 4 frases. Vai direto ao ponto.
+- Pode usar números e uma lista curta quando ajudar a ler; sem relatório longo.
 - Cumprimento (“oi”, “e aí”): uma frase só, sem listar habilidades.
-- Se precisar de tool, chame na hora — sem enrolação antes.
+- Se precisar de tool, chame na hora, sem enrolação antes.
+
+O que você faz:
+- Criar ou editar META e DESAFIO: use draft_goal e draft_challenge. Isso vale para criar do zero e também para ajustar um rascunho que já está na conversa (trocar valor, prazo, filial, nome etc.): descreva o pedido completo no campo request. A escala segue o mesmo caminho com draft_schedule.
+- Números (vendas, faturamento, ticket, P.A., estoque parado, datas sazonais): use as tools analyze_*. Nunca invente faturamento, estoque, meta, comissão ou qualquer número.
+- Navegação: use a tool navigate quando pedirem para abrir uma tela.
 
 Regras:
-- Nunca invente faturamento, estoque, meta, comissão ou qualquer número. Use as tools de análise.
-- Meta, desafio e escala: você só discute e pede rascunho via tool. Gravar de verdade é o Gestor no botão Autorizar — nunca diga que já gravou sozinho.
-- Navegação: use a tool navigate quando pedirem para abrir uma tela.
-- Rolagem (“rolar a página”, sobe, desce, topo): o app faz isso no cliente — NÃO chame analyze_sales nem invente números. Responda só confirmando a rolagem.
-- Se faltar dado da tool, fale que faltou — não chute.
-- Não reenvie análise de vendas se o gestor pediu outra coisa (rolar, abrir tela, oi).`;
+- Os rascunhos aparecem em cards no chat. Gravar de verdade só acontece quando o Gestor toca em Autorizar no app. Nunca diga que já gravou, criou ou publicou algo por conta própria; diga que o rascunho está pronto pra ele conferir e autorizar.
+- Se faltar dado (da tool ou do pedido), diga o que faltou e pergunte. Não chute.
+- Rolagem (“rolar a página”, sobe, desce, topo): o app faz isso no cliente. NÃO chame analyze_sales nem invente números. Responda só confirmando.
+- Não reenvie análise de vendas se o Gestor pediu outra coisa (rolar, abrir tela, oi).`;
 
 const TOOLS = [
   {
@@ -121,7 +124,8 @@ const TOOLS = [
     type: "function",
     function: {
       name: "draft_challenge",
-      description: "Monta rascunho de desafio (ainda não grava). O app mostra card Autorizar.",
+      description:
+        "Cria ou ajusta o rascunho de desafio (ainda não grava). Use também para editar o rascunho atual: descreva em request o pedido completo, incluindo as mudanças. O app mostra o card Autorizar.",
       parameters: {
         type: "object",
         properties: {
@@ -135,7 +139,8 @@ const TOOLS = [
     type: "function",
     function: {
       name: "draft_goal",
-      description: "Monta rascunho de meta (ainda não grava).",
+      description:
+        "Cria ou ajusta o rascunho de meta (ainda não grava). Use também para editar o rascunho atual: descreva em request o pedido completo, incluindo as mudanças. O app mostra o card Autorizar.",
       parameters: {
         type: "object",
         properties: {
@@ -149,7 +154,8 @@ const TOOLS = [
     type: "function",
     function: {
       name: "draft_schedule",
-      description: "Monta rascunho de escala (ainda não grava).",
+      description:
+        "Cria ou ajusta o rascunho de escala (ainda não grava). Use também para editar o rascunho atual: descreva em request o pedido completo. O app mostra o card Autorizar.",
       parameters: {
         type: "object",
         properties: {
@@ -234,13 +240,9 @@ async function handleChat(openaiKey: string, body: Record<string, unknown>) {
     typeof body.contextNote === "string" && body.contextNote.trim()
       ? `\n\nContexto da sessão:\n${body.contextNote.trim()}`
       : "";
-  const voiceMode = body.voiceMode === true;
-  const voiceHint = voiceMode
-    ? "\n\nModo voz ativo: responda como papo ao vivo — 1 a 3 frases, sem markdown, sem listas. Pontuação clara para TTS: vírgulas e pontos no lugar certo; pergunta termina com ?; (ex.: “Pronto, Romeu. Quer ver a Visão geral?”)."
-    : "";
 
   const messages: ChatMessage[] = [
-    { role: "system", content: SYSTEM_PROMPT + contextNote + voiceHint },
+    { role: "system", content: SYSTEM_PROMPT + contextNote },
     ...rawMessages.map((m) => normalizeMessage(m)),
   ];
 
@@ -255,8 +257,8 @@ async function handleChat(openaiKey: string, body: Record<string, unknown>) {
       messages,
       tools: TOOLS,
       tool_choice: "auto",
-      temperature: voiceMode ? 0.55 : 0.65,
-      max_tokens: voiceMode ? 280 : 450,
+      temperature: 0.65,
+      max_tokens: 450,
     }),
   });
 

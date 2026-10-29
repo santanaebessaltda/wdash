@@ -27,12 +27,8 @@ import { paths } from "@/router/paths";
 import { useSession } from "@/session/SessionProvider";
 import { SendIcon } from "@/pages/apps/icons";
 
-function voiceCaptureSupported(): boolean {
-  if (typeof window === "undefined") return false;
-  const w = window as unknown as { SpeechRecognition?: unknown; webkitSpeechRecognition?: unknown };
-  return Boolean(
-    navigator.mediaDevices?.getUserMedia || w.SpeechRecognition || w.webkitSpeechRecognition,
-  );
+function micSupported(): boolean {
+  return typeof navigator !== "undefined" && Boolean(navigator.mediaDevices?.getUserMedia);
 }
 
 /** Hub JARVIS — full-bleed no miolo (sem card), estilo Néctar. */
@@ -55,19 +51,10 @@ export function JarvisPage() {
     !j.goalDraft &&
     !j.scheduleDraft &&
     !j.createdItem &&
-    j.mode === "idle" &&
-    !j.voiceOpen;
+    j.mode === "idle";
   const name = firstNameFrom(session?.name ?? "");
   const hello = dayGreeting();
-  const busy = j.mode === "listening" || j.mode === "thinking" || j.mode === "speaking";
-  const voiceStatus =
-    j.mode === "listening"
-      ? "OUVINDO…"
-      : j.mode === "thinking"
-        ? "PENSANDO…"
-        : j.mode === "speaking"
-          ? "FALANDO…"
-          : "PRONTO";
+  const busy = j.mode === "thinking" || j.dictating || j.dictateBusy;
 
   return (
     <div className="relative flex h-full min-h-0 flex-1 flex-col overflow-hidden bg-bg-0">
@@ -115,10 +102,10 @@ export function JarvisPage() {
                   </div>
                 </div>
               ))}
-              {!j.voiceOpen && (j.mode === "listening" || j.mode === "thinking") ? (
+              {j.mode === "thinking" ? (
                 <div className="flex gap-2.5">
                   <div className="rounded-[4px_16px_16px_16px] border border-line/50 bg-bg-2/70 px-3.5 py-2.5 text-[13px] text-t2">
-                    {j.mode === "listening" ? "Ouvindo…" : j.commitBusy ? "Gravando…" : "Pensando…"}
+                    {j.commitBusy ? "Gravando…" : "Pensando…"}
                   </div>
                 </div>
               ) : null}
@@ -190,7 +177,7 @@ export function JarvisPage() {
         )}
 
         <div className={cn("w-full max-w-2xl shrink-0", empty ? "mt-4 mb-0 sm:mb-2" : "mt-auto")}>
-          {j.micHint && !j.dictating && !j.voiceOpen ? (
+          {j.micHint && !j.dictating ? (
             <p className="mb-2 text-center text-[12px] text-t2">{j.micHint}</p>
           ) : null}
 
@@ -232,62 +219,6 @@ export function JarvisPage() {
                 </button>
               </div>
             </div>
-          ) : j.voiceOpen ? (
-            <div className="flex flex-col items-center gap-3 py-1">
-              <div className="flex h-14 w-full max-w-lg items-center justify-center gap-[3px] px-2">
-                {j.voiceLevels.map((lvl, i) => (
-                  <span
-                    key={i}
-                    className="w-[3px] shrink-0 rounded-full bg-acc/90 transition-[height] duration-75"
-                    style={{
-                      height: `${Math.max(4, Math.round(4 + lvl * 36))}px`,
-                      opacity:
-                        j.voicePaused
-                          ? 0.3
-                          : j.mode === "listening" || j.mode === "speaking"
-                            ? 0.85 + lvl * 0.15
-                            : 0.45,
-                    }}
-                  />
-                ))}
-              </div>
-              <div className="flex flex-wrap items-center justify-center gap-3">
-                <span className="text-[11px] font-semibold tracking-[0.28em] text-acc">
-                  {j.voicePaused ? "ÁUDIO PAUSADO" : voiceStatus}
-                </span>
-                {j.micHint ? <span className="max-w-[12rem] text-[11px] text-warn">{j.micHint}</span> : null}
-                {j.voicePaused ? (
-                  <button
-                    type="button"
-                    onClick={j.resumeVoice}
-                    className="rounded-full border border-acc/50 px-3 py-1.5 text-[12px] font-semibold text-acc hover:bg-acc/10"
-                  >
-                    Retomar voz
-                  </button>
-                ) : null}
-                <button
-                  type="button"
-                  onClick={j.closeVoice}
-                  aria-label="Encerrar conversa por voz"
-                  title="Encerrar"
-                  className="flex h-8 w-8 items-center justify-center rounded-full text-t2 hover:bg-bg-3 hover:text-t0"
-                >
-                  <CloseIcon />
-                </button>
-                {!j.voicePaused ? (
-                  <button
-                    type="button"
-                    onClick={() => j.finishVoice()}
-                    disabled={j.mode === "thinking" || j.mode === "speaking"}
-                    aria-label={j.mode === "listening" ? "Enviar agora" : "Continuar ouvindo"}
-                    title={j.mode === "listening" ? "Enviar agora" : "Continuar"}
-                    className="flex h-10 w-10 items-center justify-center rounded-full text-acc hover:bg-acc/10 disabled:opacity-40"
-                  >
-                    <MicIcon />
-                  </button>
-                ) : null}
-              </div>
-            </div>
           ) : (
             <div className="rounded-2xl border border-line/70 bg-bg-2/80 p-2.5 shadow-[0_12px_40px_-20px_rgba(0,0,0,0.55)] backdrop-blur-md sm:p-3">
               <input
@@ -303,41 +234,14 @@ export function JarvisPage() {
                 <div className="flex items-center gap-0.5">
                   <button
                     type="button"
-                    onClick={j.toggleVoiceRead}
-                    aria-pressed={j.voiceRead}
-                    aria-label={j.voiceRead ? "Leitura em voz ligada" : "Leitura em voz desligada"}
-                    title={j.voiceRead ? "Leitura em voz: ligada" : "Leitura em voz: desligada"}
-                    className={cn(
-                      "flex h-10 w-10 items-center justify-center rounded-full transition-colors",
-                      j.voiceRead ? "text-acc" : "text-t2 hover:text-t1",
-                    )}
+                    onClick={j.startDictate}
+                    disabled={busy || !micSupported()}
+                    aria-label="Falar e transcrever"
+                    title="Microfone: gravar e transcrever no texto"
+                    className="flex h-10 w-10 items-center justify-center rounded-full text-t2 hover:text-acc disabled:opacity-50"
                   >
-                    <SpeakerIcon />
+                    <MicIcon />
                   </button>
-                  {voiceCaptureSupported() ? (
-                    <>
-                      <button
-                        type="button"
-                        onClick={() => j.openVoice({ source: "button" })}
-                        disabled={busy}
-                        aria-label="Conversar por voz"
-                        title="Conversar por voz"
-                        className="flex h-10 w-10 items-center justify-center rounded-full text-t2 hover:text-acc disabled:opacity-50"
-                      >
-                        <WaveIcon />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={j.startDictate}
-                        disabled={busy}
-                        aria-label="Falar e transcrever"
-                        title="Microfone: gravar e transcrever no texto"
-                        className="flex h-10 w-10 items-center justify-center rounded-full text-t2 hover:text-acc disabled:opacity-50"
-                      >
-                        <MicIcon />
-                      </button>
-                    </>
-                  ) : null}
                 </div>
                 <button
                   type="button"
@@ -364,20 +268,6 @@ function formatRecTime(totalSec: number): string {
   return `${m}:${String(s).padStart(2, "0")}`;
 }
 
-function SpeakerIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
-      <path
-        d="M11 5 6 9H2v6h4l5 4V5zM15.54 8.46a5 5 0 0 1 0 7.07M19.07 4.93a10 10 0 0 1 0 14.14"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
 function CloseIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
@@ -390,14 +280,6 @@ function StopIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden>
       <rect x="6" y="6" width="12" height="12" rx="1.5" fill="currentColor" />
-    </svg>
-  );
-}
-
-function WaveIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
-      <path d="M4 10v4M8 7v10M12 4v16M16 7v10M20 10v4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
     </svg>
   );
 }
