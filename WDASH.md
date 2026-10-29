@@ -237,6 +237,8 @@ Inspiração de UX: [Néctar](https://www.meu-nectar.com/) (conversa humana, res
 | **2 palmas** em qualquer página → mesmo overlay de voz | sim | **não** (falso positivo / iOS) |
 | Wake “Ei JARVIS” contínuo | opcional / depois | **não** (limitação de SO) |
 
+**Microfone na entrada (DECIDIDO — 2026-10-29):** no desktop, Gestor vê um modal ao entrar no WDash pedindo **Permitir microfone** (gesto de clique → popup nativo do Chrome). Sem isso, palmas em qualquer tela não funcionam: o Chrome **não** mostra o pedido de mic no carregamento da página nem no gesto de palmas. “Agora não” dispensa só na sessão (`sessionStorage`). Mobile continua pedindo no botão de voz.
+
 No Néctar mobile o caminho público é modo de voz no chat (+ Watch/Alexa), não gesto global — alinhamos.
 
 **Fluxo obrigatório de escrita:**

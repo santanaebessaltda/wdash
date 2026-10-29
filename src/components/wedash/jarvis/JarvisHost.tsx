@@ -1,13 +1,14 @@
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { isOwner } from "@/layout/nav-wedash";
 import { useSession } from "@/session/SessionProvider";
 import { startClapDetector, type ClapDetectorHandle } from "./clapDetector";
 import { isJarvisDesktop } from "./desktop";
 import { useJarvis } from "./JarvisProvider";
+import { MicPermissionGate } from "./MicPermissionGate";
 import { VoiceSession } from "./VoiceSession";
 
 /** Palmas no desktop abrem o mesmo modo voz do botão de onda. */
-function DesktopClapBridge() {
+function DesktopClapBridge({ micReady }: { micReady: boolean }) {
   const { session } = useSession();
   const { allowed, voiceOpen, openVoice } = useJarvis();
   const clapRef = useRef<ClapDetectorHandle | null>(null);
@@ -15,7 +16,7 @@ function DesktopClapBridge() {
   voiceOpenRef.current = voiceOpen;
 
   useEffect(() => {
-    if (!allowed || !session || !isOwner(session.role) || !isJarvisDesktop()) return;
+    if (!micReady || !allowed || !session || !isOwner(session.role) || !isJarvisDesktop()) return;
     if (voiceOpen) {
       clapRef.current?.stop();
       clapRef.current = null;
@@ -43,7 +44,7 @@ function DesktopClapBridge() {
       clapRef.current?.stop();
       clapRef.current = null;
     };
-  }, [allowed, openVoice, session, voiceOpen]);
+  }, [allowed, micReady, openVoice, session, voiceOpen]);
 
   return null;
 }
@@ -51,11 +52,19 @@ function DesktopClapBridge() {
 /** Overlay de voz + palmas (desktop). Provider fica no AppShell. Sem FAB. */
 export function JarvisHost() {
   const { session } = useSession();
+  const [micReady, setMicReady] = useState(false);
+  const onGranted = useCallback(() => setMicReady(true), []);
+
   if (!session || !isOwner(session.role)) return null;
+
+  const desktop = isJarvisDesktop();
 
   return (
     <>
-      <DesktopClapBridge />
+      {desktop ? (
+        <MicPermissionGate active onGranted={onGranted} />
+      ) : null}
+      <DesktopClapBridge micReady={micReady} />
       <VoiceSession />
     </>
   );
