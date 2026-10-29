@@ -54,10 +54,19 @@ export function JarvisPage() {
     !j.goalDraft &&
     !j.scheduleDraft &&
     !j.createdItem &&
-    j.mode === "idle";
+    j.mode === "idle" &&
+    !j.voiceOpen;
   const name = firstNameFrom(session?.name ?? "");
   const hello = dayGreeting();
   const busy = j.mode === "listening" || j.mode === "thinking" || j.mode === "speaking";
+  const voiceStatus =
+    j.mode === "listening"
+      ? "OUVINDO…"
+      : j.mode === "thinking"
+        ? "PENSANDO…"
+        : j.mode === "speaking"
+          ? "FALANDO…"
+          : "PRONTO";
 
   return (
     <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-bg-0">
@@ -104,7 +113,7 @@ export function JarvisPage() {
                   </div>
                 </div>
               ))}
-              {j.mode === "listening" || j.mode === "thinking" ? (
+              {!j.voiceOpen && (j.mode === "listening" || j.mode === "thinking") ? (
                 <div className="flex gap-2.5">
                   <div className="rounded-[4px_16px_16px_16px] border border-line/50 bg-bg-2/70 px-3.5 py-2.5 text-[13px] text-t2">
                     {j.mode === "listening" ? "Ouvindo…" : j.commitBusy ? "Gravando…" : "Pensando…"}
@@ -179,7 +188,7 @@ export function JarvisPage() {
         )}
 
         <div className={cn("w-full max-w-2xl shrink-0", empty ? "mt-4 mb-2 sm:mb-6" : "mt-auto")}>
-          {j.micHint && !j.dictating ? (
+          {j.micHint && !j.dictating && !j.voiceOpen ? (
             <p className="mb-2 text-center text-[12px] text-t2">{j.micHint}</p>
           ) : null}
 
@@ -221,6 +230,47 @@ export function JarvisPage() {
                 </button>
               </div>
             </div>
+          ) : j.voiceOpen ? (
+            <div className="flex flex-col items-center gap-3 py-1">
+              <div className="flex h-14 w-full max-w-lg items-center justify-center gap-[3px] px-2">
+                {j.voiceLevels.map((lvl, i) => (
+                  <span
+                    key={i}
+                    className="w-[3px] shrink-0 rounded-full bg-acc/90 transition-[height] duration-75"
+                    style={{
+                      height: `${Math.max(
+                        4,
+                        Math.round(4 + (j.mode === "listening" ? lvl : 0.15 + (i % 5) * 0.04) * 36),
+                      )}px`,
+                      opacity: j.mode === "listening" ? 0.85 + lvl * 0.15 : 0.45,
+                    }}
+                  />
+                ))}
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-[11px] font-semibold tracking-[0.28em] text-acc">{voiceStatus}</span>
+                {j.micHint ? <span className="max-w-[12rem] text-[11px] text-warn">{j.micHint}</span> : null}
+                <button
+                  type="button"
+                  onClick={j.closeVoice}
+                  aria-label="Encerrar conversa por voz"
+                  title="Encerrar"
+                  className="flex h-8 w-8 items-center justify-center rounded-full text-t2 hover:bg-bg-3 hover:text-t0"
+                >
+                  <CloseIcon />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => j.finishVoice()}
+                  disabled={j.mode === "thinking" || j.mode === "speaking"}
+                  aria-label={j.mode === "listening" ? "Enviar agora" : "Continuar ouvindo"}
+                  title={j.mode === "listening" ? "Enviar agora" : "Continuar"}
+                  className="flex h-10 w-10 items-center justify-center rounded-full text-acc hover:bg-acc/10 disabled:opacity-40"
+                >
+                  <MicIcon />
+                </button>
+              </div>
+            </div>
           ) : (
             <div className="rounded-2xl border border-line/70 bg-bg-2/80 p-2.5 shadow-[0_12px_40px_-20px_rgba(0,0,0,0.55)] backdrop-blur-md sm:p-3">
               <input
@@ -230,8 +280,7 @@ export function JarvisPage() {
                   if (e.key === "Enter") j.reply(j.draftText);
                 }}
                 placeholder="Como posso te ajudar?"
-                disabled={j.mode === "listening"}
-                className="h-10 w-full bg-transparent px-2 text-[15px] text-t0 outline-none placeholder:text-t2 disabled:opacity-60 sm:h-11"
+                className="h-10 w-full bg-transparent px-2 text-[15px] text-t0 outline-none placeholder:text-t2 sm:h-11"
               />
               <div className="mt-1.5 flex items-center justify-between gap-2 px-0.5 sm:mt-2">
                 <div className="flex items-center gap-0.5">
@@ -263,7 +312,7 @@ export function JarvisPage() {
                       <button
                         type="button"
                         onClick={j.startDictate}
-                        disabled={busy || j.voiceOpen}
+                        disabled={busy}
                         aria-label="Falar e transcrever"
                         title="Microfone: gravar e transcrever no texto"
                         className="flex h-10 w-10 items-center justify-center rounded-full text-t2 hover:text-acc disabled:opacity-50"
@@ -276,7 +325,7 @@ export function JarvisPage() {
                 <button
                   type="button"
                   onClick={() => j.reply(j.draftText)}
-                  disabled={!j.draftText.trim() || j.mode === "listening" || j.mode === "thinking"}
+                  disabled={!j.draftText.trim() || j.mode === "thinking"}
                   className="flex h-10 shrink-0 items-center gap-1.5 rounded-full bg-acc px-3.5 text-[13px] font-bold text-white hover:bg-acc-2 disabled:opacity-50 sm:px-4"
                   aria-label="Enviar"
                 >

@@ -227,7 +227,7 @@ Inspiração de UX: [Néctar](https://www.meu-nectar.com/) (conversa humana, res
 - Item de menu **Chat IA** (`/chat-ia`; `/jarvis` redireciona) — hub do JARVIS estilo **Néctar** (não é chat Slack): saudação **BOM DIA / BOA TARDE / BOA NOITE** + primeiro nome do Gestor; composer centralizado; **full-bleed** no miolo (sem card; AppShell zera o padding nessa rota); fundo na paleta (`--acc` / `--bg-0`) com esfera geodésica em canvas. Ícone do menu: balão com … (Lucide MessageSquareMore). **Sem botão flutuante.** Sem limpar conversa na fase atual.
 - Composer (estilo Néctar) com 3 ações + **Enviar**:
   - **Leitura em voz** (alto-falante) — ligada/desligada; quando ligada, respostas usam TTS. Preferência em `localStorage`.
-  - **Conversar por voz** (ondas) — abre o overlay de modo voz (orbe; ouvir → falar → ouvir). Clique = gesto → permissão de mic.
+  - **Conversar por voz** (ondas) — no hub (estilo Néctar): fala inicial “JARVIS à disposição {nome}”, waveform + **OUVINDO…** no lugar do composer (sem overlay fullscreen). Clique = gesto → mic.
   - **Microfone** — UI REC (waveform + timer + cancelar/parar); grava no gesto do clique (pede permissão); ao parar, **Whisper** coloca o texto no campo (não abre o overlay de conversa).
 - Orbe: CSS/canvas reativo ao mic/TTS (estados idle / listening / thinking / speaking). Lottie/WebM só se o orbe não bastar.
 - **Navegação por comando:** “abre Visão geral”, “vai pro Financeiro…” — `navigate` nas rotas do papel do Gestor + fala confirmando. Não pede Autorizar.
@@ -267,7 +267,7 @@ Leitura e **navegar entre telas** não pedem autorização. Criar/editar/apagar 
 
 **Fatia 1–5 no código (2026-10-29):** tools de leitura; Desafio / Meta / Escala com Autorizar (`challenge*` / `goal*` / `schedule*`). FAB+modal foi o shell inicial.
 
-**Fatia 6 no código (2026-10-29):** UX Néctar — menu **Chat IA** `/chat-ia`; overlay de modo voz com orbe **só pelo botão de onda**; ditado REC pelo botão de mic; tom humano; intent **navegar**. Sem FAB. Sem palmas.
+**Fatia 6 no código (2026-10-29):** UX Néctar — menu **Chat IA** `/chat-ia`; modo voz inline (waveform + OUVINDO…) pelo botão de onda + fala inicial; ditado REC pelo mic; tom humano; intent **navegar**. Sem FAB. Sem palmas. Sem overlay fullscreen.
 
 **Fatia 7 no código (2026-10-29):** **OpenAI ligada.** Edge `jarvis-ai` (chat `gpt-4o-mini` + tools + Whisper + **TTS**). Secret `OPENAI_API_KEY` no Supabase (nunca no front). Front: `llmClient` com loop de tools (vendas/estoque/sazonal/navegar/rascunhos); fallback local se a Edge falhar. Modo voz = MediaRecorder → Whisper → fala. Autorizar de meta/desafio/escala continua no app.
 

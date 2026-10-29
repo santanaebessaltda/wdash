@@ -11,3 +11,9 @@ export function firstNameFrom(fullName: string): string {
   const part = fullName.trim().split(/\s+/)[0];
   return part || "Gestor";
 }
+
+/** Fala inicial ao abrir conversa por voz (estilo Néctar). */
+export function voiceStandbyLine(firstName: string): string {
+  const name = firstName.trim() || "Gestor";
+  return `JARVIS à disposição ${name}.`;
+}

@@ -45,14 +45,8 @@ import {
   validateScheduleDraft,
   type ScheduleDraft,
 } from "./scheduleDraft";
-import {
-  createSpeechRecognition,
-  speak,
-  speechRecognitionSupported,
-  stopSpeaking,
-  ttsSupported,
-  type SpeechRecognitionLike,
-} from "./speech";
+import { firstNameFrom, voiceStandbyLine } from "./greeting";
+import { speak, stopSpeaking, ttsSupported, type SpeechRecognitionLike } from "./speech";
 
 const VOICE_READ_KEY = "wedash.jarvis.voiceRead";
 
@@ -103,10 +97,12 @@ type JarvisApi = {
   dictateBusy: boolean;
   dictateSeconds: number;
   dictateLevels: number[];
+  /** Níveis do waveform no modo conversa por voz (OUVINDO…). */
+  voiceLevels: number[];
   startDictate: () => void;
   finishDictate: () => void;
   cancelDictate: () => void;
-  /** `button` = clique (pede mic). `clap` = palmas (só ouve se já tiver permissão). */
+  /** Clique no botão de onda → fala inicial + escuta no hub (estilo Néctar). */
   openVoice: (opts?: { source?: "button" | "clap" }) => void;
   closeVoice: () => void;
   /** Para a gravação / envia; em idle, pede mic de novo (precisa de clique). */
@@ -152,6 +148,7 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
   const [dictateBusy, setDictateBusy] = useState(false);
   const [dictateSeconds, setDictateSeconds] = useState(0);
   const [dictateLevels, setDictateLevels] = useState<number[]>(() => Array.from({ length: 40 }, () => 0.12));
+  const [voiceLevels, setVoiceLevels] = useState<number[]>(() => Array.from({ length: 40 }, () => 0.12));
 
   const endRef = useRef<HTMLDivElement>(null);
   const cancelSpeakRef = useRef<(() => void) | null>(null);
@@ -796,6 +793,7 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
     mediaStreamRef.current?.getTracks().forEach((t) => t.stop());
     mediaStreamRef.current = null;
     mediaRecRef.current = null;
+    setVoiceLevels(Array.from({ length: 40 }, () => 0.12));
   }, [stopVad]);
 
   const finishMediaRecording = useCallback(() => {
@@ -901,7 +899,7 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
         };
         rec.start(200);
         setMode("listening");
-        setMicHint("Pode falar — paro sozinho quando você silenciar.");
+        setMicHint(null);
 
         const AudioCtx =
           window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
@@ -910,8 +908,10 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
         const source = ctx.createMediaStreamSource(stream);
         const analyser = ctx.createAnalyser();
         analyser.fftSize = 1024;
+        analyser.smoothingTimeConstant = 0.55;
         source.connect(analyser);
-        const data = new Float32Array(analyser.fftSize);
+        const timeData = new Float32Array(analyser.fftSize);
+        const freqData = new Uint8Array(analyser.frequencyBinCount);
         let heardSpeech = false;
         let silentMs = 0;
         let lastTs = performance.now();
@@ -922,12 +922,23 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
             void ctx.close();
             return;
           }
-          analyser.getFloatTimeDomainData(data);
+          analyser.getFloatTimeDomainData(timeData);
           let peak = 0;
-          for (let i = 0; i < data.length; i++) {
-            const v = Math.abs(data[i] ?? 0);
+          for (let i = 0; i < timeData.length; i++) {
+            const v = Math.abs(timeData[i] ?? 0);
             if (v > peak) peak = v;
           }
+          analyser.getByteFrequencyData(freqData);
+          const bars = 40;
+          const step = Math.max(1, Math.floor(freqData.length / bars));
+          const next: number[] = [];
+          for (let i = 0; i < bars; i++) {
+            let sum = 0;
+            for (let j = 0; j < step; j++) sum += freqData[i * step + j] ?? 0;
+            next.push(Math.min(1, sum / step / 180));
+          }
+          setVoiceLevels(next);
+
           const now = performance.now();
           const dt = now - lastTs;
           lastTs = now;
@@ -965,79 +976,14 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
     [stopMediaTracks],
   );
 
-  const startWebSpeech = useCallback(() => {
-    const rec = createSpeechRecognition();
-    if (!rec) {
-      void startMediaWithVad();
-      return;
-    }
-    try {
-      speechRecRef.current?.abort();
-    } catch {
-      /* ignore */
-    }
-    stopSpeaking();
-    setMicHint(null);
-    setDraftText("");
-    speechRecRef.current = rec;
-    rec.continuous = false;
-    rec.interimResults = true;
-    let finalText = "";
-    rec.onresult = (event) => {
-      let interim = "";
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        const row = event.results[i];
-        if (!row) continue;
-        const piece = row[0]?.transcript ?? "";
-        if (row.isFinal) finalText += piece;
-        else interim += piece;
-      }
-      const shown = (finalText || interim).trim();
-      if (shown) setDraftText(shown);
-    };
-    rec.onerror = (event) => {
-      const err = event.error;
-      if (err === "aborted") return;
-      if (err === "no-speech") {
-        setMicHint("Não ouvi nada — fala de novo.");
-        setMode("idle");
-        if (voiceOpenRef.current) window.setTimeout(() => startListeningRef.current(), 500);
-        return;
-      }
-      // not-allowed / network / etc.: tenta gravação (já pedimos getUserMedia antes)
-      void startMediaWithVad();
-    };
-    rec.onend = () => {
-      speechRecRef.current = null;
-      const said = finalText.trim();
-      if (said) {
-        setMode("thinking");
-        reply(said);
-        return;
-      }
-      if (voiceOpenRef.current) {
-        setMode("idle");
-      }
-    };
-    try {
-      rec.start();
-      setMode("listening");
-      setMicHint("Pode falar — envio sozinho quando você parar.");
-    } catch {
-      void startMediaWithVad();
-    }
-  }, [reply, startMediaWithVad]);
-
-  /** Já com mic liberado: sobe Web Speech ou Whisper. */
+  /** Já com mic liberado: Whisper + waveform (mesmo path do botão de onda). */
   const beginListenAfterMicOk = useCallback(() => {
     if (!voiceOpenRef.current) return;
-    if (speechRecognitionSupported()) startWebSpeech();
-    else void startMediaWithVad();
-  }, [startMediaWithVad, startWebSpeech]);
+    void startMediaWithVad();
+  }, [startMediaWithVad]);
 
   /**
-   * Pede o mic no mesmo gesto do clique (sem setTimeout antes).
-   * Se chamar depois de timer/palmas, o Chrome NÃO mostra o popup.
+   * Clique no botão de onda: pede mic no gesto → fala inicial → escuta.
    */
   const requestMicFromUserGesture = useCallback(() => {
     if (!navigator.mediaDevices?.getUserMedia) {
@@ -1045,8 +991,7 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
       setMicHint("Sem microfone neste aparelho — usa o chat escrito.");
       return;
     }
-    setMicHint("Pedindo acesso ao microfone…");
-    // Inicia getUserMedia ainda no gesto do clique → popup nativo.
+    setMicHint(null);
     void navigator.mediaDevices
       .getUserMedia({ audio: micAudioConstraints })
       .then((stream) => {
@@ -1054,19 +999,34 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
           stream.getTracks().forEach((t) => t.stop());
           return;
         }
-        // Preferimos Whisper/MediaRecorder com o stream já aberto (mais estável que Web Speech).
-        void startMediaWithVad(stream);
+        mediaStreamRef.current = stream;
+        const line = voiceStandbyLine(firstNameFrom(session?.name ?? ""));
+        setMessages((m) => [...m, { from: "jarvis", text: line }]);
+        setMode("speaking");
+        cancelSpeakRef.current?.();
+        cancelSpeakRef.current = speak(line, {
+          onEnd: () => {
+            if (!voiceOpenRef.current) {
+              stream.getTracks().forEach((t) => t.stop());
+              mediaStreamRef.current = null;
+              setMode("idle");
+              return;
+            }
+            void startMediaWithVad(stream);
+          },
+        });
       })
       .catch((err) => {
+        setVoiceOpen(false);
         setMode("idle");
         const name = err instanceof DOMException ? err.name : "";
         if (name === "NotAllowedError" || name === "PermissionDeniedError" || name === "SecurityError") {
-          setMicHint(null);
+          setMicHint("Microfone bloqueado neste site. Libera no cadeado da URL e tenta de novo.");
         } else {
-          setMicHint("Não consegui abrir o microfone. Tenta de novo em Falar.");
+          setMicHint("Não consegui abrir o microfone. Tenta de novo.");
         }
       });
-  }, [startMediaWithVad]);
+  }, [session?.name, startMediaWithVad]);
 
   const startListening = useCallback(() => {
     if (!voiceOpenRef.current) return;
@@ -1136,7 +1096,9 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
     stopSpeaking();
     cancelSpeakRef.current?.();
     setDraftText("");
+    setMicHint(null);
     setMode("idle");
+    setVoiceLevels(Array.from({ length: 40 }, () => 0.12));
   }, [stopMediaTracks]);
 
   const clearChat = useCallback(() => {
@@ -1189,6 +1151,7 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
       dictateBusy,
       dictateSeconds,
       dictateLevels,
+      voiceLevels,
       startDictate,
       finishDictate,
       cancelDictate,
@@ -1247,6 +1210,7 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
       startDictate,
       storeNameFor,
       toggleVoiceRead,
+      voiceLevels,
       voiceOpen,
       voiceRead,
     ],

@@ -1,9 +1,7 @@
-import { VoiceSession } from "./VoiceSession";
-
 /**
- * Overlay de conversa por voz.
- * Palmas / modal de mic na entrada ficam off — voz e REC só pelos botões do Chat IA.
+ * Antes: overlay fullscreen + palmas.
+ * Modo voz agora vive no próprio Chat IA (waveform + OUVINDO…), estilo Néctar.
  */
 export function JarvisHost() {
-  return <VoiceSession />;
+  return null;
 }

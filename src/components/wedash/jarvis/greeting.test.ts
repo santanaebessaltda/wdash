@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dayGreeting, firstNameFrom } from "./greeting";
+import { dayGreeting, firstNameFrom, voiceStandbyLine } from "./greeting";
 
 describe("dayGreeting", () => {
   it("usa faixa de horário", () => {
@@ -13,5 +13,12 @@ describe("firstNameFrom", () => {
   it("pega o primeiro nome", () => {
     expect(firstNameFrom("Romeu Fernandes")).toBe("Romeu");
     expect(firstNameFrom("")).toBe("Gestor");
+  });
+});
+
+describe("voiceStandbyLine", () => {
+  it("monta a fala inicial estilo Néctar", () => {
+    expect(voiceStandbyLine("Romeu")).toBe("JARVIS à disposição Romeu.");
+    expect(voiceStandbyLine("")).toBe("JARVIS à disposição Gestor.");
   });
 });
