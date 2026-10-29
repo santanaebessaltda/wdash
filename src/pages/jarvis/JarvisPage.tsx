@@ -71,10 +71,11 @@ export function JarvisPage() {
 
   return (
     <div className="relative flex h-full min-h-0 flex-1 flex-col overflow-hidden bg-bg-0">
-      <JarvisHubBackdrop />
+      {/* Orb só no hub vazio; com conversa = só degradê (Néctar). */}
+      <JarvisHubBackdrop sphere={empty} />
 
       <div
-        className="pad-base relative z-10 flex min-h-0 flex-1 flex-col items-center px-3 pt-2 sm:px-6 sm:pt-4"
+        className="pad-base relative z-10 flex min-h-0 flex-1 flex-col items-center px-4 pt-3 sm:px-8 sm:pt-5"
         style={padBottom("0px")}
       >
         {empty ? (
@@ -85,7 +86,7 @@ export function JarvisPage() {
             </h1>
           </div>
         ) : (
-          <div className="mb-3 w-full max-w-2xl min-h-0 flex-1 overflow-y-auto overscroll-contain pt-1">
+          <div className="mb-3 w-full max-w-2xl min-h-0 flex-1 overflow-y-auto overscroll-contain px-1 pt-1 sm:px-2">
             <div className="flex flex-col gap-3 sm:gap-4">
               {j.messages.map((m, i) => (
                 <div key={i} className={cn("flex gap-2.5", m.from === "user" && "flex-row-reverse")}>
@@ -103,10 +104,10 @@ export function JarvisPage() {
                     ) : null}
                     <div
                       className={cn(
-                        "px-3.5 py-2.5 text-[13.5px] leading-relaxed backdrop-blur-sm",
+                        "px-3.5 py-2.5 text-[13.5px] leading-relaxed",
                         m.from === "user"
                           ? "rounded-[16px_4px_16px_16px] bg-acc text-white"
-                          : "rounded-[4px_16px_16px_16px] border border-line/50 bg-bg-2/70 text-t0",
+                          : "rounded-[4px_16px_16px_16px] border border-line/40 bg-bg-2/80 text-t0 backdrop-blur-sm",
                       )}
                     >
                       {m.text}
