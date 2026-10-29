@@ -60,20 +60,6 @@ export type JarvisCreated =
   | { kind: "challenge" | "goal"; id: string; name: string }
   | { kind: "schedule"; name: string };
 
-const OPENING: JarvisMessage = {
-  from: "jarvis",
-  text: "E aí. Sou o JARVIS. Manda no texto ou no botão de voz — a gente resolve junto, e eu só gravo depois que você autorizar.",
-};
-
-export const SUGGESTIONS = [
-  "Como estão as vendas dos últimos 3 meses?",
-  "Tem produto parado no estoque?",
-  "Abre a Visão geral",
-  "Quero montar um desafio",
-  "Vamos criar a meta de novembro",
-  "Gerar a escala de novembro",
-];
-
 function readTopbarStoreIds(): string[] {
   try {
     const raw = sessionStorage.getItem("wedash.store") ?? sessionStorage.getItem("gestao.filial");
@@ -103,6 +89,7 @@ type JarvisApi = {
   /** Para a gravação / envia; em idle, pede mic de novo (precisa de clique). */
   finishVoice: () => void;
   reply: (q: string) => void;
+  clearChat: () => void;
   authorizeChallenge: () => void;
   authorizeGoal: () => void;
   authorizeSchedule: () => void;
@@ -127,7 +114,7 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
   const location = useLocation();
   const allowed = Boolean(session && isOwner(session.role));
 
-  const [messages, setMessages] = useState<JarvisMessage[]>([OPENING]);
+  const [messages, setMessages] = useState<JarvisMessage[]>([]);
   const [mode, setMode] = useState<JarvisMode>("idle");
   const [micHint, setMicHint] = useState<string | null>(null);
   const [draftText, setDraftText] = useState("");
@@ -152,7 +139,7 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
   const vadRafRef = useRef(0);
   const startListeningRef = useRef<() => void>(() => undefined);
   const finishVoiceRef = useRef<() => void>(() => undefined);
-  const messagesRef = useRef<JarvisMessage[]>([OPENING]);
+  const messagesRef = useRef<JarvisMessage[]>([]);
   messagesRef.current = messages;
 
   challengeDraftRef.current = challengeDraft;
@@ -423,7 +410,6 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
       }
 
       const history: LlmChatMessage[] = messagesRef.current
-        .filter((m) => m !== OPENING)
         .slice(-12)
         .map((m) => ({
           role: m.from === "user" ? "user" : "assistant",
@@ -566,8 +552,6 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
     }
   }, [reply, stopMediaTracks, stopVad]);
 
-  const MIC_DENIED_HINT =
-    "Microfone bloqueado. No Chrome: cadeado ao lado da URL → Configurações do site → Microfone → Permitir → recarrega a página.";
   const MIC_NEED_CLICK_HINT =
     "Toque em Falar para o Chrome pedir o microfone (só aparece depois de um clique).";
 
@@ -679,7 +663,9 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
         setMode("idle");
         const name = err instanceof DOMException ? err.name : "";
         setMicHint(
-          name === "NotAllowedError" || name === "PermissionDeniedError" ? MIC_DENIED_HINT : "Não consegui abrir o microfone.",
+          name === "NotAllowedError" || name === "PermissionDeniedError"
+            ? null
+            : "Não consegui abrir o microfone.",
         );
       }
     },
@@ -782,7 +768,7 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
         setMode("idle");
         const name = err instanceof DOMException ? err.name : "";
         if (name === "NotAllowedError" || name === "PermissionDeniedError" || name === "SecurityError") {
-          setMicHint(MIC_DENIED_HINT);
+          setMicHint(null);
         } else {
           setMicHint("Não consegui abrir o microfone. Tenta de novo em Falar.");
         }
@@ -856,6 +842,26 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
     setMode("idle");
   }, [stopMediaTracks]);
 
+  const clearChat = useCallback(() => {
+    replyGen.current += 1;
+    cancelSpeakRef.current?.();
+    stopSpeaking();
+    stopMediaTracks();
+    setVoiceOpen(false);
+    setMessages([]);
+    setDraftText("");
+    setMicHint(null);
+    setMode("idle");
+    setChallengeDraft(null);
+    challengeDraftRef.current = null;
+    setGoalDraft(null);
+    goalDraftRef.current = null;
+    setScheduleDraft(null);
+    scheduleDraftRef.current = null;
+    setCreatedItem(null);
+    setCommitBusy(false);
+  }, [stopMediaTracks]);
+
   useEffect(() => {
     return () => {
       cancelSpeakRef.current?.();
@@ -882,6 +888,7 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
       closeVoice,
       finishVoice,
       reply,
+      clearChat,
       authorizeChallenge: () => void authorizeChallenge(),
       authorizeGoal: () => void authorizeGoal(),
       authorizeSchedule: () => void authorizeSchedule(),
@@ -909,6 +916,7 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
       authorizeGoal,
       authorizeSchedule,
       challengeDraft,
+      clearChat,
       closeVoice,
       commitBusy,
       createdItem,

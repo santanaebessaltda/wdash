@@ -61,9 +61,7 @@ export function MicPermissionGate({ active, onGranted }: Props) {
         return;
       }
       if (result === "denied") {
-        setError(
-          "Microfone bloqueado. No Chrome: cadeado ao lado da URL → Microfone → Permitir → recarrega.",
-        );
+        setError("Microfone bloqueado neste site.");
         return;
       }
       setError("Não consegui abrir o microfone neste aparelho.");

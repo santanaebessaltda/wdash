@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { Avatar, Button } from "@/components/ui";
+import { Avatar, Dropdown } from "@/components/ui";
 import { validateChallengeForm } from "@/data/wedash/challengeForm";
 import { ChallengeProposalCard } from "@/components/wedash/jarvis/ChallengeProposalCard";
 import { GoalProposalCard } from "@/components/wedash/jarvis/GoalProposalCard";
@@ -18,9 +18,10 @@ import {
   scheduleDraftReady,
   validateScheduleDraft,
 } from "@/components/wedash/jarvis/scheduleDraft";
-import { SUGGESTIONS, useJarvis } from "@/components/wedash/jarvis/JarvisProvider";
+import { useJarvis } from "@/components/wedash/jarvis/JarvisProvider";
 import { cn } from "@/lib/cn";
 import { paths } from "@/router/paths";
+import { MoreIcon, SendIcon } from "@/pages/apps/icons";
 
 function voiceCaptureSupported(): boolean {
   if (typeof window === "undefined") return false;
@@ -51,6 +52,25 @@ export function JarvisPage() {
           <p className="truncate text-sm font-bold text-t0">JARVIS</p>
           <p className="mt-0.5 text-xs text-ok">Online · seu sócio na operação</p>
         </div>
+        <Dropdown
+          align="right"
+          trigger={
+            <button
+              type="button"
+              className="flex h-9 w-9 items-center justify-center rounded-[10px] border border-line text-t1 hover:bg-bg-3 hover:text-t0"
+              aria-label="Mais opções"
+            >
+              <MoreIcon size={16} />
+            </button>
+          }
+          items={[
+            {
+              label: "Limpar conversa",
+              onClick: j.clearChat,
+              disabled: j.messages.length === 0 && !j.challengeDraft && !j.goalDraft && !j.scheduleDraft && !j.createdItem,
+            },
+          ]}
+        />
       </div>
 
       <div className="flex-1 overflow-y-auto p-5">
@@ -141,16 +161,6 @@ export function JarvisPage() {
             </Link>
           </div>
         ) : null}
-
-        {j.messages.length <= 1 ? (
-          <div className="mt-4 flex flex-wrap gap-2 border-t border-line pt-4">
-            {SUGGESTIONS.map((s) => (
-              <Button key={s} size="sm" variant="secondary" onClick={() => j.reply(s)}>
-                {s}
-              </Button>
-            ))}
-          </div>
-        ) : null}
       </div>
 
       <div className="border-t border-line px-5 py-3.5">
@@ -182,10 +192,11 @@ export function JarvisPage() {
             type="button"
             onClick={() => j.reply(j.draftText)}
             disabled={!j.draftText.trim() || j.mode === "listening" || j.mode === "thinking"}
-            className="flex h-[42px] shrink-0 items-center justify-center rounded-xl bg-acc px-3.5 text-white hover:bg-acc-2 disabled:opacity-50"
+            className="flex h-[42px] shrink-0 items-center gap-1.5 rounded-xl bg-acc px-4 text-[13px] font-bold text-white hover:bg-acc-2 disabled:opacity-50"
             aria-label="Enviar"
           >
-            <SendIcon />
+            <SendIcon size={16} />
+            <span className="hidden sm:inline">Enviar</span>
           </button>
         </div>
       </div>
@@ -197,14 +208,6 @@ function WaveIcon() {
   return (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
       <path d="M4 10v4M8 7v10M12 4v16M16 7v10M20 10v4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-function SendIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
-      <path d="M12 19V5M5 12l7-7 7 7" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
