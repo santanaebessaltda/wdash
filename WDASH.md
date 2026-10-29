@@ -237,10 +237,10 @@ Inspiração de UX: [Néctar](https://www.meu-nectar.com/) (conversa humana, res
 |---|---|---|
 | Menu **JARVIS** + chat | sim | sim (entrada principal) |
 | Botão de onda no chat → modo voz | sim | sim |
-| **2 palmas** em qualquer página → mesmo overlay de voz | sim | **não** (falso positivo / iOS) |
+| **2 palmas** em qualquer página → mesmo overlay de voz | **não** (só botões do Chat IA — palmas geravam falso positivo) | **não** |
 | Wake “Ei JARVIS” contínuo | opcional / depois | **não** (limitação de SO) |
 
-**Microfone na entrada (DECIDIDO — 2026-10-29):** no desktop, Gestor vê um modal ao entrar no WDash pedindo **Permitir microfone** (gesto de clique → popup nativo do Chrome). Sem isso, palmas em qualquer tela não funcionam: o Chrome **não** mostra o pedido de mic no carregamento da página nem no gesto de palmas. “Agora não” dispensa só na sessão (`sessionStorage`). Mobile continua pedindo no botão de voz.
+**Microfone / voz (DECIDIDO — 2026-10-29, ajustado):** voz e ditado (REC) **só pelos botões** do Chat IA (onda = conversa; mic = REC → Whisper). Palmas e modal de mic na entrada **desligados** — abriam sozinhos com falso positivo. Pedido de mic no clique do botão (gesto do Chrome).
 
 No Néctar mobile o caminho público é modo de voz no chat (+ Watch/Alexa), não gesto global — alinhamos.
 
@@ -267,7 +267,7 @@ Leitura e **navegar entre telas** não pedem autorização. Criar/editar/apagar 
 
 **Fatia 1–5 no código (2026-10-29):** tools de leitura; Desafio / Meta / Escala com Autorizar (`challenge*` / `goal*` / `schedule*`). FAB+modal foi o shell inicial.
 
-**Fatia 6 no código (2026-10-29):** UX Néctar — menu **Chat IA** `/chat-ia` (chat Vela + botão de voz); overlay de modo voz com orbe; palmas **só desktop** abrem o overlay; tom humano; intent **navegar** (rotas do Gestor). Sem FAB.
+**Fatia 6 no código (2026-10-29):** UX Néctar — menu **Chat IA** `/chat-ia`; overlay de modo voz com orbe **só pelo botão de onda**; ditado REC pelo botão de mic; tom humano; intent **navegar**. Sem FAB. Sem palmas.
 
 **Fatia 7 no código (2026-10-29):** **OpenAI ligada.** Edge `jarvis-ai` (chat `gpt-4o-mini` + tools + Whisper + **TTS**). Secret `OPENAI_API_KEY` no Supabase (nunca no front). Front: `llmClient` com loop de tools (vendas/estoque/sazonal/navegar/rascunhos); fallback local se a Edge falhar. Modo voz = MediaRecorder → Whisper → fala. Autorizar de meta/desafio/escala continua no app.
 
