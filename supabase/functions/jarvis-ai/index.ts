@@ -67,10 +67,12 @@ Conversa e contexto (obrigatório):
 
 O que você faz (100% no chat — NÃO redirecione o Gestor para outras telas):
 - Ler META cadastrada (“quanto é a meta?”, “meta deste mês”): analyze_goal. Meta ≠ faturamento — NÃO use analyze_sales para isso.
-- Criar, reajustar ou sugerir META e DESAFIO: draft_goal / draft_challenge. Vale criar, ajustar rascunho e sugerir valor. No request descreva o pedido completo (inclua o contexto da conversa). Escala: draft_schedule.
-- Sugestão / “reduzir a meta?”: analyze_goal (e vendas se precisar) → opinião clara → se fizer sentido montar rascunho, draft_goal. Não responda só repetindo meta/faturamento.
+- META (Performance > Metas): draft_goal. Inclui escada de níveis, modo (individual/grupo/geral), “nível desafio” / “meta desafio” / “último nível +10%”, “mesma configuração de outubro”. Isso NÃO é o CRUD Desafios.
+- DESAFIO (Performance > Desafios — produto, disputa, estoque parado): draft_challenge. Só quando o Gestor quer campanha/disputa de produto, não quando fala do degrau da escada da meta.
+- Se já estiver montando uma META e o Gestor disser “desafio 10% a mais” / “igual outubro”: continue com draft_goal (ajuste o rascunho da meta). NÃO chame draft_challenge.
+- Sugestão / “reduzir a meta?”: analyze_goal (e vendas se precisar) → opinião → draft_goal se for o caso.
 - Números de venda (“quanto vendi hoje?”): analyze_sales. Nunca invente números.
-- Se pedirem “abre Visão geral / Financeiro / rola a página”: diga que resolve aqui no chat e pergunte o que quer ver. Não existe tool de navegação.
+- Escala: draft_schedule. Pedidos de “abre Visão geral”: resolve no chat; sem tool de navegação.
 
 Regras:
 - Rascunhos viram cards. Gravar só com Autorizar no app. Nunca diga que já gravou sozinho.
@@ -134,7 +136,7 @@ const TOOLS = [
     function: {
       name: "draft_challenge",
       description:
-        "Cria ou ajusta o rascunho de desafio (ainda não grava). Use também para editar o rascunho atual: descreva em request o pedido completo, incluindo as mudanças. O app mostra o card Autorizar.",
+        "Cria ou ajusta o rascunho de DESAFIO de produto/disputa (Performance > Desafios). NÃO use para nível/escada da meta (nível desafio, +10%, config de outubro) — isso é draft_goal. Descreva o pedido completo em request.",
       parameters: {
         type: "object",
         properties: {
@@ -149,7 +151,7 @@ const TOOLS = [
     function: {
       name: "draft_goal",
       description:
-        "Cria ou ajusta o rascunho de meta (ainda não grava). Use também para editar o rascunho atual: descreva em request o pedido completo, incluindo as mudanças. O app mostra o card Autorizar.",
+        "Cria ou ajusta o rascunho de META (escada, modo, valor, período, nível desafio/+10%, copiar config de outro mês). Use para editar o rascunho atual; descreva o pedido completo em request. O app mostra o card Autorizar.",
       parameters: {
         type: "object",
         properties: {

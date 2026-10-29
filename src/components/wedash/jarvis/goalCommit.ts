@@ -34,7 +34,7 @@ export async function commitGoal(tenantId: string, form: GoalDraftForm): Promise
     tierMode: ready.tierMode,
     spreadUnidentified: ready.spreadUnidentified,
     tiers,
-    groups: [],
+    groups: ready.groups,
     published: true,
   });
   if (!res.ok) {

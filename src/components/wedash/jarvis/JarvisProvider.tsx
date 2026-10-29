@@ -34,6 +34,7 @@ import { loadGoalBrief } from "./goalBrief";
 import {
   classifyIntent,
   looksLikeGoalAdvice,
+  looksLikeGoalLadderTalk,
   looksLikeLeaveChatRequest,
   looksLikeOpinionOrCounsel,
   looksLikeSalesQuery,
@@ -649,7 +650,19 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
         }
 
         for (const effect of llm.sideEffects) {
-          if (effect.kind === "draft_challenge") {
+          // “Nível desafio / +10% / config de outubro” = escada da META, não CRUD Desafio.
+          const qNorm = q
+            .toLowerCase()
+            .normalize("NFD")
+            .replace(/\p{M}/gu, "");
+          const asGoalLadder =
+            effect.kind === "draft_challenge" &&
+            (looksLikeGoalLadderTalk(effect.request || q) ||
+              looksLikeGoalLadderTalk(q) ||
+              (Boolean(goalDraftRef.current) &&
+                /desafio/.test(qNorm) &&
+                !/produto|body|estoque|disputa|splash|kit\b/.test(qNorm)));
+          if (effect.kind === "draft_challenge" && !asGoalLadder) {
             setGoalDraft(null);
             goalDraftRef.current = null;
             setScheduleDraft(null);
@@ -659,7 +672,7 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
             setChallengeDraft(draft);
             challengeDraftRef.current = draft;
             setCreatedItem(null);
-          } else if (effect.kind === "draft_goal") {
+          } else if (effect.kind === "draft_goal" || asGoalLadder) {
             setChallengeDraft(null);
             challengeDraftRef.current = null;
             setScheduleDraft(null);

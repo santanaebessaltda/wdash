@@ -78,9 +78,27 @@ export function looksLikeSalesQuery(raw: string): boolean {
   );
 }
 
+/**
+ * “Nível desafio” / escada / +10% na meta — NÃO é o CRUD Desafios.
+ * Ex.: “último nível 10% a mais”, “mesma config de outubro”.
+ */
+export function looksLikeGoalLadderTalk(raw: string): boolean {
+  const p = normalizeIntentText(raw);
+  if (/produto|body|estoque|disputa|quem fizer mais|podio|pódio|prêmio em|premio em/.test(p)) return false;
+  return (
+    /nivel (desafio|ultimo)|ultimo nivel|meta desafio|desafio (da|de) (a )?meta|escada|10\s*%(\s*a\s*mais)?|por cento a mais|mesma configura|igual (a|ao|a meta|outubro|novembro)|copiar.*(meta|outubro)|configura[cç][aã]o (de |da )?(meta|outubro|mes)|seguir.*(configura|outubro|meta)/.test(
+      p,
+    ) ||
+    (/\bmeta\b/.test(p) && /\bdesafio\b/.test(p) && /nivel|%|por cento|configura|outubro|novembro/.test(p))
+  );
+}
+
+/** Performance > Desafios (produto/disputa) — não confundir com nível da escada da meta. */
 function looksLikeChallengeAdvice(raw: string): boolean {
   const p = normalizeIntentText(raw);
-  return /desafio/.test(p);
+  if (!/desafio/.test(p)) return false;
+  if (looksLikeGoalLadderTalk(p)) return false;
+  return true;
 }
 
 /** Pedidos antigos de “abre tela / rola página” — respondemos no chat, sem sair. */
@@ -114,6 +132,7 @@ export function classifyIntent(raw: string): JarvisIntent {
   if (/autorizo|pode criar|pode gravar|confirma|pode seguir|fechado pode/.test(p)) return "authorize";
   if (looksLikeLeaveChatRequest(p)) return "stay_in_chat";
   if (looksLikeChallengeAdvice(p)) return "challenge";
+  if (looksLikeGoalLadderTalk(p)) return "goal";
   if (looksLikeGoalRead(p)) return "analyze_goal";
   if (looksLikeGoalAdvice(p)) return "goal";
   if (/escala|folga|6\s*[x×]\s*1|plantao|turno/.test(p)) return "schedule";

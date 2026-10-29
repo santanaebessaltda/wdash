@@ -36,6 +36,16 @@ describe("classifyIntent", () => {
     expect(classifyIntent("Melhor reduzir a meta?")).toBe("goal");
   });
 
+  it("nível desafio da escada não vira CRUD Desafio", () => {
+    expect(classifyIntent("O nível desafio pode ser 10% a mais")).toBe("goal");
+    expect(
+      classifyIntent(
+        "Sim, a meta pode ser 350.000 e o desafio 10% a mais, mesma configuração de outubro",
+      ),
+    ).toBe("goal");
+    expect(classifyIntent("Quero criar um desafio de body splash")).toBe("challenge");
+  });
+
   it("sugestão/reajuste de meta não vira atalho de vendas", () => {
     expect(
       classifyIntent(

@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
+  applyChallengeTierPct,
   emptyGoalForm,
   ensureGoalName,
   goalDraftReady,
   mergeGoalUtterance,
+  parseConfigSourceMonth,
   parseGoalPeriod,
   parseGoalTarget,
   validateGoalDraft,
@@ -47,5 +49,41 @@ describe("mergeGoalUtterance", () => {
     expect(form.storeId).toBe("a");
     expect(goalDraftReady(form)).toBe(true);
     expect(Object.keys(validateGoalDraft(form))).toEqual([]);
+  });
+
+  it("nível desafio +10% ajusta o último degrau para 110%", () => {
+    let form = emptyGoalForm("a");
+    form = mergeGoalUtterance(
+      form,
+      "meta 350 mil, nível desafio 10% a mais, mesma configuração de outubro",
+      ctx,
+    );
+    expect(form.tiers[form.tiers.length - 1]?.minAttainmentPct).toBe(110);
+    expect(form.tiers[form.tiers.length - 1]?.name).toMatch(/desafio/i);
+  });
+});
+
+describe("parseConfigSourceMonth", () => {
+  it("lê outubro como fonte da escada", () => {
+    expect(parseConfigSourceMonth("mesma configuração da meta de outubro", "2026-10-29")).toEqual({
+      from: "2026-10-01",
+      to: "2026-10-31",
+    });
+  });
+});
+
+describe("applyChallengeTierPct", () => {
+  it("mantém escada crescente ao baixar o desafio para 110%", () => {
+    const tiers = applyChallengeTierPct(
+      [
+        { name: "N1", minAttainmentPct: 100, commissionPct: 1.5, bonus: 0 },
+        { name: "N2", minAttainmentPct: 120, commissionPct: 2, bonus: 0 },
+        { name: "N3", minAttainmentPct: 150, commissionPct: 2.5, bonus: 0 },
+        { name: "N4", minAttainmentPct: 180, commissionPct: 3, bonus: 0 },
+      ],
+      110,
+    );
+    expect(tiers.map((t) => t.minAttainmentPct)).toEqual([100, 110]);
+    expect(tiers[1]?.name).toMatch(/desafio/i);
   });
 });

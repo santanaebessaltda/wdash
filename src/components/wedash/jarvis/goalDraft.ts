@@ -1,8 +1,10 @@
 import { endOfMonth, startOfMonth } from "@/data/wedash/engine/format";
-import type { Tier } from "@/data/wedash/engine/goalTypes";
+import type { GoalGroup, Tier } from "@/data/wedash/engine/goalTypes";
+import { fetchGoals } from "@/data/wedash/goalsRepo";
 import { fetchSalesDayAggs } from "@/data/wedash/salesRepo";
 import { brlCent, monthYearTitle } from "@/lib/format";
 import { matchStoresInText, type JarvisContext } from "./context";
+import { looksLikeGoalLadderTalk } from "./respond";
 
 export type GoalDraftForm = {
   name: string;
@@ -14,6 +16,8 @@ export type GoalDraftForm = {
   spreadUnidentified: boolean;
   /** Escada igual ao default do editor de Metas. */
   tiers: Tier[];
+  /** % por grupo (soma 100); vazio = sem rateio por grupo. */
+  groups: GoalGroup[];
   managerOn: boolean;
 };
 
@@ -39,6 +43,7 @@ export function emptyGoalForm(storeId: string): GoalDraftForm {
     tierMode: "INDIVIDUAL",
     spreadUnidentified: false,
     tiers: defaultGoalTiers(),
+    groups: [],
     managerOn: false,
   };
 }
@@ -93,6 +98,15 @@ export function parseGoalPeriod(text: string, today: string): { startsOn: string
   }
   for (const [name, month] of Object.entries(MONTH_NAMES)) {
     if (!p.includes(name)) continue;
+    // Evita tratar “config de outubro” como período da meta nova.
+    if (
+      new RegExp(
+        `(configura|igual|copiar|seguir|mesma|mesmo|escada|nivel).{0,40}${name}|${name}.{0,20}(configura|escada|nivel)`,
+      ).test(p) &&
+      !new RegExp(`meta (de |do |para |em )?${name}|${name} (com |de )?meta|competencia.{0,10}${name}`).test(p)
+    ) {
+      continue;
+    }
     const yearMatch = p.match(new RegExp(`${name}\\s+(?:de\\s+)?(20\\d{2})`));
     const y = yearMatch ? Number(yearMatch[1]) : Number(today.slice(0, 4));
     const startsOn = `${y}-${pad(month)}-01`;
@@ -167,6 +181,94 @@ export function ensureGoalName(f: GoalDraftForm): GoalDraftForm {
   return { ...f, name: "Nova meta" };
 }
 
+/**
+ * Degrau “Desafio” no % pedido (padrão 110 = meta + 10%).
+ * Mantém só níveis abaixo desse % e o degrau Desafio (escada crescente).
+ */
+export function applyChallengeTierPct(tiers: Tier[], pct: number): Tier[] {
+  if (tiers.length === 0) {
+    return [{ name: "Desafio", minAttainmentPct: pct, commissionPct: 3, bonus: 0 }];
+  }
+  const cloned = tiers.map((t) => ({ ...t }));
+  const below = cloned.filter((t) => t.minAttainmentPct < pct && !/desafio/i.test(t.name));
+  const prevDesafio = cloned.find((t) => /desafio/i.test(t.name));
+  const template = prevDesafio ?? cloned[cloned.length - 1]!;
+  const desafio: Tier = {
+    ...template,
+    name: "Desafio",
+    minAttainmentPct: pct,
+  };
+  return [...below, desafio];
+}
+
+/**
+ * Mês de onde copiar escada/modo (“mesma configuração de outubro”).
+ * Diferente do período da meta nova.
+ */
+export function parseConfigSourceMonth(text: string, today: string): { from: string; to: string } | null {
+  const p = norm(text);
+  const wantsCopy = /configura|igual|copiar|seguir|mesma|mesmo|basead|como (em|no|na)|escada (de|do|da)/.test(p);
+  if (!wantsCopy) return null;
+
+  if (/mes passado/.test(p)) {
+    const from = shiftMonthStart(today, -1);
+    return { from, to: endOfMonth(from) };
+  }
+
+  for (const [name, month] of Object.entries(MONTH_NAMES)) {
+    if (
+      !new RegExp(
+        `(configura|igual|copiar|seguir|mesma|mesmo|escada|nivel|de).{0,48}${name}|${name}.{0,24}(configura|escada|nivel)`,
+      ).test(p)
+    ) {
+      continue;
+    }
+    const y = Number(today.slice(0, 4));
+    const from = `${y}-${pad(month)}-01`;
+    return { from, to: endOfMonth(from) };
+  }
+
+  const from = shiftMonthStart(today, -1);
+  return { from, to: endOfMonth(from) };
+}
+
+/** Copia modo/escada/rateio/gerência da meta publicada do mês de referência. */
+export async function copyGoalLadderFromPeriod(
+  form: GoalDraftForm,
+  ctx: JarvisContext,
+  win: { from: string; to: string },
+): Promise<GoalDraftForm> {
+  const storeId = form.storeId || (ctx.stores.length === 1 ? ctx.stores[0]!.id : "");
+  if (!storeId) return form;
+  try {
+    const goals = await fetchGoals({
+      tenantId: ctx.tenantId,
+      storeIds: [storeId],
+      from: win.from,
+      to: win.to,
+    });
+    const src = goals.find((g) => g.storeId === storeId) ?? goals[0];
+    if (!src) return form;
+    const hasManager = src.tiers.some((t) => t.managerPct != null);
+    return {
+      ...form,
+      tierMode: src.tierMode,
+      spreadUnidentified: src.spreadUnidentified === true,
+      managerOn: hasManager,
+      groups: src.groups.map((g) => ({ shiftId: g.shiftId, name: g.name, pct: g.pct })),
+      tiers: src.tiers.map((t) => ({
+        name: t.name,
+        minAttainmentPct: t.minAttainmentPct,
+        commissionPct: t.commissionPct,
+        bonus: t.bonus,
+        ...(t.managerPct != null ? { managerPct: t.managerPct, managerBonus: t.managerBonus } : {}),
+      })),
+    };
+  } catch {
+    return form;
+  }
+}
+
 export function mergeGoalUtterance(form: GoalDraftForm, text: string, ctx: JarvisContext): GoalDraftForm {
   const p = norm(text);
   const next: GoalDraftForm = {
@@ -195,6 +297,11 @@ export function mergeGoalUtterance(form: GoalDraftForm, text: string, ctx: Jarvi
 
   const target = parseGoalTarget(text);
   if (target != null) next.target = target;
+
+  // “nível desafio / 10% a mais” = último degrau da escada em 110% (não é CRUD Desafio).
+  if (looksLikeGoalLadderTalk(text) && /10\s*%|por cento a mais|nivel desafio|meta desafio|ultimo nivel/.test(p)) {
+    next.tiers = applyChallengeTierPct(next.tiers, 110);
+  }
 
   const name = text.match(/(?:chamar|nome(?:ar)?|titulo|título)\s+(?:de\s+|como\s+)?["“]?([^"”\n]{3,80})["”]?/i);
   if (name?.[1]) next.name = name[1].trim().slice(0, 80);
@@ -256,20 +363,32 @@ export async function discussGoal(
   let form = prev?.form ?? emptyGoalForm(ctx.stores.length === 1 ? ctx.stores[0]!.id : "");
   form = mergeGoalUtterance(form, question, ctx);
 
+  const sourceWin = parseConfigSourceMonth(question, ctx.today);
+  let copiedLadder = false;
+  if (sourceWin) {
+    const before = JSON.stringify(form.tiers);
+    form = await copyGoalLadderFromPeriod(form, ctx, sourceWin);
+    copiedLadder = JSON.stringify(form.tiers) !== before;
+    if (looksLikeGoalLadderTalk(question) && /10\s*%|por cento a mais|nivel desafio|meta desafio/.test(norm(question))) {
+      form = { ...form, tiers: applyChallengeTierPct(form.tiers, 110) };
+    }
+  }
+
   if (form.target == null && form.storeId && /suger|propor|basead|historico|histórico|mes passado|mês passado/.test(norm(question))) {
     const suggested = await suggestGoalTarget(ctx, form.storeId);
     if (suggested != null) form = { ...form, target: suggested };
   }
 
   if (!form.startsOn) {
-    // Sem período explícito: competência = próximo mês civil (meta usual).
     const startsOn = shiftMonthStart(ctx.today, 1);
     form = ensureGoalName({ ...form, startsOn, endsOn: endOfMonth(startsOn) });
   }
 
   const storeName = ctx.stores.find((s) => s.id === form.storeId)?.tradeName ?? "";
   let reply = formatGoalProposal(form, storeName);
-  if (form.target != null && /suger|propor|basead|historico|histórico/.test(norm(question))) {
+  if (copiedLadder) {
+    reply = `Mantive a escada/modo da meta de ${monthYearTitle(sourceWin!.from)} e só ajustei o que você pediu. ${reply}`;
+  } else if (form.target != null && /suger|propor|basead|historico|histórico/.test(norm(question))) {
     reply = `Sugeri ${brlCent(form.target)} com base no mês passado (+10%). ${reply}`;
   }
   return { reply, draft: { form } };
