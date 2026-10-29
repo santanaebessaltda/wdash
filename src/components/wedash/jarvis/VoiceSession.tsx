@@ -68,7 +68,7 @@ export function VoiceSession() {
         </Button>
       </div>
       <p className="mt-10 max-w-sm px-6 text-center text-[11px] text-t2">
-        Fala e para — eu envio sozinho. Ou toca no orbe / Em Enviar agora.
+        Na primeira vez, toque em Falar e aceite o microfone no popup do Chrome. Depois fala e para — eu envio sozinho.
       </p>
     </div>,
     document.body,

@@ -26,7 +26,7 @@ function DesktopClapBridge() {
     void startClapDetector(
       () => {
         if (voiceOpenRef.current) return;
-        openVoice();
+        openVoice({ source: "clap" });
       },
       { threshold: 0.28, minGapMs: 100, maxGapMs: 1100, cooldownMs: 2000 },
     ).then((handle) => {

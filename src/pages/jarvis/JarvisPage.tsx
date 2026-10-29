@@ -169,7 +169,7 @@ export function JarvisPage() {
           {voiceCaptureSupported() ? (
             <button
               type="button"
-              onClick={() => j.openVoice()}
+              onClick={() => j.openVoice({ source: "button" })}
               disabled={j.mode === "listening" || j.mode === "thinking" || j.mode === "speaking"}
               aria-label="Conversar por voz"
               title="Conversar por voz"

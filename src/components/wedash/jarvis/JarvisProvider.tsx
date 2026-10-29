@@ -97,9 +97,10 @@ type JarvisApi = {
   createdItem: JarvisCreated | null;
   commitBusy: boolean;
   voiceOpen: boolean;
-  openVoice: () => void;
+  /** `button` = clique (pede mic). `clap` = palmas (só ouve se já tiver permissão). */
+  openVoice: (opts?: { source?: "button" | "clap" }) => void;
   closeVoice: () => void;
-  /** Para a gravação e manda pro Whisper. */
+  /** Para a gravação / envia; em idle, pede mic de novo (precisa de clique). */
   finishVoice: () => void;
   reply: (q: string) => void;
   authorizeChallenge: () => void;
@@ -567,23 +568,22 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
 
   const MIC_DENIED_HINT =
     "Microfone bloqueado. No Chrome: cadeado ao lado da URL → Configurações do site → Microfone → Permitir → recarrega a página.";
+  const MIC_NEED_CLICK_HINT =
+    "Toque em Falar para o Chrome pedir o microfone (só aparece depois de um clique).";
 
-  /** Dispara o prompt nativo do navegador (getUserMedia). Sem isso o Web Speech só falha com not-allowed. */
-  const ensureMicPermission = useCallback(async (): Promise<"granted" | "denied" | "unavailable"> => {
-    if (!navigator.mediaDevices?.getUserMedia) return "unavailable";
+  const micAudioConstraints: MediaTrackConstraints = {
+    echoCancellation: true,
+    noiseSuppression: true,
+    autoGainControl: true,
+  };
+
+  /** true se o site já tem mic liberado (sem precisar de popup). */
+  const micAlreadyGranted = useCallback(async (): Promise<boolean> => {
     try {
-      // Se já foi concedido, resolve na hora. Se ainda não, o Chrome mostra o popup.
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
-      });
-      stream.getTracks().forEach((t) => t.stop());
-      return "granted";
-    } catch (err) {
-      const name = err instanceof DOMException ? err.name : "";
-      if (name === "NotAllowedError" || name === "PermissionDeniedError" || name === "SecurityError") {
-        return "denied";
-      }
-      return "unavailable";
+      const status = await navigator.permissions.query({ name: "microphone" as PermissionName });
+      return status.state === "granted";
+    } catch {
+      return false;
     }
   }, []);
 
@@ -749,27 +749,58 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
     }
   }, [reply, startMediaWithVad]);
 
+  /** Já com mic liberado: sobe Web Speech ou Whisper. */
+  const beginListenAfterMicOk = useCallback(() => {
+    if (!voiceOpenRef.current) return;
+    if (speechRecognitionSupported()) startWebSpeech();
+    else void startMediaWithVad();
+  }, [startMediaWithVad, startWebSpeech]);
+
+  /**
+   * Pede o mic no mesmo gesto do clique (sem setTimeout antes).
+   * Se chamar depois de timer/palmas, o Chrome NÃO mostra o popup.
+   */
+  const requestMicFromUserGesture = useCallback(() => {
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setMode("idle");
+      setMicHint("Sem microfone neste aparelho — usa o chat escrito.");
+      return;
+    }
+    setMicHint("Pedindo acesso ao microfone…");
+    // Inicia getUserMedia ainda no gesto do clique → popup nativo.
+    void navigator.mediaDevices
+      .getUserMedia({ audio: micAudioConstraints })
+      .then((stream) => {
+        if (!voiceOpenRef.current) {
+          stream.getTracks().forEach((t) => t.stop());
+          return;
+        }
+        // Preferimos Whisper/MediaRecorder com o stream já aberto (mais estável que Web Speech).
+        void startMediaWithVad(stream);
+      })
+      .catch((err) => {
+        setMode("idle");
+        const name = err instanceof DOMException ? err.name : "";
+        if (name === "NotAllowedError" || name === "PermissionDeniedError" || name === "SecurityError") {
+          setMicHint(MIC_DENIED_HINT);
+        } else {
+          setMicHint("Não consegui abrir o microfone. Tenta de novo em Falar.");
+        }
+      });
+  }, [startMediaWithVad]);
+
   const startListening = useCallback(() => {
     if (!voiceOpenRef.current) return;
+    // Reinício após TTS / silêncio: só se já tiver permissão (sem gesto).
     void (async () => {
-      setMicHint("Pedindo acesso ao microfone…");
-      const perm = await ensureMicPermission();
-      if (!voiceOpenRef.current) return;
-      if (perm === "denied") {
-        setMode("idle");
-        setMicHint(MIC_DENIED_HINT);
+      if (await micAlreadyGranted()) {
+        beginListenAfterMicOk();
         return;
       }
-      if (perm === "unavailable") {
-        setMode("idle");
-        setMicHint("Sem microfone neste aparelho — usa o chat escrito.");
-        return;
-      }
-      // Chrome/Edge: Web Speech ao vivo. Senão / se falhar: Whisper.
-      if (speechRecognitionSupported()) startWebSpeech();
-      else void startMediaWithVad();
+      setMode("idle");
+      setMicHint(MIC_NEED_CLICK_HINT);
     })();
-  }, [ensureMicPermission, startMediaWithVad, startWebSpeech]);
+  }, [beginListenAfterMicOk, micAlreadyGranted]);
   startListeningRef.current = () => startListening();
 
   const finishVoice = useCallback(() => {
@@ -785,18 +816,36 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
       finishMediaRecording();
       return;
     }
-    startListening();
-  }, [finishMediaRecording, startListening]);
+    // Clique em Falar / orbe com idle → pede mic no gesto do usuário.
+    requestMicFromUserGesture();
+  }, [finishMediaRecording, requestMicFromUserGesture]);
   finishVoiceRef.current = () => finishVoice();
 
-  const openVoice = useCallback(() => {
-    setVoiceOpen(true);
-    stopSpeaking();
-    setMicHint(null);
-    setMode("idle");
-    // Espera o detector de palmas soltar o mic
-    window.setTimeout(() => startListening(), 450);
-  }, [startListening]);
+  const openVoice = useCallback(
+    (opts?: { source?: "button" | "clap" }) => {
+      const source = opts?.source ?? "button";
+      setVoiceOpen(true);
+      stopSpeaking();
+      setDraftText("");
+      setMode("idle");
+
+      if (source === "clap") {
+        // Palmas não contam como gesto: sem permissão prévia o Chrome não pergunta.
+        void (async () => {
+          if (await micAlreadyGranted()) {
+            window.setTimeout(() => beginListenAfterMicOk(), 350);
+            return;
+          }
+          setMicHint(MIC_NEED_CLICK_HINT);
+        })();
+        return;
+      }
+
+      // Clique no botão de voz: pedir mic AGORA (mesmo gesto).
+      requestMicFromUserGesture();
+    },
+    [beginListenAfterMicOk, micAlreadyGranted, requestMicFromUserGesture],
+  );
 
   const closeVoice = useCallback(() => {
     setVoiceOpen(false);
