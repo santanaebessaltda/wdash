@@ -224,8 +224,8 @@ Inspiração de UX: [Néctar](https://www.meu-nectar.com/) (conversa humana, res
 **Tom de voz:** linguajar **humano**, informal, no estilo Néctar — curto, confirma o que fez (“Pronto — tô na Visão geral”), sem jargão de produto. Não soa como manual.
 
 **Superfície (DECIDIDO):**
-- Item de menu **Chat IA** (`/jarvis`) — página de chat do JARVIS (casca no padrão Vela `Chat.tsx`: 1 thread, sem lista Slack). Ícone balão com … (Lucide MessageSquareMore). **Sem botão flutuante.**
-- Composer com **botão de onda/voz** (como ChatGPT / Néctar). Clicou → **modo voz**: overlay com orbe animado; conversa falada contínua (ouvir → falar → ouvir), sem digitar.
+- Item de menu **Chat IA** (`/jarvis`) — hub do JARVIS estilo **Néctar** (não é chat Slack): saudação **BOM DIA / BOA TARDE / BOA NOITE** + primeiro nome do Gestor; composer centralizado; fundo na paleta (`--acc` / `--bg-0`) com esfera geodésica em canvas. Ícone do menu: balão com … (Lucide MessageSquareMore). **Sem botão flutuante.**
+- Composer com **microfone** (clique = gesto → popup nativo de permissão) e **Enviar**. Clicou no mic → **modo voz**: overlay com orbe; conversa falada contínua (ouvir → falar → ouvir).
 - Orbe: CSS/canvas reativo ao mic/TTS (estados idle / listening / thinking / speaking). Lottie/WebM só se o orbe não bastar.
 - **Navegação por comando:** “abre Visão geral”, “vai pro Financeiro…” — `navigate` nas rotas do papel do Gestor + fala confirmando. Não pede Autorizar.
 
