@@ -225,7 +225,7 @@ Inspiração de UX: [Néctar](https://www.meu-nectar.com/) (conversa humana, res
 
 **Onde roda:** app web e **PWA** (mic no gesto do REC).
 
-**Tom:** informal, humano — curto, confirma o que fez, sem jargão de produto.
+**Tom:** informal, humano — curto, confirma o que fez, sem jargão de produto. **Contexto (2026-10-29):** opinião/follow-up (“atinge?”, “reduzir a meta?”) vai pelo LLM com histórico; brief direto só na 1ª pergunta factual — evita bot de palavra-chave.
 
 **Superfície (DECIDIDO — 2026-10-29):**
 - **Botão flutuante** no canto inferior direito (só Gestor) — painel no estilo Apps > Chat do Vela (thread + composer); mic = ditado; **Limpar**; F5 zera histórico (sessão). **Fora do menu.** `/chat-ia` e `/jarvis` redirecionam para Visão geral. **Filial:** Topbar.

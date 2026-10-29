@@ -35,6 +35,7 @@ import {
   classifyIntent,
   looksLikeGoalAdvice,
   looksLikeLeaveChatRequest,
+  looksLikeOpinionOrCounsel,
   looksLikeSalesQuery,
   STAY_IN_CHAT_REPLY,
 } from "./respond";
@@ -603,8 +604,13 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
         syncScopePeriodFromQuestion(q, location.pathname, location.search, navigate);
       };
 
-      // Meta cadastrada: brief direto — não misturar com faturamento nem com rascunho.
-      if (intent === "analyze_goal") {
+      // Brief direto só em 1ª pergunta factual. Com histórico ou opinião (“acha?”, “reduzir?”)
+      // vai pro LLM — senão vira bot de palavra-chave e ignora o contexto.
+      const priorTurns = messagesRef.current.length;
+      const briefOk =
+        priorTurns === 0 && !looksLikeOpinionOrCounsel(q) && !looksLikeGoalAdvice(q);
+
+      if (intent === "analyze_goal" && briefOk) {
         applyPeriodHint();
         void loadGoalBrief(ctx, q).then((answer) => {
           if (gen !== replyGen.current) return;
@@ -613,8 +619,7 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      // Vendas: brief direto só em pergunta clara de leitura — nunca em sugestão/reajuste de meta.
-      if (intent === "analyze_sales" && looksLikeSalesQuery(q) && !looksLikeGoalAdvice(q)) {
+      if (intent === "analyze_sales" && briefOk && looksLikeSalesQuery(q)) {
         applyPeriodHint();
         void loadSalesBrief(ctx, q).then((answer) => {
           if (gen !== replyGen.current) return;

@@ -30,6 +30,12 @@ describe("classifyIntent", () => {
     expect(classifyIntent("Como está a meta deste mês?")).toBe("analyze_goal");
   });
 
+  it("opinião sobre meta não vira leitura seca do brief", () => {
+    expect(classifyIntent("Você acha que a gente atinge essa meta?")).toBe("goal");
+    expect(classifyIntent("Você acha melhor reduzir o valor da meta?")).toBe("goal");
+    expect(classifyIntent("Melhor reduzir a meta?")).toBe("goal");
+  });
+
   it("sugestão/reajuste de meta não vira atalho de vendas", () => {
     expect(
       classifyIntent(

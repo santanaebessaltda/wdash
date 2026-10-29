@@ -25,12 +25,23 @@ function normalizeIntentText(raw: string): string {
     .replace(/\p{M}/gu, "");
 }
 
-/** Leitura: “quanto é a meta / como está a meta deste mês”. */
+/**
+ * Opinião / conselho / follow-up — não é leitura seca de número.
+ * Ex.: “você acha que atinge?”, “melhor reduzir a meta?”.
+ */
+export function looksLikeOpinionOrCounsel(raw: string): boolean {
+  const p = normalizeIntentText(raw);
+  return /voce acha|vc acha|acha (que|melhor)|o que (voce|vc) (acha|sugere|recomenda)|melhor (reduzir|aumentar|baixar|subir|mudar|alterar|criar)|vale a pena|faz sentido|deveria|consegue(mos)? (bater|atingir)|vai (dar|bater|atingir)|ating(e|ir)|reduzir|aumentar|diminuir|abaixar|reavaliar|revisar (a )?meta|ajust(ar|e) (a |o )?(valor|meta)/.test(
+    p,
+  );
+}
+
+/** Leitura factual: “quanto é a meta / qual a meta deste mês”. */
 export function looksLikeGoalRead(raw: string): boolean {
   const p = normalizeIntentText(raw);
   if (!/\bmeta\b/.test(p)) return false;
-  if (looksLikeGoalWrite(p)) return false;
-  return /quanto|qual (e |eh )?|de quanto|como (esta|ta)|esta com|ta com|valor da meta|meta (deste|desse|do|da|este|esse|atual)|tem meta|qual a meta|a meta .*quanto|saber.*(a )?meta|ver.*(a )?meta|consultar.*(a )?meta|me (fala|diga|diz).*(a )?meta/.test(
+  if (looksLikeGoalWrite(p) || looksLikeOpinionOrCounsel(p)) return false;
+  return /quanto (e |eh |e a |eh a )?a? ?meta|qual (e |eh )?(a |o )?(meta|valor da meta)|de quanto|como (esta|ta) (a |o )?meta|esta com|ta com|meta (deste|desse|do|da|este|esse|atual)|tem meta|qual a meta|a meta .*quanto|saber.*(a )?meta|ver.*(a )?meta|consultar.*(a )?meta|me (fala|diga|diz).*(a )?meta/.test(
     p,
   );
 }
@@ -38,7 +49,7 @@ export function looksLikeGoalRead(raw: string): boolean {
 /** Escrita / sugestão / reajuste — rascunho + Autorizar. */
 export function looksLikeGoalWrite(raw: string): boolean {
   const p = normalizeIntentText(raw);
-  return /reajust|suger|criar.*meta|montar.*meta|nova meta|novo valor|valor sugerido|alterar (a )?meta|mudar (a )?meta|baixar (a )?meta|subir (a )?meta|propor|proponha|quero (uma |a )?meta|vamos (a |na )?meta|meta de \d|comissao|premiacao|escada|posso (baixar|subir|mudar|alterar)|vai bater|nao vai bater/.test(
+  return /reajust|suger|criar.*meta|montar.*meta|nova meta|novo valor|valor sugerido|alterar (a )?meta|mudar (a )?meta|baixar (a )?meta|subir (a )?meta|reduzir (a |o )?(valor (da |da meta| )?|meta)|aumentar (a |o )?(valor (da |da meta| )?|meta)|diminuir (a )?meta|abaixar (a )?meta|propor|proponha|quero (uma |a )?meta|vamos (a |na )?meta|meta de \d|comissao|premiacao|escada|posso (baixar|subir|mudar|alterar|reduzir|aumentar)|vai bater|nao vai bater/.test(
     p,
   );
 }
@@ -47,6 +58,7 @@ export function looksLikeGoalWrite(raw: string): boolean {
 export function looksLikeGoalAdvice(raw: string): boolean {
   const p = normalizeIntentText(raw);
   if (looksLikeGoalRead(p)) return false;
+  if (looksLikeOpinionOrCounsel(p) && /\bmeta\b/.test(p)) return true;
   return looksLikeGoalWrite(p) || (/\bmeta\b/.test(p) && !looksLikeSalesQueryLoose(p));
 }
 
