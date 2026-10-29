@@ -1,7 +1,7 @@
 import { endOfMonth } from "@/data/wedash/engine/format";
 import { fetchSalesDayAggs } from "@/data/wedash/salesRepo";
 import type { SalesDayAgg } from "@/data/wedash/salesTypes";
-import { brl } from "@/lib/format";
+import { brlCent } from "@/lib/format";
 import { matchStoresInText, scopeLabel, type JarvisContext, type JarvisStoreRef } from "./context";
 
 export type SalesWindow = { from: string; to: string; label: string };
@@ -147,20 +147,20 @@ export function formatSalesBrief(brief: SalesBrief, opts?: { concise?: boolean }
   if (opts?.concise || brief.label === "hoje") {
     return (
       `${brief.label === "hoje" ? "Hoje" : brief.label} em ${brief.storeLabel}: ` +
-      `${brl(brief.revenue)}, ${brief.salesCount.toLocaleString("pt-BR")} venda${brief.salesCount === 1 ? "" : "s"}.`
+      `${brlCent(brief.revenue)}, ${brief.salesCount.toLocaleString("pt-BR")} venda${brief.salesCount === 1 ? "" : "s"}.`
     );
   }
-  const ticket = brief.ticket != null ? brl(brief.ticket) : "—";
+  const ticket = brief.ticket != null ? brlCent(brief.ticket) : "—";
   const pa = brief.pa != null ? brief.pa.toLocaleString("pt-BR", { maximumFractionDigits: 2 }) : "—";
   const months =
     brief.byMonth.length > 1
       ? ` Por mês: ${brief.byMonth
-          .map((m) => `${fmtMonth(m.month)} ${brl(m.revenue)} (${m.salesCount} vendas)`)
+          .map((m) => `${fmtMonth(m.month)} ${brlCent(m.revenue)} (${m.salesCount} vendas)`)
           .join("; ")}.`
       : "";
   return (
     `Em ${brief.storeLabel}, ${brief.label} (${fmtDate(brief.from)} a ${fmtDate(brief.to)}): ` +
-    `faturamento ${brl(brief.revenue)}, ${brief.salesCount.toLocaleString("pt-BR")} vendas, ` +
+    `faturamento ${brlCent(brief.revenue)}, ${brief.salesCount.toLocaleString("pt-BR")} vendas, ` +
     `ticket médio ${ticket}, P.A. ${pa}.${months} ` +
     `Se quiser, a gente usa isso para discutir meta ou desafio — sem gravar até você autorizar.`
   );

@@ -1,7 +1,7 @@
 import { endOfMonth, startOfMonth } from "@/data/wedash/engine/format";
 import type { Tier } from "@/data/wedash/engine/goalTypes";
 import { fetchSalesDayAggs } from "@/data/wedash/salesRepo";
-import { brl, monthYearTitle } from "@/lib/format";
+import { brlCent, monthYearTitle } from "@/lib/format";
 import { matchStoresInText, type JarvisContext } from "./context";
 
 export type GoalDraftForm = {
@@ -237,7 +237,7 @@ export function formatGoalProposal(form: GoalDraftForm, storeName: string): stri
     form.tierMode === "GENERAL" ? "Geral" : form.tierMode === "GROUP" ? "Grupo" : "Individual";
   const base =
     `Rascunho de meta: ${form.name || "(sem nome)"} · ${storeName || "filial?"} · ${period} · ` +
-    `${mode} · alvo ${form.target != null ? brl(form.target) : "a definir"} · ` +
+    `${mode} · alvo ${form.target != null ? brlCent(form.target) : "a definir"} · ` +
     `${form.tiers.length} níveis na escada` +
     (form.managerOn ? " · com premiação da gerência" : "") +
     ".";
@@ -270,7 +270,7 @@ export async function discussGoal(
   const storeName = ctx.stores.find((s) => s.id === form.storeId)?.tradeName ?? "";
   let reply = formatGoalProposal(form, storeName);
   if (form.target != null && /suger|propor|basead|historico|histórico/.test(norm(question))) {
-    reply = `Sugeri ${brl(form.target)} com base no mês passado (+10%). ${reply}`;
+    reply = `Sugeri ${brlCent(form.target)} com base no mês passado (+10%). ${reply}`;
   }
   return { reply, draft: { form } };
 }

@@ -17,7 +17,7 @@ import {
   type ChallengeProduct,
 } from "@/data/wedash/challengesRepo";
 import { addDays, dateToIso, isoToDate } from "@/lib/format";
-import { brl } from "@/lib/format";
+import { brlCent } from "@/lib/format";
 import { matchStoresInText, type JarvisContext } from "./context";
 import { pickStalledProducts } from "./stockStalled";
 import { fetchSalesProductPeriodAggs } from "@/data/wedash/salesRepo";
@@ -208,7 +208,7 @@ export function formatChallengeProposal(form: ChallengeForm, storeName: string):
       : "a definir";
   const prize = form.prizes[0]
     ? form.prizes[0].kind === "MONEY"
-      ? brl(Number(form.prizes[0].amount.replace(/\./g, "").replace(",", ".")) || 0)
+      ? brlCent(Number(form.prizes[0].amount.replace(/\./g, "").replace(",", ".")) || 0)
       : form.prizes[0].label
     : "a definir";
   const scopeExtra =

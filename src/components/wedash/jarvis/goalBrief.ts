@@ -1,7 +1,7 @@
 import { endOfMonth, startOfMonth } from "@/data/wedash/engine/format";
 import { fetchGoals } from "@/data/wedash/goalsRepo";
 import { fetchSalesDayAggs } from "@/data/wedash/salesRepo";
-import { brl, monthYearTitle } from "@/lib/format";
+import { brlCent, monthYearTitle } from "@/lib/format";
 import { matchStoresInText, scopeLabel, type JarvisContext, type JarvisStoreRef } from "./context";
 import { parseGoalPeriod } from "./goalDraft";
 
@@ -80,13 +80,15 @@ export async function loadGoalBrief(ctx: JarvisContext, question: string): Promi
     const sold = revenueByStore.get(g.storeId);
     const pct =
       sold != null && g.target > 0 ? Math.round((sold / g.target) * 1000) / 10 : null;
+    const pctLabel =
+      pct != null ? pct.toLocaleString("pt-BR", { minimumFractionDigits: 0, maximumFractionDigits: 1 }) : null;
     const progress =
       sold != null
-        ? ` · realizado até ${salesTo === ctx.today ? "hoje" : salesTo.slice(8)}: ${brl(sold)}${
-            pct != null ? ` (${pct}% da meta)` : ""
+        ? ` · realizado até ${salesTo === ctx.today ? "hoje" : salesTo.slice(8)}: ${brlCent(sold)}${
+            pctLabel != null ? ` (${pctLabel}% da meta)` : ""
           }`
         : "";
-    return `${storeName}: meta ${brl(g.target)} (${g.startsOn.slice(8)}/${g.startsOn.slice(5, 7)} a ${g.endsOn.slice(8)}/${g.endsOn.slice(5, 7)})${progress}.`;
+    return `${storeName}: meta ${brlCent(g.target)} (${g.startsOn.slice(8)}/${g.startsOn.slice(5, 7)} a ${g.endsOn.slice(8)}/${g.endsOn.slice(5, 7)})${progress}.`;
   });
 
   if (picked.length === 1) {

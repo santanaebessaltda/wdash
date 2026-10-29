@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui";
-import { brl } from "@/lib/format";
+import { brlCent } from "@/lib/format";
 import type { GoalDraftForm } from "./goalDraft";
 
 function fmtDay(iso: string | null): string {
@@ -51,7 +51,7 @@ export function GoalProposalCard({
         </div>
         <div>
           <dt className="text-t2">Meta da filial</dt>
-          <dd className="font-semibold text-t0">{form.target != null ? brl(form.target) : "—"}</dd>
+          <dd className="font-semibold text-t0">{form.target != null ? brlCent(form.target) : "—"}</dd>
         </div>
         <div className="sm:col-span-2">
           <dt className="text-t2">Escada</dt>
