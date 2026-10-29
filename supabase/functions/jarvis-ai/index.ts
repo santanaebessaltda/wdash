@@ -58,17 +58,16 @@ Estilo:
 - Cumprimento (“oi”, “e aí”): uma frase só, sem listar habilidades.
 - Se precisar de tool, chame na hora, sem enrolação antes.
 
-O que você faz:
-- Criar, reajustar ou sugerir META e DESAFIO: use draft_goal / draft_challenge. Vale criar do zero, ajustar rascunho na conversa e sugerir valor novo (ex.: com base no vendido até hoje). No request descreva o pedido completo (filial, mês, valor sugerido ou o que falta). Escala: draft_schedule.
-- Quando pedirem SUGESTÃO de valor de meta: se precisar de números, chame analyze_sales (período do mês / até hoje) e depois responda com a sugestão e/ou draft_goal — NÃO responda só repetindo o faturamento do dia.
-- Números puros (“quanto vendi hoje?”, “e em todas as filiais?”): analyze_*. Nunca invente faturamento, estoque, meta, comissão ou qualquer número.
-- Navegação: tool navigate.
+O que você faz (100% no chat — NÃO redirecione o Gestor para outras telas):
+- Criar, reajustar ou sugerir META e DESAFIO: draft_goal / draft_challenge. Vale criar, ajustar rascunho e sugerir valor (ex.: com base no vendido até hoje). No request descreva o pedido completo. Escala: draft_schedule.
+- Sugestão de valor de meta: se precisar de números, analyze_sales e depois sugestão e/ou draft_goal — não responda só repetindo o faturamento do dia.
+- Números (“quanto vendi hoje?”, “e em todas as filiais?”): analyze_*. Nunca invente números.
+- Se pedirem “abre Visão geral / Financeiro / rola a página”: diga que resolve aqui no chat e pergunte o que quer ver (vendas, meta…). Não existe tool de navegação.
 
 Regras:
 - Rascunhos viram cards. Gravar só com Autorizar no app. Nunca diga que já gravou sozinho.
 - Se faltar dado, diga o que faltou e pergunte. Não chute.
-- Rolagem: o app faz no cliente — não chame analyze_sales.
-- Não reenvie só análise de vendas se o pedido era outra coisa (meta, sugestão, rolar, abrir tela, oi).`;
+- Não reenvie só análise de vendas se o pedido era outra coisa (meta, sugestão, oi).`;
 
 const TOOLS = [
   {
@@ -105,20 +104,6 @@ const TOOLS = [
       name: "analyze_seasonal",
       description: "Próximas datas sazonais e feriados relevantes.",
       parameters: { type: "object", properties: {} },
-    },
-  },
-  {
-    type: "function",
-    function: {
-      name: "navigate",
-      description: "Abre uma tela do app (Visão geral, Financeiro, Escala, Metas, etc.).",
-      parameters: {
-        type: "object",
-        properties: {
-          request: { type: "string", description: "Ex.: abre Visão geral" },
-        },
-        required: ["request"],
-      },
     },
   },
   {

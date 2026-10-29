@@ -217,35 +217,28 @@ Sem esses 4 elementos, o número é "dado jogado na tela" — não serve para de
 
 Inspiração de UX: [Néctar](https://www.meu-nectar.com/) (conversa humana, resolve com contexto). No WDash o nome na tela é **JARVIS**. Papel: sócio sênior em Vendas, Comercial e Administração — discute, analisa e propõe; **nunca grava sozinho**.
 
-**Decisão de produto (2026-10-29):** **sem conversa por voz contínua**. Sai TTS obrigatório, onda “OUVINDO…”, 2 palmas, dock flutuante e wake word. Fica **chat texto** + **microfone = transcrição** (Whisper → campo → o Gestor envia). Motivo: qualidade/custo da voz e falsos positivos; no desktop o Gestor lê e autoriza melhor no chat. Prompt e tools preparados para **criar/editar meta, criar/editar desafio, escala, números e navegação** pelo chat.
+**Decisão de produto (2026-10-29):** **sem conversa por voz contínua**. Sai TTS, onda, palmas, dock e wake. Fica **chat texto** + **mic = transcrição**. Motivo: qualidade/custo da voz; o Gestor lê e autoriza melhor no chat.
+
+**Decisão (2026-10-29 — chat fechado):** o JARVIS **não redireciona** para outras telas nem rola o Dashboard. Tudo (números, meta, desafio, escala) acontece **100% dentro do Chat IA**. Pedidos tipo “abre Visão geral” = responde no chat e oferece o que a pessoa precisa ali. Link opcional após Autorizar (abrir meta/desafio no CRUD) continua — é escolha do Gestor, não comando automático.
 
 **Quem vê:** só visão **Gestor** (`OWNER` / `ADMIN_GLOBAL`). Gerente e Vendedor não têm JARVIS na fase 1.
 
-**Onde roda:** app web e **PWA instalado** (mesmo shell; mic no gesto do REC).
+**Onde roda:** app web e **PWA** (mic no gesto do REC).
 
-**Tom:** linguajar **humano**, informal, no estilo Néctar — curto, confirma o que fez (“Pronto — tô na Visão geral”), sem jargão de produto.
+**Tom:** informal, humano — curto, confirma o que fez, sem jargão de produto.
 
 **Superfície (DECIDIDO):**
-- Item de menu **Chat IA** (`/chat-ia`; `/jarvis` redireciona) — hub estilo **Néctar**: saudação **BOM DIA / BOA TARDE / BOA NOITE** + primeiro nome; composer centralizado; **full-bleed**; esfera geodésica **só no hub vazio**. Ícone: Lucide MessageSquareMore. **Sem botão flutuante.** **Filial:** Topbar.
-- Composer: campo de texto + **Microfone** (REC → Whisper no campo) + **Enviar**. Sem alto-falante / onda de conversa.
-- **Navegação / rolagem por comando** no chat (“abre Visão geral”, “rola a página”) — sem Autorizar.
-- **F5** zera o chat (hub + orb); histórico só em memória na sessão. Com conversa aberta, **Limpar chat** (topo da thread) volta ao hub vazio — mesma ação do `clearChat`.
+- Menu **Chat IA** (`/chat-ia`) — hub Néctar; composer + mic + Enviar; **Limpar chat**; F5 zera histórico (só memória de sessão). **Filial:** Topbar.
+- Sem navegação/rolagem por comando.
 
-**Acionamento:**
-| | Desktop | Mobile / PWA |
-|---|---|---|
-| Menu **Chat IA** + chat | sim | sim |
-| Mic → transcrição no campo | sim | sim |
-| Conversa por voz / 2 palmas / dock | **não** | **não** |
-
-**Leituras no chat:** vendas (ex. “quanto vendi hoje”) alinham `period` + sobem o miolo; estoque parado; sazonal. **Rolar** é UI no cliente — não dispara brief de vendas.
+**Leituras no chat:** vendas, estoque parado, sazonal — resposta no thread (período da pergunta pode gravar em sessionStorage para o Dashboard se o Gestor abrir depois).
 
 **Fluxo obrigatório de escrita:**
-`Pedir no chat → Analisar (só leitura se precisar) → Discutir detalhes → Propor rascunho (card) → Autorizar (botão ou “autorizo” no chat) → Executar nas mesmas APIs do CRUD → Confirmar (toast + link).`
+`Pedir no chat → Analisar se precisar → Discutir → Rascunho (card) → Autorizar → APIs do CRUD → Confirmar no chat (+ link opcional).`
 
-Leitura e navegar **não** pedem autorização. Criar/editar/apagar **sempre** pede.
+Leitura **não** pede Autorizar. Criar/editar/apagar **sempre** pede.
 
-**Escopo de ação (todas as telas em que o Gestor já age):** Metas, Desafios, Escala, Estoque (consulta + ideias), Pedido de compra, Financeiro (leitura primeiro; escrita só depois que o domínio estiver maduro). Dashboard continua **100% leitura** — o JARVIS não inventa botão de CRUD dentro do Dashboard; grava via repositórios/Edges já existentes. Abrir uma tela do menu = navegação, não escrita.
+**Escopo:** Metas, Desafios, Escala, Estoque (consulta), números — tudo via chat. Dashboard continua **100% leitura** no menu; o JARVIS não manda o Gestor pra lá.
 
 **Metas e Desafios — cobertura total, criação conjunta:**
 - O JARVIS não fica preso a um atalho (ex.: só “estoque parado”). Ele **discute e monta junto** com o Gestor, cobrindo **todos os cenários** que a UI já permite.
@@ -259,13 +252,9 @@ Leitura e navegar **não** pedem autorização. Criar/editar/apagar **sempre** p
 
 **Fora de escopo na fase 1:** Gerente/Vendedor; gravação sem autorização; conversa por voz contínua / palmas / wake; clone visual pixel-perfect do Néctar.
 
-**Ordem de build:** (1) shell chat; (2) leitura; (3) Desafio; (4) Meta; (5) Escala; (6) chat no menu + ditado + navegar; (7) editar meta/desafio pelo chat + demais escritas.
+**Ordem de build:** (1) shell chat; (2) leitura; (3) Desafio; (4) Meta; (5) Escala; (6) chat + ditado; (7) editar meta/desafio no chat; sem navigate.
 
-**Fatia 1–5 no código (2026-10-29):** tools de leitura; Desafio / Meta / Escala com Autorizar.
-
-**Fatia 6–7:** Chat IA + OpenAI + Whisper ditado + navegar/rolar/vendas.
-
-**Fatia 8 (2026-10-29):** corte do modo voz contínuo; chat-first; prompt para criar/ajustar meta e desafio pelo texto.
+**Fatia 8–9 (2026-10-29):** sem voz contínua; chat-first; **sem redirecionar páginas** — tools/prompt só no chat.
 
 ### Alertas (DECIDIDO — 2026-09-29)
 - **Todo alerta do app usa `Alert`** (`src/components/ui/Alert.tsx`, padrão Components > Alerts do Vela — "Storage almost full" etc.): fundo suave da cor, sem borda, ícone 18px e título em negrito na cor, texto em `text-t1`. Variantes `success · warning · danger · info · accent`; `icon` troca o ícone (Spinner, RadialProgress), `action` = links/botões à direita (`AlertLink` para link de texto), `footer` = conteúdo extra (lista expandida, checkbox).

@@ -1,5 +1,4 @@
 import type { JarvisContext } from "./context";
-import { formatNavigateReply, resolveNavigate } from "./navigateBrief";
 import { loadSalesBrief } from "./salesBrief";
 import { loadSeasonalBrief } from "./seasonalBrief";
 import { loadStockStalledBrief } from "./stockStalled";
@@ -9,7 +8,6 @@ export type JarvisToolName =
   | "analyze_sales"
   | "analyze_stock"
   | "analyze_seasonal"
-  | "navigate"
   | "draft_challenge"
   | "draft_goal"
   | "draft_schedule";
@@ -29,16 +27,6 @@ export async function runJarvisTool(
       return { content: await loadStockStalledBrief(ctx, question) };
     case "analyze_seasonal":
       return { content: loadSeasonalBrief(ctx.today) };
-    case "navigate": {
-      const target = resolveNavigate(question, "OWNER");
-      if (!target) {
-        return { content: "Não achei essa tela no menu do Gestor." };
-      }
-      return {
-        content: `Navegação ok: ${formatNavigateReply(target)} (rota ${target.to}).`,
-        sideEffect: { kind: "navigate", request: question },
-      };
-    }
     case "draft_challenge":
       return {
         content: "Rascunho de desafio será montado no app; o Gestor precisa autorizar para gravar.",

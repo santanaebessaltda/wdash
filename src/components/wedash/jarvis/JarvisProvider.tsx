@@ -31,11 +31,12 @@ import {
 } from "./goalDraft";
 import { blobToBase64, jarvisLlmTurn, jarvisTranscribe, type LlmChatMessage } from "./llmClient";
 import {
-  formatNavigateReply,
-  looksLikeNavigate,
-  resolveNavigate,
-} from "./navigateBrief";
-import { classifyIntent, looksLikeGoalAdvice, looksLikeSalesQuery } from "./respond";
+  classifyIntent,
+  looksLikeGoalAdvice,
+  looksLikeLeaveChatRequest,
+  looksLikeSalesQuery,
+  STAY_IN_CHAT_REPLY,
+} from "./respond";
 import { commitSchedule } from "./scheduleCommit";
 import {
   discussSchedule,
@@ -45,13 +46,7 @@ import {
   type ScheduleDraft,
 } from "./scheduleDraft";
 import { loadSalesBrief } from "./salesBrief";
-import {
-  applyScrollFromQuestion,
-  formatScrollReply,
-  looksLikeScroll,
-  scrollAppMain,
-} from "./pageChrome";
-import { searchWithPeriodFromQuestion, syncScopePeriodFromQuestion } from "./syncPeriod";
+import { syncScopePeriodFromQuestion } from "./syncPeriod";
 
 export type JarvisMessage = { from: "user" | "jarvis"; text: string };
 export type JarvisMode = "idle" | "thinking";
@@ -478,33 +473,10 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
   const replyLocal = useCallback(
     async (q: string, ctx: ReturnType<typeof jarvisContextFromSession>, finish: (a: string) => void) => {
       const intent = classifyIntent(q);
-      const n = q
-        .toLowerCase()
-        .normalize("NFD")
-        .replace(/\p{M}/gu, "");
 
-      if (intent === "scroll" || looksLikeScroll(q)) {
-        const kind = applyScrollFromQuestion(q) ?? "down";
-        finish(formatScrollReply(kind));
+      if (intent === "stay_in_chat" || looksLikeLeaveChatRequest(q)) {
+        finish(STAY_IN_CHAT_REPLY);
         return;
-      }
-
-      if (intent === "navigate" || looksLikeNavigate(q)) {
-        const target = resolveNavigate(q, session!.role);
-        if (target) {
-          syncScopePeriodFromQuestion(q, location.pathname, location.search, navigate);
-          navigate({
-            pathname: target.to,
-            search: searchWithPeriodFromQuestion(target.to, location.search, q),
-          });
-          window.setTimeout(() => scrollAppMain({ top: 0 }), 40);
-          finish(formatNavigateReply(target));
-          return;
-        }
-        if (!/desafio|meta|escala|comissao|premiacao/.test(n)) {
-          finish("Não achei essa tela. Tenta tipo: abre Visão geral, vai pro Financeiro, abre Escala…");
-          return;
-        }
       }
 
       if (
@@ -557,7 +529,7 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
 
       finish(await jarvisAnswer(q, ctx));
     },
-    [location.search, navigate, session],
+    [session],
   );
 
   const reply = useCallback(
@@ -620,21 +592,19 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      // Rolagem de página — nunca passa pelo LLM (evita responder vendas “do nada”).
-      if (intent === "scroll" || looksLikeScroll(q)) {
-        const kind = applyScrollFromQuestion(q) ?? "down";
-        finish(formatScrollReply(kind));
+      if (intent === "stay_in_chat" || looksLikeLeaveChatRequest(q)) {
+        finish(STAY_IN_CHAT_REPLY);
         return;
       }
 
-      // Sempre tenta alinhar o período se a pergunta citar hoje/semana/mês (mesmo fora do fast-path).
-      const applyPeriodAndScroll = () => {
+      // Alinha período da pergunta no storage (Dashboard depois); sem sair do chat.
+      const applyPeriodHint = () => {
         syncScopePeriodFromQuestion(q, location.pathname, location.search, navigate);
       };
 
       // Vendas: brief direto só em pergunta clara de leitura — nunca em sugestão/reajuste de meta.
       if (intent === "analyze_sales" && looksLikeSalesQuery(q) && !looksLikeGoalAdvice(q)) {
-        applyPeriodAndScroll();
+        applyPeriodHint();
         void loadSalesBrief(ctx, q).then((answer) => {
           if (gen !== replyGen.current) return;
           finish(answer);
@@ -657,23 +627,13 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
           if (llm.reason === "openai_not_configured") {
             setMicHint("IA ainda sem chave no servidor — usando modo local.");
           }
-          applyPeriodAndScroll();
+          applyPeriodHint();
           await replyLocal(q, ctx, finish);
           return;
         }
 
         for (const effect of llm.sideEffects) {
-          if (effect.kind === "navigate") {
-            const target = resolveNavigate(effect.request, session.role);
-            if (target) {
-              syncScopePeriodFromQuestion(q, location.pathname, location.search, navigate);
-              navigate({
-                pathname: target.to,
-                search: searchWithPeriodFromQuestion(target.to, location.search, q),
-              });
-              window.setTimeout(() => scrollAppMain({ top: 0 }), 40);
-            }
-          } else if (effect.kind === "draft_challenge") {
+          if (effect.kind === "draft_challenge") {
             setGoalDraft(null);
             goalDraftRef.current = null;
             setScheduleDraft(null);
@@ -706,8 +666,7 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
           }
         }
 
-        // Alinha filtro de período se a pergunta citar hoje/semana/mês (no-op se não citar).
-        applyPeriodAndScroll();
+        applyPeriodHint();
 
         finish(llm.content);
       })();

@@ -1,6 +1,7 @@
 /**
  * Intents e respostas curtas em tom humano (estilo Néctar).
  * Números e gravação ficam nos briefs / drafts — aqui só o jeito de falar.
+ * Sem navigate/scroll: o JARVIS resolve 100% no chat.
  */
 
 export type JarvisIntent =
@@ -12,8 +13,7 @@ export type JarvisIntent =
   | "challenge"
   | "goal"
   | "schedule"
-  | "navigate"
-  | "scroll"
+  | "stay_in_chat"
   | "authorize"
   | "unknown";
 
@@ -52,6 +52,27 @@ function looksLikeChallengeAdvice(raw: string): boolean {
   return /desafio/.test(p);
 }
 
+/** Pedidos antigos de “abre tela / rola página” — respondemos no chat, sem sair. */
+export function looksLikeLeaveChatRequest(raw: string): boolean {
+  const p = normalizeIntentText(raw);
+  if (looksLikeGoalAdvice(p) || looksLikeChallengeAdvice(p) || looksLikeSalesQuery(p)) return false;
+  if (/vend[aeiou]|faturamento|estoque|escala|comissao|premiacao/.test(p)) return false;
+  return (
+    /rolar|rola\b|scroll|desce(r)?( a pagina)?|sobe(r)?( a pagina)?|pro topo|pro final|fim da pagina|pra baixo|pra cima/.test(
+      p,
+    ) ||
+    /(abre|abrir|entra|entrar|vai (pra|pro|para)|vamos (pra|pro|para)|me leva|abre a tela) .*(visao|financeiro|produto|equipe|dashboard|inicio|home|metas?|desafios?|estoque|escala|carteira)/.test(
+      p,
+    ) ||
+    /^(abre|abrir|entra|vai pro|vai pra|mostra) (a |o )?(visao geral|financeiro|produtos|equipe|dashboard|escala|metas?|desafios?)\b/.test(
+      p,
+    )
+  );
+}
+
+export const STAY_IN_CHAT_REPLY =
+  "Aqui no chat a gente resolve — vendas, meta, desafio, escala. Me pede o que precisa; não te mando pra outra tela.";
+
 export function classifyIntent(raw: string): JarvisIntent {
   const p = normalizeIntentText(raw);
 
@@ -60,17 +81,7 @@ export function classifyIntent(raw: string): JarvisIntent {
     return "capability";
   }
   if (/autorizo|pode criar|pode gravar|confirma|pode seguir|fechado pode/.test(p)) return "authorize";
-  // Antes de navigate/vendas — “rolar a página” não é abrir tela nem faturamento.
-  if (
-    /rolar|rola\b|scroll|desce(r)?( a pagina)?|sobe(r)?( a pagina)?|pro topo|pro final|fim da pagina|pra baixo|pra cima/.test(
-      p,
-    )
-  ) {
-    return "scroll";
-  }
-  if (/(abre|abrir|entra|entrar|vai (pra|pro|para)|vamos (pra|pro|para)|mostra|mostrar|me leva|abre a tela)/.test(p)) {
-    return "navigate";
-  }
+  if (looksLikeLeaveChatRequest(p)) return "stay_in_chat";
   if (looksLikeChallengeAdvice(p)) return "challenge";
   if (looksLikeGoalAdvice(p)) return "goal";
   if (/escala|folga|6\s*[x×]\s*1|plantao|turno/.test(p)) return "schedule";
@@ -84,9 +95,9 @@ export function jarvisReply(question: string): string {
   const intent = classifyIntent(question);
   switch (intent) {
     case "greeting":
-      return "E aí. Tô no chat — vendas, estoque, meta, desafio, escala, ou te levo pra uma tela. Por onde vamos?";
+      return "E aí. Tô no chat — vendas, estoque, meta, desafio, escala. Por onde vamos?";
     case "capability":
-      return "No chat eu leio a base do Dashboard, monto e ajusto meta, desafio e escala com você, e abro telas se pedir. Gravar só depois do seu Autorizar no card.";
+      return "No chat eu leio a base, monto e ajusto meta, desafio e escala, e passo números. Gravar só depois do seu Autorizar no card — sem te mandar pra outra tela.";
     case "analyze_sales":
       return "Deixa eu olhar as vendas aí…";
     case "analyze_stock":
@@ -99,13 +110,11 @@ export function jarvisReply(question: string): string {
       return "Bora a meta. Fala a filial, o mês e o valor — ou pede uma sugestão pelo histórico. Eu mostro a escada e espero seu Autorizar.";
     case "schedule":
       return "Na escala eu uso o mesmo motor do montador. Me diz a filial e o mês — proponho o rascunho e só gero de verdade com o seu OK.";
-    case "navigate":
-      return "Pode falar tipo: abre Visão geral, vai pro Financeiro, abre Escala…";
-    case "scroll":
-      return "Posso rolar a página — sobe, desce, topo ou final.";
+    case "stay_in_chat":
+      return STAY_IN_CHAT_REPLY;
     case "authorize":
       return "Ainda não tenho rascunho pra gravar. Quando a gente montar algo, eu peço seu OK.";
     default:
-      return "Manda aí — vendas, estoque, desafio, meta, escala, rolar a página, ou “abre Visão geral”. Se for criar, a gente fecha o detalhe e eu só gravo com autorização.";
+      return "Manda aí — vendas, estoque, desafio, meta ou escala. Se for criar, a gente fecha o detalhe e eu só gravo com autorização.";
   }
 }

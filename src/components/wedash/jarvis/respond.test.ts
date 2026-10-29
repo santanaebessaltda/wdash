@@ -6,13 +6,13 @@ describe("classifyIntent", () => {
     expect(classifyIntent("Oi JARVIS")).toBe("greeting");
   });
 
-  it("reconhece desafio, meta, escala, navegação e rolagem", () => {
+  it("reconhece desafio, meta, escala e pedidos de sair do chat", () => {
     expect(classifyIntent("Quero criar um desafio de body splash")).toBe("challenge");
     expect(classifyIntent("Vamos montar a meta de março")).toBe("goal");
     expect(classifyIntent("Gerar a escala de novembro 6x1")).toBe("schedule");
-    expect(classifyIntent("Abre a Visão geral")).toBe("navigate");
-    expect(classifyIntent("Rolar a página")).toBe("scroll");
-    expect(classifyIntent("Sobe um pouco")).toBe("scroll");
+    expect(classifyIntent("Abre a Visão geral")).toBe("stay_in_chat");
+    expect(classifyIntent("Rolar a página")).toBe("stay_in_chat");
+    expect(classifyIntent("Vai pro Financeiro")).toBe("stay_in_chat");
   });
 
   it("reconhece estoque e vendas", () => {
@@ -46,5 +46,10 @@ describe("jarvisReply", () => {
   it("não inventa número de faturamento", () => {
     const text = jarvisReply("Qual o faturamento de hoje?");
     expect(text).not.toMatch(/R\$\s*\d/);
+  });
+
+  it("pede para ficar no chat em vez de redirecionar", () => {
+    const text = jarvisReply("Abre a Visão geral");
+    expect(text.toLowerCase()).toMatch(/chat/);
   });
 });

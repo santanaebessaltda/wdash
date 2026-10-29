@@ -19,7 +19,6 @@ export type LlmTurnResult =
   | { ok: false; reason: string };
 
 export type LlmSideEffect =
-  | { kind: "navigate"; request: string }
   | { kind: "draft_challenge"; request: string }
   | { kind: "draft_goal"; request: string }
   | { kind: "draft_schedule"; request: string };
