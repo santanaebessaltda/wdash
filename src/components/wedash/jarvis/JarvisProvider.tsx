@@ -727,10 +727,8 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
 
         if (!llm.ok) {
           const reason = llm.reason || "erro";
-          if (reason === "gemini_not_configured") {
-            setMicHint("Falta GEMINI_API_KEY no servidor.");
-          } else if (reason.includes("properties") || reason.includes("INVALID_ARGUMENT")) {
-            setMicHint("Erro no schema das tools no Gemini.");
+          if (reason === "openai_not_configured") {
+            setMicHint("Falta OPENAI_API_KEY no servidor.");
           } else {
             setMicHint(`IA: ${reason.slice(0, 120)}`);
           }

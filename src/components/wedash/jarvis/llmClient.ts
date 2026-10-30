@@ -113,7 +113,7 @@ export async function jarvisLlmTurn(
       },
     });
 
-    const payload = data as {
+    let payload = data as {
       ok?: boolean;
       error?: string;
       type?: string;
@@ -121,12 +121,24 @@ export async function jarvisLlmTurn(
       assistant?: LlmChatMessage;
     } | null;
 
-    if (error && !payload) {
-      return { ok: false, reason: error.message || "invoke_failed" };
+    // Non-2xx: o client às vezes só traz "Edge Function returned a non-2xx…"; tenta o body.
+    if (error && (!payload || payload.ok === false)) {
+      try {
+        const ctx = (error as { context?: Response }).context;
+        if (ctx) {
+          const body = (await ctx.clone().json()) as typeof payload;
+          if (body && typeof body === "object") payload = body;
+        }
+      } catch {
+        /* ignore */
+      }
     }
 
     if (!payload?.ok) {
-      return { ok: false, reason: payload?.error || error?.message || "jarvis_ai_error" };
+      return {
+        ok: false,
+        reason: payload?.error || error?.message || "jarvis_ai_error",
+      };
     }
 
     if (payload.type === "message") {

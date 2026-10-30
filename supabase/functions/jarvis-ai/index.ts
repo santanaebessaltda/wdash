@@ -1,6 +1,6 @@
 /**
- * jarvis-ai — chat (Gemini) + Whisper/TTS só para Gestor.
- * Chat = Gemini (GEMINI_API_KEY). STT = OpenAI Whisper. TTS = OpenAI ou Gemini.
+ * jarvis-ai — chat + Whisper/TTS só para Gestor.
+ * Chat = OpenAI (OPENAI_API_KEY). STT = Whisper. TTS = OpenAI (padrão) ou Gemini.
  */
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { corsHeaders, serve } from "../_shared/cors.ts";
@@ -8,7 +8,7 @@ import { OWNER_ROLES, loadStaffCaller } from "../_shared/staffAuth.ts";
 
 const OPENAI_URL = "https://api.openai.com/v1";
 const GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta";
-const CHAT_MODEL = Deno.env.get("JARVIS_CHAT_MODEL")?.trim() || "gemini-2.5-flash";
+const CHAT_MODEL = Deno.env.get("JARVIS_CHAT_MODEL")?.trim() || "gpt-4o-mini";
 /** STT rápido; fallback whisper-1 se o modelo novo falhar. */
 const STT_MODEL = Deno.env.get("JARVIS_STT_MODEL")?.trim() || "gpt-4o-mini-transcribe";
 /**
@@ -282,8 +282,8 @@ serve(async (req) => {
       return await handleTranscribe(openaiKey, body);
     }
     if (action === "chat") {
-      if (!geminiKey) return json({ ok: false, error: "gemini_not_configured" }, 503);
-      return await handleChatGemini(geminiKey, body);
+      if (!openaiKey) return json({ ok: false, error: "openai_not_configured" }, 503);
+      return await handleChatOpenAi(openaiKey, body);
     }
     return json({ ok: false, error: "unknown_action" }, 400);
   } catch (err) {
@@ -293,79 +293,7 @@ serve(async (req) => {
   }
 });
 
-type GeminiPart = {
-  text?: string;
-  functionCall?: { name?: string; args?: Record<string, unknown> };
-  functionResponse?: { name?: string; response?: Record<string, unknown> };
-};
-
-function geminiFunctionDeclarations() {
-  // Gemini 400 se parameters.properties for {} — omitir parameters nesse caso.
-  return TOOLS.map((t) => {
-    const parameters = t.function.parameters as {
-      type?: string;
-      properties?: Record<string, unknown>;
-      required?: string[];
-    };
-    const props = parameters?.properties ?? {};
-    if (Object.keys(props).length === 0) {
-      return {
-        name: t.function.name,
-        description: t.function.description,
-      };
-    }
-    return {
-      name: t.function.name,
-      description: t.function.description,
-      parameters,
-    };
-  });
-}
-
-/** Converte o histórico OpenAI-like do app para contents do Gemini. */
-function toGeminiContents(messages: ChatMessage[]): { role: string; parts: GeminiPart[] }[] {
-  const contents: { role: string; parts: GeminiPart[] }[] = [];
-  for (const m of messages) {
-    if (m.role === "system") continue;
-    if (m.role === "user") {
-      contents.push({ role: "user", parts: [{ text: m.content || "" }] });
-      continue;
-    }
-    if (m.role === "assistant") {
-      const parts: GeminiPart[] = [];
-      if (m.content) parts.push({ text: m.content });
-      for (const tc of m.tool_calls ?? []) {
-        let args: Record<string, unknown> = {};
-        try {
-          args = JSON.parse(tc.function.arguments || "{}") as Record<string, unknown>;
-        } catch {
-          args = {};
-        }
-        parts.push({ functionCall: { name: tc.function.name, args } });
-      }
-      if (parts.length === 0) parts.push({ text: "" });
-      contents.push({ role: "model", parts });
-      continue;
-    }
-    if (m.role === "tool") {
-      const part: GeminiPart = {
-        functionResponse: {
-          name: m.name || "tool",
-          response: { result: m.content || "" },
-        },
-      };
-      const last = contents[contents.length - 1];
-      if (last?.role === "user" && last.parts.some((p) => p.functionResponse)) {
-        last.parts.push(part);
-      } else {
-        contents.push({ role: "user", parts: [part] });
-      }
-    }
-  }
-  return contents;
-}
-
-async function handleChatGemini(geminiKey: string, body: Record<string, unknown>) {
+async function handleChatOpenAi(openaiKey: string, body: Record<string, unknown>) {
   const rawMessages = body.messages;
   if (!Array.isArray(rawMessages) || rawMessages.length === 0) {
     return json({ ok: false, error: "messages_required" }, 400);
@@ -376,66 +304,55 @@ async function handleChatGemini(geminiKey: string, body: Record<string, unknown>
       ? `\n\nContexto da sessão:\n${body.contextNote.trim()}`
       : "";
 
-  const messages = rawMessages.map((m) => normalizeMessage(m));
-  const contents = toGeminiContents(messages);
-  if (contents.length === 0) return json({ ok: false, error: "messages_required" }, 400);
+  const messages: ChatMessage[] = [
+    { role: "system", content: SYSTEM_PROMPT + contextNote },
+    ...rawMessages.map((m) => normalizeMessage(m)),
+  ];
 
-  const url =
-    `${GEMINI_URL}/models/${encodeURIComponent(CHAT_MODEL)}:generateContent` +
-    `?key=${encodeURIComponent(geminiKey)}`;
-
-  const res = await fetch(url, {
+  const res = await fetch(`${OPENAI_URL}/chat/completions`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      Authorization: `Bearer ${openaiKey}`,
+      "Content-Type": "application/json",
+    },
     body: JSON.stringify({
-      systemInstruction: { parts: [{ text: SYSTEM_PROMPT + contextNote }] },
-      contents,
-      tools: [{ functionDeclarations: geminiFunctionDeclarations() }],
-      toolConfig: { functionCallingConfig: { mode: "AUTO" } },
-      generationConfig: {
-        temperature: 0.7,
-        maxOutputTokens: 512,
-      },
+      model: CHAT_MODEL,
+      messages,
+      tools: TOOLS,
+      tool_choice: "auto",
+      temperature: 0.7,
+      max_tokens: 512,
     }),
   });
 
   const payload = await res.json();
   if (!res.ok) {
-    const detail = payload?.error?.message ?? `gemini_http_${res.status}`;
+    const detail = payload?.error?.message ?? `openai_http_${res.status}`;
     throw new Error(String(detail));
   }
 
-  const parts: GeminiPart[] = payload?.candidates?.[0]?.content?.parts ?? [];
-  if (!Array.isArray(parts) || parts.length === 0) throw new Error("empty_completion");
+  const choice = payload?.choices?.[0]?.message as
+    | {
+        role?: string;
+        content?: string | null;
+        tool_calls?: ToolCall[];
+      }
+    | undefined;
+  if (!choice) throw new Error("empty_completion");
 
-  const functionCalls = parts.filter((p) => p.functionCall?.name);
-  if (functionCalls.length > 0) {
-    const textBits = parts
-      .map((p) => (typeof p.text === "string" ? p.text.trim() : ""))
-      .filter(Boolean);
-    const tool_calls: ToolCall[] = functionCalls.map((p, i) => ({
-      id: `gemini_${i}_${p.functionCall!.name}`,
-      type: "function",
-      function: {
-        name: String(p.functionCall!.name),
-        arguments: JSON.stringify(p.functionCall!.args ?? {}),
-      },
-    }));
+  if (choice.tool_calls && choice.tool_calls.length > 0) {
     return json({
       ok: true,
       type: "tool_calls",
       assistant: {
         role: "assistant",
-        content: textBits.length > 0 ? textBits.join("\n\n") : null,
-        tool_calls,
+        content: choice.content ?? null,
+        tool_calls: choice.tool_calls,
       },
     });
   }
 
-  const text = parts
-    .map((p) => (typeof p.text === "string" ? p.text : ""))
-    .join("\n")
-    .trim();
+  const text = (choice.content || "").trim();
   if (!text) throw new Error("empty_content");
   return json({ ok: true, type: "message", content: text });
 }
