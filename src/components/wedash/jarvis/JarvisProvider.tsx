@@ -726,10 +726,15 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
         applyPeriodHint();
 
         if (!llm.ok) {
-          if (llm.reason === "gemini_not_configured" || llm.reason === "openai_not_configured") {
-            setMicHint("IA ainda sem chave no servidor.");
+          const reason = llm.reason || "erro";
+          if (reason === "gemini_not_configured") {
+            setMicHint("Falta GEMINI_API_KEY no servidor.");
+          } else if (reason.includes("properties") || reason.includes("INVALID_ARGUMENT")) {
+            setMicHint("Erro no schema das tools no Gemini.");
+          } else {
+            setMicHint(`IA: ${reason.slice(0, 120)}`);
           }
-          finish("A IA ficou offline um instante. Manda de novo?");
+          finish("A IA tropeçou neste turno. Manda de novo?");
           return;
         }
 

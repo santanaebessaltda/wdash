@@ -134,8 +134,16 @@ const TOOLS = [
     function: {
       name: "analyze_seasonal",
       description:
-        "Datas sazonais e feriados. Use ao montar/sugerir meta ou desafio do periodo.",
-      parameters: { type: "object", properties: {} },
+        "Datas sazonais e feriados. Use ao montar/sugerir meta ou desafio do periodo. Sem argumentos.",
+      parameters: {
+        type: "object",
+        properties: {
+          reason: {
+            type: "string",
+            description: "Por que precisa do calendário sazonal (opcional)",
+          },
+        },
+      },
     },
   },
   {
@@ -292,11 +300,26 @@ type GeminiPart = {
 };
 
 function geminiFunctionDeclarations() {
-  return TOOLS.map((t) => ({
-    name: t.function.name,
-    description: t.function.description,
-    parameters: t.function.parameters,
-  }));
+  // Gemini 400 se parameters.properties for {} — omitir parameters nesse caso.
+  return TOOLS.map((t) => {
+    const parameters = t.function.parameters as {
+      type?: string;
+      properties?: Record<string, unknown>;
+      required?: string[];
+    };
+    const props = parameters?.properties ?? {};
+    if (Object.keys(props).length === 0) {
+      return {
+        name: t.function.name,
+        description: t.function.description,
+      };
+    }
+    return {
+      name: t.function.name,
+      description: t.function.description,
+      parameters,
+    };
+  });
 }
 
 /** Converte o histórico OpenAI-like do app para contents do Gemini. */

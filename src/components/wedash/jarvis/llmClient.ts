@@ -129,9 +129,10 @@ export async function jarvisLlmTurn(
       return { ok: false, reason: payload?.error || error?.message || "jarvis_ai_error" };
     }
 
-    if (payload.type === "message" && payload.content) {
-      // Se o modelo colou o tool result, devolve vazio — o Provider usa fala humana do draft.
-      const content = looksLikeLeakedGoalFacts(payload.content) ? "" : payload.content;
+    if (payload.type === "message") {
+      const raw = (payload.content || "").trim();
+      // Vazio ou vazamento → ok com content vazio; o Provider pede pra mandar de novo.
+      const content = raw && !looksLikeLeakedGoalFacts(raw) ? raw : "";
       return { ok: true, content, sideEffects };
     }
 
