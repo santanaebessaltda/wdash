@@ -3,9 +3,12 @@ import {
   applyProposedTarget,
   createPendingCommit,
   goalDraftFingerprint,
+  hasProposalAwaitingAccept,
+  looksLikeAcceptPendingProposal,
   looksLikeAcceptProposal,
   looksLikeAskValueSuggestionP0,
   looksLikeConfirmPendingSave,
+  looksLikeNaturalAffirmation,
   looksLikeRequestSave,
   looksLikeSimulateLevelsAtAmount,
   looksLikeValueInconsistency,
@@ -61,10 +64,23 @@ describe("P0 contrato proposta vs aplicado", () => {
     expect(looksLikeAskValueSuggestionP0("qual valor você recomenda?")).toBe(true);
   });
 
-  it("aceite explicito da proposta", () => {
+  it("aceite natural da proposta pendente", () => {
+    expect(looksLikeNaturalAffirmation("Pode ser")).toBe(true);
+    expect(looksLikeNaturalAffirmation("Fechado")).toBe(true);
+    expect(looksLikeNaturalAffirmation("Vamos nessa")).toBe(true);
+    expect(looksLikeNaturalAffirmation("Sim")).toBe(true);
+    expect(looksLikeNaturalAffirmation("Vamos deixar 45 e 55% mesmo")).toBe(false);
     expect(looksLikeAcceptProposal("aceito a recomendada")).toBe(true);
-    expect(looksLikeAcceptProposal("vamos com essa")).toBe(true);
-    expect(looksLikeAcceptProposal("vamos deixar 45 e 55")).toBe(false);
+
+    const awaiting = hasProposalAwaitingAccept({
+      form: { target: 244_600 },
+      proposedTarget: 257_000,
+    });
+    expect(awaiting).toBe(true);
+    expect(looksLikeAcceptPendingProposal("Pode ser", true, false)).toBe(true);
+    expect(looksLikeAcceptPendingProposal("Pode ser", true, true)).toBe(false); // save aguardando
+    expect(looksLikeAcceptPendingProposal("Sim", false, false)).toBe(false); // sem proposta
+    expect(looksLikeAcceptPendingProposal("pode salvar o rascunho", true, false)).toBe(false);
   });
 
   it("applyProposedTarget seta form.target e limpa pendingCommit", () => {

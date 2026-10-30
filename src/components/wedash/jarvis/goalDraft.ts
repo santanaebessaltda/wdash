@@ -18,8 +18,8 @@ import {
 import {
   clearPendingCommit,
   createPendingCommit,
-  looksLikeAcceptProposal,
-  looksLikeAcceptProposalBare,
+  hasProposalAwaitingAccept,
+  looksLikeAcceptPendingProposal,
   looksLikeAskValueSuggestionP0,
   looksLikeConfirmPendingSave,
   looksLikeRequestSave,
@@ -1759,16 +1759,22 @@ export async function discussGoal(
       // Não toca form.target nem userLockedTarget.
     }
   }
-  // Aceite explícito da proposta → aplica no rascunho (nunca por "sim" se já há outro target).
-  if (lockedTarget == null && proposedTarget != null) {
-    const canBareAccept = form.target == null && !userLockedTarget;
+  // Aceite contextual da proposta (pode ser / fechado / vamos nessa / sim) —
+  // só se há proposta pendente e NÃO há confirmação de gravação aguardando.
+  let justAcceptedProposal = false;
+  {
+    const saveAwaiting = prev?.pendingCommit?.awaitingConfirm === true;
+    const proposalAwaiting = hasProposalAwaitingAccept({ form, proposedTarget });
     if (
-      looksLikeAcceptProposal(lastUser) ||
-      (canBareAccept && looksLikeAcceptProposalBare(lastUser, true))
+      lockedTarget == null &&
+      proposedTarget != null &&
+      looksLikeAcceptPendingProposal(lastUser, proposalAwaiting, saveAwaiting)
     ) {
       form = { ...form, target: proposedTarget };
       userLockedTarget = true;
       assembly = { ...assembly, valueDiscussed: true };
+      justAcceptedProposal = true;
+      // Nunca autoriza gravação ao aceitar valor.
     }
   }
   if (lockedTarget != null) {
@@ -2281,13 +2287,7 @@ export async function discussGoal(
     });
   } else if (looksLikeInspectGoalDraft(lastUser)) {
     spokenReply = speakGoalDraftConfig(draftOut, { facet: goalInspectFacet(lastUser) });
-  } else if (
-    userLockedTarget &&
-    form.target != null &&
-    proposedTarget != null &&
-    form.target === proposedTarget &&
-    (looksLikeAcceptProposal(lastUser) || looksLikeAcceptProposalBare(lastUser, true))
-  ) {
+  } else if (justAcceptedProposal && form.target != null) {
     spokenReply =
       `Apliquei ${brlCent(form.target)} no rascunho.\n\n` +
       buildGoalConfigSnapshot(form, form.target).chatBlocks.join("\n\n");

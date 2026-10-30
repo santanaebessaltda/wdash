@@ -108,28 +108,12 @@ export function pendingCommitStillValid(draft: GoalDraft): boolean {
   return p.fingerprint === goalDraftFingerprint(draft.form);
 }
 
-export function looksLikeAcceptProposal(text: string): boolean {
-  const p = norm(text).trim();
-  if (/nao|não|outra|diferente|muda o valor|troca o valor/.test(p) && !/nao precisa/.test(p)) {
-    if (/^(nao|não)\b/.test(p)) return false;
-  }
-  return (
-    /aceito (a |o )?(proposta|recomend|valor|meta)|vamos (de |com )?(a )?recomend|fica a recomend|pode (ser|ficar) (a |o )?(recomend|proposta)|fechado (nessa|nessa faixa|no valor)|quero (a |o )?recomend|aplica (a |o )?recomend|usa (a |o )?recomend|vamos com (essa|esse|a recomend|o valor)/.test(
-      p,
-    ) ||
-    (/^(sim|pode|ok|fechado|isso)(\b|,|$)/.test(p) &&
-      false) /* bare sim NÃO aceita proposta — só com pendingCommit ou pedido explícito */
-  );
-}
-
-/** Aceite curto só conta se havia proposta pendente e a pergunta do JARVIS era sobre valor. */
-export function looksLikeAcceptProposalBare(text: string, hasProposed: boolean): boolean {
-  if (!hasProposed) return false;
-  const p = norm(text).trim();
-  return (
-    looksLikeAcceptProposal(text) ||
-    /^(sim|pode|ok|fechado|isso|essa|esse|pode ser)(\b|,|$)/.test(p)
-  );
+/** Há proposta do motor ainda não aplicada no rascunho. */
+export function hasProposalAwaitingAccept(draft: {
+  form: { target: number | null };
+  proposedTarget?: number | null;
+}): boolean {
+  return draft.proposedTarget != null && draft.form.target !== draft.proposedTarget;
 }
 
 export function looksLikeRequestSave(text: string): boolean {
@@ -139,6 +123,60 @@ export function looksLikeRequestSave(text: string): boolean {
       p,
     ) || /^(salva|grava|autorizo)(\b|,|$)/.test(p)
   );
+}
+
+/** Afirmação natural curta (contexto decide se é aceite de proposta ou de gravação). */
+export function looksLikeNaturalAffirmation(text: string): boolean {
+  const p = norm(text).trim();
+  if (!p || looksLikeRequestSave(text)) return false;
+  if (/^(nao|não)\b/.test(p)) return false;
+  if (/outra|diferente|muda o valor|troca o valor|nao quero|não quero|deixar|peso|turno|grupo|\d+\s*%/.test(p)) {
+    return false;
+  }
+  // Frases curtas / naturais — “pode ser”, “vamos nessa”, “fechado”, “sim”…
+  if (p.length > 48) return false;
+  return (
+    /^(sim|pode|ok|fechado|isso|essa|esse|beleza|show|perfeito|combinado|fechou|bora|topa)([!.?…]*)$/.test(
+      p,
+    ) ||
+    /^(pode ser|vamos nessa|vamos nisso|vamos com essa|vamos com isso|fechado nessa|fechado nisso|pode ficar|fica assim|pode aplicar|aplica isso|aplica esse)([!.?…]*)$/.test(
+      p,
+    ) ||
+    /^(sim|pode|ok|fechado|isso)[,!]?\s+(pode ser|vamos|fechado|isso)\s*[!.?…]*$/.test(p)
+  );
+}
+
+/** Aceite explícito da recomendação (formulações longas + naturais). */
+export function looksLikeAcceptProposal(text: string): boolean {
+  const p = norm(text).trim();
+  if (/^(nao|não)\b/.test(p)) return false;
+  if (/outra|diferente|muda o valor|troca o valor/.test(p) && !/nao precisa|não precisa/.test(p)) {
+    return false;
+  }
+  if (looksLikeNaturalAffirmation(text)) return true;
+  return /aceito (a |o )?(proposta|recomend|valor|meta)|vamos (de |com )?(a )?recomend|fica a recomend|pode (ser|ficar) (a |o )?(recomend|proposta)|fechado (nessa|nessa faixa|no valor)|quero (a |o )?recomend|aplica (a |o )?recomend|usa (a |o )?recomend|vamos com (essa|esse|a recomend|o valor)|aplica esse valor|quero esse valor|fica (nesse|com )?(esse )?valor|aplica (esse |o )?valor/.test(
+    p,
+  );
+}
+
+/**
+ * Aceita a proposta pendente com linguagem natural.
+ * Nunca se `saveAwaiting` — nesse caso o SIM é da gravação, não do valor.
+ * Aceitar proposta NUNCA autoriza gravação.
+ */
+export function looksLikeAcceptPendingProposal(
+  text: string,
+  proposalAwaiting: boolean,
+  saveAwaiting: boolean,
+): boolean {
+  if (!proposalAwaiting || saveAwaiting) return false;
+  if (looksLikeRequestSave(text)) return false;
+  return looksLikeAcceptProposal(text);
+}
+
+/** @deprecated use looksLikeAcceptPendingProposal */
+export function looksLikeAcceptProposalBare(text: string, hasProposed: boolean): boolean {
+  return looksLikeAcceptPendingProposal(text, hasProposed, false);
 }
 
 export function looksLikeConfirmPendingSave(text: string): boolean {

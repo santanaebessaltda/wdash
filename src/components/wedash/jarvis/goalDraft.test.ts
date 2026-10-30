@@ -583,6 +583,115 @@ describe("P0 proposta 244600 vs 257000", () => {
     expect(spokenReply).toMatch(/257|Apliquei/i);
   });
 
+  it.each(["Pode ser", "Fechado", "Vamos nessa", "Sim"])(
+    "aceite natural %s aplica proposta sem autorizar gravação",
+    async (phrase) => {
+      const prev = {
+        form: {
+          ...emptyGoalForm("a"),
+          name: "Novembro 2026",
+          startsOn: "2026-11-01",
+          endsOn: "2026-11-30",
+          target: 244_600,
+        },
+        assembly: {
+          ...emptyGoalAssembly(),
+          periodConfirmed: true,
+          valueDiscussed: true,
+          path: "copy" as const,
+          confirmedGroups: true,
+          confirmedSpread: true,
+          confirmedTiers: true,
+        },
+        userLockedTarget: true,
+        proposedTarget: 257_000,
+        copyStatus: "ok" as const,
+        pendingCommit: null,
+      };
+      const { draft, spokenReply, shouldCommit } = await discussGoal(phrase, ctx, prev);
+      expect(draft.form.target).toBe(257_000);
+      expect(draft.pendingCommit?.authorized).toBeFalsy();
+      expect(shouldCommit).toBeFalsy();
+      expect(spokenReply).toMatch(/Apliquei|257/i);
+    },
+  );
+
+  it("sim sem proposta pendente nao aplica valor", async () => {
+    const prev = {
+      form: {
+        ...emptyGoalForm("a"),
+        name: "Novembro 2026",
+        startsOn: "2026-11-01",
+        endsOn: "2026-11-30",
+        target: 244_600,
+      },
+      assembly: {
+        ...emptyGoalAssembly(),
+        periodConfirmed: true,
+        valueDiscussed: true,
+        path: "copy" as const,
+        confirmedGroups: true,
+        confirmedSpread: true,
+        confirmedTiers: true,
+      },
+      userLockedTarget: true,
+      proposedTarget: 244_600, // já igual ao aplicado — nada pendente
+      copyStatus: "ok" as const,
+    };
+    const { draft, shouldCommit } = await discussGoal("Sim", ctx, prev);
+    expect(draft.form.target).toBe(244_600);
+    expect(shouldCommit).toBeFalsy();
+  });
+
+  it("SIM com save aguardando confirma gravação e nao troca pelo proposed", async () => {
+    const form = {
+      ...emptyGoalForm("a"),
+      name: "Novembro 2026",
+      startsOn: "2026-11-01",
+      endsOn: "2026-11-30",
+      target: 244_600,
+      groups: [{ shiftId: "m", name: "T1", pct: 100 }],
+    };
+    const { createPendingCommit } = await import("./goalContract");
+    const pending = createPendingCommit(
+      {
+        form,
+        assembly: {
+          ...emptyGoalAssembly(),
+          periodConfirmed: true,
+          valueDiscussed: true,
+          path: "copy",
+          confirmedGroups: true,
+          confirmedSpread: true,
+          confirmedTiers: true,
+          confirmedMount: true,
+        },
+      },
+      "Loja",
+    );
+    const prev = {
+      form,
+      assembly: {
+        ...emptyGoalAssembly(),
+        periodConfirmed: true,
+        valueDiscussed: true,
+        path: "copy" as const,
+        confirmedGroups: true,
+        confirmedSpread: true,
+        confirmedTiers: true,
+        confirmedMount: true,
+      },
+      pendingCommit: pending,
+      userLockedTarget: true,
+      proposedTarget: 257_000,
+      copyStatus: "ok" as const,
+    };
+    const { draft, shouldCommit } = await discussGoal("Sim", ctx, prev);
+    expect(draft.form.target).toBe(244_600);
+    expect(draft.pendingCommit?.authorized).toBe(true);
+    expect(shouldCommit).toBe(true);
+  });
+
   it("simulacao com 257 nao muda rascunho 244600", async () => {
     const prev = {
       form: {
