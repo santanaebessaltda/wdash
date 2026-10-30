@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { classifyIntent, jarvisReply } from "./respond";
 
 describe("classifyIntent", () => {
-  it("reconhece cumprimento", () => {
+  it("reconhece cumprimento no fallback local", () => {
     expect(classifyIntent("Oi JARVIS")).toBe("greeting");
   });
 

@@ -227,7 +227,7 @@ Inspiração de UX: [Néctar](https://www.meu-nectar.com/) (conversa humana, res
 
 **Tom:** informal, humano — curto, confirma o que fez, sem jargão de produto.
 
-**Roteamento (DECIDIDO — 2026-10-29, LLM-first; chat = Gemini — 2026-10-30):** turno pelo **Gemini** (`jarvis-ai` action `chat`, `GEMINI_API_KEY`). Tools (`analyze_*` / `draft_*`) só executam (números / estado do rascunho); a **fala é 100% do modelo** — o app não sobrescreve bolha com frase fixa de gate. Keywords/`classifyIntent` só para Autorizar, descartar, “abre tela” e **fallback local** se a Edge falhar. STT continua Whisper (OpenAI); TTS configurável.
+**Roteamento (DECIDIDO — 2026-10-29, LLM-first; chat = Gemini — 2026-10-30):** turno pelo **Gemini** (`jarvis-ai` action `chat`, `GEMINI_API_KEY`). **Conversa = prompt + tools** — o app não classifica cumprimento/intenção de papo (oi, opa, hi…) por keyword; a IA interpreta. Tools só executam (números / estado do rascunho); a fala é do modelo. Keywords/`classifyIntent` só para Autorizar, descartar, “abre tela” e **fallback local** se a Edge falhar. STT = Whisper; TTS configurável.
 
 **Superfície (DECIDIDO — 2026-10-29):**
 - **Botão flutuante** no canto inferior direito (só Gestor) — painel no estilo Apps > Chat do Vela (thread + composer); mic = ditado; **Limpar** zera o thread; histórico da conversa fica em `sessionStorage` (sobrevive a F5 no mesmo separador). **Fora do menu.** `/chat-ia` e `/jarvis` redirecionam para Visão geral. **Filial:** Topbar.

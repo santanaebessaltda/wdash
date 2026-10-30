@@ -51,7 +51,7 @@ function contextNote(ctx: JarvisContext, session?: JarvisLlmSession | null): str
     `Sazonal/feriados a considerar sozinho (meta/desafio): ${compactSeasonalContext(ctx.today, 2)}.`,
     "Interprete a intenção pelo histórico + mensagem atual. Não roteie por palavra isolada.",
     "Você escreve TODA a fala ao Gestor. Tools só trazem dado/estado. Nunca use travessão (—).",
-    "Cumprimento (oi/e aí): cumprimente pelo nome e pergunte o que precisa. NÃO liste menu (vendas, estoque, meta…).",
+    "Cumprimento/small talk: responda humano pelo nome; sem tool e sem relatório. Sem cardápio de menu.",
     "Ao montar meta ou desafio, ja leve sazonal/feriado na sugestao de valor quando couber (1 frase).",
   ];
   if (session?.goalDraftSummary) {

@@ -160,6 +160,7 @@ export function looksLikeStillDiscussing(raw: string): boolean {
 export function classifyIntent(raw: string): JarvisIntent {
   const p = normalizeIntentText(raw);
 
+  // So fallback local (Edge fora): a conversa real e a IA via prompt, sem lista de cumprimento.
   if (/^(oi|ola|bom dia|boa tarde|boa noite|e ai|eai)\b/.test(p) || p.includes("tudo bem")) return "greeting";
   if (/o que (voce|vc) (faz|pode)|como (voce|vc) funciona|suas habilidades|no que (voce|vc) ajuda/.test(p)) {
     return "capability";

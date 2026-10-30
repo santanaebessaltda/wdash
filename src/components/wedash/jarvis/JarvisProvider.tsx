@@ -722,7 +722,7 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      // “Abre tela / rola” — resposta fixa; o resto a IA interpreta (histórico + rascunho aberto).
+      // Só atalho de produto: “abre tela / rola”. Conversa (oi, meta, vendas…) = IA + prompt.
       if (intent === "stay_in_chat" || looksLikeLeaveChatRequest(q)) {
         finish(STAY_IN_CHAT_REPLY);
         return;
@@ -796,29 +796,7 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
       });
 
       void (async () => {
-        // Se ja tem meta em discussao e a fala e curta (isso/novembro/270k), aplica no draft
-        // mesmo se o Gemini nao chamar draft_goal — evita perder o fio.
-        const recentMeta =
-          !!goalDraftRef.current ||
-          messagesRef.current.slice(-8).some((m) => /\bmeta\b/i.test(m.text));
-        const shortFollowUp =
-          q.trim().length < 80 &&
-          /^(isso|esse|essa|sim|ok|pode ser|topa|fechado|novembro|dezembro|janeiro|fevereiro|marco|março|abril|maio|junho|julho|agosto|setembro|outubro|\d)/i.test(
-            q.trim(),
-          );
-
-        if (recentMeta && shortFollowUp && goalDraftRef.current) {
-          const historyBlob = [...messagesRef.current, { from: "user" as const, text: q }]
-            .slice(-16)
-            .map((m) => `${m.from}: ${m.text}`)
-            .join("\n");
-          const { draft } = await discussGoal(historyBlob || q, ctx, goalDraftRef.current);
-          if (gen !== replyGen.current) return;
-          goalDraftRef.current = draft;
-          setGoalDraft(null);
-        }
-
-        // LLM-first (Gemini): a IA escolhe tools e SEMPRE redige a fala.
+        // LLM-first: a IA interpreta (prompt) e escolhe tools; app nao roteia cumprimento/mes por keyword.
         const llm = await jarvisLlmTurn(history, ctx, q, llmSession(), llmHooks());
         if (gen !== replyGen.current) return;
 
