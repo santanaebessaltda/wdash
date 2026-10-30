@@ -56,7 +56,7 @@ function contextNote(ctx: JarvisContext, session?: JarvisLlmSession | null): str
   ];
   if (session?.goalDraftSummary) {
     lines.push(
-      `Proposta de META em discussao (so texto, sem card): ${session.goalDraftSummary}. Continuacao = draft_goal. Confirmacao curta (cria a meta/autorizo) grava rascunho em Metas. Nao invente que ja gravou.`,
+      `Proposta de META em discussao (so texto, sem card): ${session.goalDraftSummary}. Continuacao = draft_goal. Resposta curta do Gestor (isso/mes/valor) CONTINUA a meta — nao pergunte de novo se e meta ou desafio. Confirmacao (cria a meta/autorizo) grava rascunho. Nao invente que ja gravou.`,
     );
     if (session.goalDraftMissing) {
       lines.push(`Ainda faltando na meta: ${session.goalDraftMissing}. Pergunte isso de forma natural.`);

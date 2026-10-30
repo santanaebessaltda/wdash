@@ -209,6 +209,6 @@ export function jarvisReply(question: string, firstName?: string): string {
     case "authorize":
       return "Ainda não tenho rascunho pra gravar. Quando a gente montar algo, eu peço seu OK.";
     default:
-      return "Manda aí: vendas, estoque, desafio, meta ou escala. Se for criar, a gente fecha o detalhe e eu só gravo com autorização.";
+      return "O que você precisa? Pode ser número, meta, desafio ou escala.";
   }
 }
