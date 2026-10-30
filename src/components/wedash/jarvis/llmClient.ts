@@ -58,27 +58,23 @@ function contextNote(ctx: JarvisContext, session?: JarvisLlmSession | null): str
     `Sazonal/feriados a considerar sozinho (meta/desafio): ${compactSeasonalContext(ctx.today, 2)}.`,
     "Interprete a intenção pelo sentido + histórico. O app não classifica palavra-chave.",
     "Você escreve TODA a fala. Tools só executam. Nunca use travessão (—).",
-    "Cumprimento/small talk (oi, opa, e aí, fala…): responda humano pelo nome; ZERO tools; ZERO relatório de vendas.",
-    "Gravar rascunho/card = commit_draft. Descartar = discard_draft. Pedido de abrir outra tela = responda no chat, sem navegar.",
+    "Voce redige toda a fala. Cumprimento = zero tools. Gravar = commit_draft; descartar = discard_draft.",
   ];
   if (session?.goalDraftSummary) {
     lines.push(
-      `META em discussao (texto): ${session.goalDraftSummary}. SEMPRE continue com draft_goal neste fio; gravar = commit_draft target=goal.`,
+      `META em discussao: ${session.goalDraftSummary}. Continue SEMPRE com draft_goal; gravar = commit_draft target=goal.`,
     );
     if (session.goalPeriodConfirmed) {
-      lines.push("Mes JA confirmado pelo Gestor. PROIBIDO perguntar o mes de novo.");
+      lines.push("Mes ja confirmado. Nao pergunte o mes de novo.");
     } else {
-      lines.push("Mes ainda nao confirmado. Pergunte pra qual mes montar a meta (nao diga 'quer fechar').");
+      lines.push("Mes ainda nao confirmado.");
     }
     if (session.goalNextStep) {
-      lines.push(`Proximo passo da meta: ${session.goalNextStep}`);
+      lines.push(`Proximo passo (estado do app): ${session.goalNextStep}`);
     }
     if (session.goalDraftMissing) {
-      lines.push(`Ainda faltando na meta: ${session.goalDraftMissing}.`);
+      lines.push(`Ainda faltando: ${session.goalDraftMissing}.`);
     }
-    lines.push(
-      "PROIBIDO voltar ao menu (numero/meta/desafio/escala) ou perguntar 'o que voce precisa' enquanto a meta estiver aberta.",
-    );
   }
   if (session?.challengeDraftSummary) {
     lines.push(`DESAFIO aberto (card): ${session.challengeDraftSummary}. Gravar = commit_draft target=challenge.`);

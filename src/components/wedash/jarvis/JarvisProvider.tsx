@@ -12,7 +12,6 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { validateChallengeForm } from "@/data/wedash/challengeForm";
 import { isOwner } from "@/layout/nav-wedash";
 import { useSession } from "@/session/SessionProvider";
-import { jarvisAnswer } from "./answer";
 import { commitChallenge } from "./challengeCommit";
 import {
   challengeDraftReady,
@@ -27,11 +26,8 @@ import {
   discussGoal,
   formatGoalFactsForModel,
   goalCanCommit,
-  looksLikeGoalConversation,
   looksLikeLeakedGoalFacts,
-  looksLikeLostGoalReply,
   missingGoalLabels,
-  naturalGoalAskFromDraft,
   validateGoalDraft,
   type GoalDraft,
 } from "./goalDraft";
@@ -572,52 +568,6 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
     [commitBusy, session, speakAnswer],
   );
 
-  /** Mantém o rascunho de meta no ref mesmo se o Gemini esquecer de chamar draft_goal. */
-  const syncGoalDraft = useCallback(
-    async (q: string, ctx: ReturnType<typeof jarvisContextFromSession>): Promise<GoalDraft | null> => {
-      if (challengeDraftRef.current && !goalDraftRef.current) return null;
-      if (
-        !goalDraftRef.current &&
-        !looksLikeGoalConversation(messagesRef.current, q, ctx.today)
-      ) {
-        return null;
-      }
-      const { draft } = await discussGoal(q, ctx, goalDraftRef.current);
-      goalDraftRef.current = draft;
-      setGoalDraft(null);
-      setCreatedItem(null);
-      return draft;
-    },
-    [],
-  );
-
-  /** Fallback sem Gemini: continua fio de meta/desafio/escala; sem menu genérico no meio da meta. */
-  const replyLocal = useCallback(
-    async (q: string, ctx: ReturnType<typeof jarvisContextFromSession>, finish: (a: string) => void) => {
-      const goal = await syncGoalDraft(q, ctx);
-      if (goal) {
-        finish(naturalGoalAskFromDraft(goal));
-        return;
-      }
-      if (challengeDraftRef.current) {
-        const { reply: answer, draft } = await discussChallenge(q, ctx, challengeDraftRef.current);
-        setChallengeDraft(draft);
-        challengeDraftRef.current = draft;
-        finish(answer);
-        return;
-      }
-      if (scheduleDraftRef.current) {
-        const { reply: answer, draft } = await discussSchedule(q, ctx, scheduleDraftRef.current);
-        setScheduleDraft(draft);
-        scheduleDraftRef.current = draft;
-        finish(answer);
-        return;
-      }
-      finish(await jarvisAnswer(q, ctx));
-    },
-    [syncGoalDraft],
-  );
-
   const reply = useCallback(
     (question: string) => {
       const q = question.trim();
@@ -629,15 +579,11 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
       setMicHint(null);
       const ctx = jarvisContextFromSession(session, readTopbarStoreIds());
 
+      // Fala = só o modelo. App não monta script de conversa.
       const finish = (answer: string) => {
         if (gen !== replyGen.current) return;
-        // Ultima barreira: nunca mostrar estado interno / JSON da tool no chat.
-        if (looksLikeLeakedGoalFacts(answer)) {
-          speakAnswer(
-            goalDraftRef.current
-              ? naturalGoalAskFromDraft(goalDraftRef.current)
-              : "Me fala mais um detalhe pra gente fechar a meta.",
-          );
+        if (looksLikeLeakedGoalFacts(answer) || !answer.trim()) {
+          speakAnswer("Deu um tropeço na resposta. Manda de novo?");
           return;
         }
         speakAnswer(answer);
@@ -727,7 +673,6 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
           if (t === "schedule") {
             return (await authorizeSchedule({ silent: true })) ?? "Não consegui gravar a escala.";
           }
-          // Meta: remonta pelo histórico curto pra pegar último “ok” antes de gravar.
           if (goalDraftRef.current || t === "goal") {
             const historyBlob = [...messagesRef.current, { from: "user" as const, text: q }]
               .slice(-16)
@@ -774,39 +719,21 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
       });
 
       void (async () => {
-        // Prompt + tools; app sincroniza estado da meta pra nao perder o fio.
+        // Só prompt + tools. Sem script local de conversa.
         const llm = await jarvisLlmTurn(history, ctx, q, llmSession, llmHooks());
         if (gen !== replyGen.current) return;
 
-        if (!llm.ok) {
-          if (llm.reason === "gemini_not_configured" || llm.reason === "openai_not_configured") {
-            setMicHint("IA ainda sem chave no servidor. Usando modo local.");
-          }
-          applyPeriodHint();
-          await replyLocal(q, ctx, finish);
-          return;
-        }
-
         applyPeriodHint();
 
-        // Mesmo com Gemini ok: aplica a fala do Gestor no rascunho (Novembro, valor…).
-        const draft = await syncGoalDraft(q, ctx);
-        if (gen !== replyGen.current) return;
+        if (!llm.ok) {
+          if (llm.reason === "gemini_not_configured" || llm.reason === "openai_not_configured") {
+            setMicHint("IA ainda sem chave no servidor.");
+          }
+          finish("A IA ficou offline um instante. Manda de novo?");
+          return;
+        }
 
-        const raw = llm.content.trim();
-        if (draft && (looksLikeLeakedGoalFacts(raw) || !raw || looksLikeLostGoalReply(raw, draft))) {
-          finish(naturalGoalAskFromDraft(draft));
-          return;
-        }
-        if (raw && !looksLikeLeakedGoalFacts(raw)) {
-          finish(raw);
-          return;
-        }
-        if (draft) {
-          finish(naturalGoalAskFromDraft(draft));
-          return;
-        }
-        finish("Me fala mais um detalhe?");
+        finish(llm.content.trim());
       })();
     },
     [
@@ -816,10 +743,8 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
       location.pathname,
       location.search,
       navigate,
-      replyLocal,
       session,
       speakAnswer,
-      syncGoalDraft,
     ],
   );
 
