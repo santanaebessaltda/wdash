@@ -118,16 +118,21 @@ export function JarvisFloat() {
                 </div>
               ) : (
                 <div className="flex flex-col gap-4">
-                  {j.messages.map((m, i) => (
-                    <div key={i} className={cn("flex gap-2.5", m.from === "user" && "flex-row-reverse")}>
-                      {m.from === "jarvis" ? <Avatar name="JARVIS" size="sm" className="mt-0.5" /> : null}
+                  {j.messages.map((m, i) => {
+                    const prev = j.messages[i - 1];
+                    const sameAuthor = prev?.from === m.from;
+                    return (
+                    <div key={i} className={cn("flex gap-2.5", m.from === "user" && "flex-row-reverse", sameAuthor && "-mt-2")}>
+                      {m.from === "jarvis" ? (
+                        sameAuthor ? <span className="w-8 shrink-0" aria-hidden /> : <Avatar name="JARVIS" size="sm" className="mt-0.5" />
+                      ) : null}
                       <div
                         className={cn(
                           "flex max-w-[85%] flex-col sm:max-w-[78%]",
                           m.from === "user" ? "items-end" : "items-start",
                         )}
                       >
-                        {m.from === "jarvis" ? (
+                        {m.from === "jarvis" && !sameAuthor ? (
                           <span className="mb-1 text-[11.5px] font-semibold text-t2">JARVIS</span>
                         ) : null}
                         <div
@@ -142,12 +147,28 @@ export function JarvisFloat() {
                         </div>
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                   {j.mode === "thinking" ? (
                     <div className="flex gap-2.5">
                       <Avatar name="JARVIS" size="sm" className="mt-0.5" />
-                      <div className="rounded-[4px_16px_16px_16px] bg-bg-3 px-3.5 py-2.5 text-[13px] text-t2">
-                        {j.commitBusy ? "Gravando…" : "Pensando…"}
+                      <div
+                        className="flex items-center gap-2 rounded-[4px_16px_16px_16px] bg-bg-3 px-3.5 py-2.5 text-[13px] text-t2"
+                        aria-live="polite"
+                        aria-label={j.commitBusy ? "Gravando" : "JARVIS digitando"}
+                      >
+                        {j.commitBusy ? (
+                          "Gravando…"
+                        ) : (
+                          <>
+                            <span className="flex items-center gap-1" aria-hidden>
+                              <TypingDot delay={0} />
+                              <TypingDot delay={150} />
+                              <TypingDot delay={300} />
+                            </span>
+                            <span>digitando…</span>
+                          </>
+                        )}
                       </div>
                     </div>
                   ) : null}
@@ -314,6 +335,15 @@ function formatRecTime(totalSec: number): string {
   const m = Math.floor(totalSec / 60);
   const s = totalSec % 60;
   return `${m}:${String(s).padStart(2, "0")}`;
+}
+
+function TypingDot({ delay }: { delay: number }) {
+  return (
+    <span
+      className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-t2"
+      style={{ animationDelay: `${delay}ms` }}
+    />
+  );
 }
 
 function ChatIaIcon() {

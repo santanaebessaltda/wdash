@@ -21,6 +21,7 @@ import {
   type ChallengeDraft,
 } from "./challengeDraft";
 import { jarvisContextFromSession } from "./context";
+import { splitJarvisReply, sleepMs, typingDelayMs } from "./chatBlocks";
 import { commitGoal } from "./goalCommit";
 import {
   discussGoal,
@@ -198,10 +199,27 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
     [session],
   );
 
-  /** Só anexa a resposta no chat e volta pra idle (sem TTS). */
-  const speakAnswer = useCallback((answer: string) => {
-    setMessages((m) => [...m, { from: "jarvis", text: answer }]);
-    setMode("idle");
+  /**
+   * Anexa a resposta em bolhas curtas, com “digitando…” entre elas.
+   * Sem TTS — só chat. Cancela se replyGen subir (nova pergunta / Limpar).
+   */
+  const speakAnswer = useCallback(async (answer: string) => {
+    const gen = replyGen.current;
+    const blocks = splitJarvisReply(answer);
+    if (blocks.length === 0) {
+      if (gen === replyGen.current) setMode("idle");
+      return;
+    }
+    for (let i = 0; i < blocks.length; i++) {
+      if (gen !== replyGen.current) return;
+      setMessages((m) => [...m, { from: "jarvis", text: blocks[i]! }]);
+      if (i < blocks.length - 1) {
+        setMode("thinking");
+        await sleepMs(typingDelayMs(blocks[i + 1]!));
+        if (gen !== replyGen.current) return;
+      }
+    }
+    if (gen === replyGen.current) setMode("idle");
   }, []);
 
 

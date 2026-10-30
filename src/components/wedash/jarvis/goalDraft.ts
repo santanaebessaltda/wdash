@@ -457,7 +457,7 @@ export async function findPriorGoalForStore(
   ctx: JarvisContext,
   storeId: string,
   targetStartsOn: string,
-): Promise<{ from: string; to: string; name: string; tiers: number; groups: number } | null> {
+): Promise<{ from: string; to: string; name: string; target: number; tiers: number; groups: number } | null> {
   if (!storeId) return null;
   const from = shiftMonthStart(targetStartsOn, -1);
   const to = endOfMonth(from);
@@ -474,6 +474,7 @@ export async function findPriorGoalForStore(
       from: src.startsOn,
       to: src.endsOn,
       name: src.name,
+      target: src.target,
       tiers: src.tiers.length,
       groups: src.groups.length,
     };
@@ -575,9 +576,15 @@ export type GoalTargetSuggestion = {
   /** Ex.: "mes passado + sazonal (Black Friday +12%)" */
   rationale: string;
   seasonalSummary: string;
+  /** Blocos curtos pra bolhas no chat. */
+  chatBlocks: string[];
 };
 
-/** Sugere meta: base historica × fator sazonal do periodo alvo. */
+function clamp(n: number, lo: number, hi: number): number {
+  return Math.min(hi, Math.max(lo, n));
+}
+
+/** Sugere meta: histórico × crescimento observado × sazonal; compara meta anterior. */
 export async function suggestGoalTarget(
   ctx: JarvisContext,
   storeId: string,
@@ -591,9 +598,11 @@ export async function suggestGoalTarget(
   const last = shiftMonthStart(ctx.today, -1);
   const yoyFrom = shiftMonthStart(targetFrom, -12);
   const yoyTo = endOfMonth(yoyFrom);
+  const prevYoyFrom = shiftMonthStart(yoyFrom, -12);
+  const prevYoyTo = endOfMonth(prevYoyFrom);
 
   try {
-    const [lastRows, yoyRows] = await Promise.all([
+    const [lastRows, yoyRows, prevYoyRows, priorGoal] = await Promise.all([
       fetchSalesDayAggs({
         tenantId: ctx.tenantId,
         storeIds: [storeId],
@@ -606,38 +615,85 @@ export async function suggestGoalTarget(
         from: yoyFrom,
         to: yoyTo,
       }),
+      fetchSalesDayAggs({
+        tenantId: ctx.tenantId,
+        storeIds: [storeId],
+        from: prevYoyFrom,
+        to: prevYoyTo,
+      }),
+      findPriorGoalForStore(ctx, storeId, targetFrom),
     ]);
     const lastCents = preferAllBrand(lastRows).reduce((s, r) => s + r.revenueCents, 0);
     const yoyCents = preferAllBrand(yoyRows).reduce((s, r) => s + r.revenueCents, 0);
+    const prevYoyCents = preferAllBrand(prevYoyRows).reduce((s, r) => s + r.revenueCents, 0);
 
     let baseCents = 0;
-    let baseLabel = "";
+    const baseBits: string[] = [];
+    if (yoyCents > 0) {
+      baseBits.push(`mesmo mês ano passado (${brlCent(yoyCents / 100)})`);
+    }
+    if (lastCents > 0) {
+      baseBits.push(`mês recente (${brlCent(lastCents / 100)})`);
+    }
     if (yoyCents > 0 && lastCents > 0) {
-      // Media do mesmo mes ano passado e do mes recente — depois aplica sazonal do alvo.
       baseCents = (yoyCents + lastCents) / 2;
-      baseLabel = "media do mesmo mes ano passado e do mes recente";
     } else if (yoyCents > 0) {
       baseCents = yoyCents;
-      baseLabel = "mesmo mes ano passado";
     } else if (lastCents > 0) {
       baseCents = lastCents;
-      baseLabel = "mes passado";
     } else {
       return null;
     }
 
-    const growth = 1.05; // piso de crescimento alem do sazonal
+    // Crescimento (ou queda) do mesmo mês: ano passado vs dois anos atrás.
+    let growthPct = 0.05;
+    let growthLabel = "coloquei +5% de folga de crescimento";
+    if (prevYoyCents > 0 && yoyCents > 0) {
+      const observed = (yoyCents - prevYoyCents) / prevYoyCents;
+      growthPct = clamp(observed, -0.12, 0.22);
+      const rounded = Math.round(growthPct * 100);
+      growthLabel =
+        rounded === 0
+          ? "no mesmo mês o faturamento ficou estável ano a ano"
+          : rounded > 0
+            ? `nesse mês o faturamento cresceu cerca de ${rounded}% vs o ano anterior — usei isso de referência`
+            : `nesse mês o faturamento caiu cerca de ${Math.abs(rounded)}% vs o ano anterior — usei isso de referência`;
+    }
+
+    const growth = 1 + growthPct;
     const raw = (baseCents / 100) * growth * bias.factor;
     const amount = Math.round(raw / 100) * 100;
     if (amount <= 0) return null;
 
-    const pct = Math.round((bias.factor - 1) * 100);
+    const sazonalPct = Math.round((bias.factor - 1) * 100);
     const sazonalBit =
       bias.factor === 1
         ? "sem ajuste sazonal forte"
-        : `sazonal ${pct > 0 ? "+" : ""}${pct}%`;
-    const rationale = `${baseLabel} (+5% crescimento, ${sazonalBit})`;
-    return { amount, rationale, seasonalSummary: bias.summary };
+        : `ajuste sazonal ${sazonalPct > 0 ? "+" : ""}${sazonalPct}%`;
+    const rationale = `${baseBits.join(" + ")}; ${growthLabel}; ${sazonalBit}`;
+
+    const chatBlocks: string[] = [
+      `Olha, uma ideia de meta: ${brlCent(amount)}.`,
+      `Base: ${baseBits.join("; ")}. ${growthLabel.charAt(0).toUpperCase()}${growthLabel.slice(1)}.`,
+    ];
+    if (bias.events.length > 0) {
+      chatBlocks.push(`${bias.summary} ${sazonalBit.charAt(0).toUpperCase()}${sazonalBit.slice(1)}.`);
+    }
+    if (priorGoal && priorGoal.target > 0) {
+      const delta = amount - priorGoal.target;
+      const deltaPct = Math.round((delta / priorGoal.target) * 100);
+      chatBlocks.push(
+        `A meta de ${monthYearTitle(priorGoal.from)} foi ${brlCent(priorGoal.target)}` +
+          (deltaPct === 0
+            ? " — estou sugerindo algo na mesma faixa."
+            : deltaPct > 0
+              ? ` — essa sugestão fica cerca de ${deltaPct}% acima.`
+              : ` — essa sugestão fica cerca de ${Math.abs(deltaPct)}% abaixo.`),
+      );
+    }
+    chatBlocks.push("O que acha desse valor? Pode falar outro número ou pedir pra subir/baixar.");
+
+    return { amount, rationale, seasonalSummary: bias.summary, chatBlocks };
   } catch {
     return null;
   }
@@ -650,21 +706,24 @@ export function formatGoalProposal(form: GoalDraftForm, storeName: string, assem
       : "a definir";
   const mode =
     form.tierMode === "GENERAL" ? "Geral" : form.tierMode === "GROUP" ? "Grupo" : "Individual";
-  const base =
-    `Meta em montagem: ${form.name || "(sem nome)"} · ${storeName || "filial?"} · ${period} · ` +
-    `${mode} · alvo ${form.target != null ? brlCent(form.target) : "a definir"} · ` +
-    `${form.tiers.length} níveis na escada` +
-    (form.managerOn ? " · com premiação da gerência" : "") +
-    (form.spreadUnidentified ? " · rateio sem vendedor identificado" : "") +
-    (form.groups.length > 0 ? ` · ${form.groups.length} grupos` : "") +
-    ".";
+  const bits = [
+    form.name || "Nova meta",
+    storeName || "filial?",
+    period,
+    mode,
+    form.target != null ? `alvo ${brlCent(form.target)}` : "alvo a definir",
+    `${form.tiers.length} níveis`,
+  ];
+  if (form.spreadUnidentified) bits.push("rateio sem identificação");
+  if (form.groups.length > 0) bits.push(`${form.groups.length} grupos`);
+  const base = `Resumo: ${bits.join(" · ")}.`;
   if (!goalDraftReady(form)) {
     const missing = missingGoalLabels(validateGoalDraft(form));
-    return `${base} Ainda falta: ${missing.join(", ")}. Pode falar o valor, a filial ou o mês.`;
+    return `${base}\n\nAinda falta: ${missing.join(", ")}. Pode falar o valor, a filial ou o mês.`;
   }
   const a = assembly ?? emptyGoalAssembly();
   if (goalCanCommit({ form, assembly: a })) {
-    return `${base} Fechado pra mim. Diz "cria a meta" / Autorizo — eu salvo como rascunho em Metas (igual Salvar rascunho); você revisa e publica lá.`;
+    return `${base}\n\nFechado pra mim. Diz "cria a meta" / Autorizo — eu salvo como rascunho em Metas; você revisa e publica lá.`;
   }
   return base;
 }
@@ -784,12 +843,12 @@ export async function discussGoal(
         norm(question),
       ));
 
-  let suggestionNote: string | null = null;
+  let suggestionBlocks: string[] = [];
   if (wantsValueHelp && form.storeId) {
     const suggested = await suggestGoalTarget(ctx, form.storeId, period);
     if (suggested != null) {
       form = { ...form, target: suggested.amount };
-      suggestionNote = `Sugeri ${brlCent(suggested.amount)} (${suggested.rationale}). ${suggested.seasonalSummary}`;
+      suggestionBlocks = suggested.chatBlocks;
     }
   }
   // Alvo falado pelo Gestor ("270 mil") sempre ganha da sugestao automatica / R$ antigo no historico.
@@ -807,10 +866,10 @@ export async function discussGoal(
     if (prior && !looksLikeDeclineConfigCopy(lastUser)) {
       pendingConfigCopy = { from: prior.from, to: prior.to };
       configOffer =
-        `Tem meta em ${monthYearTitle(prior.from)} nessa filial (${prior.tiers} niveis` +
+        `Tem meta em ${monthYearTitle(prior.from)} nessa filial (${prior.tiers} níveis` +
         (prior.groups > 0 ? `, ${prior.groups} grupos` : "") +
-        `). Quer que eu copie a configuração (escada, bônus opcional e distribuição por grupo)? ` +
-        `Se não, a gente monta do zero (grupos, rateio sem identificação e níveis).`;
+        `, alvo ${brlCent(prior.target)}). Quer que eu copie a configuração (escada, bônus e grupos)?` +
+        `\n\nSe não, a gente monta do zero — grupos, rateio sem identificação e níveis.`;
       skipAssemblyParse = true;
     } else {
       assembly = { ...assembly, path: "fresh" };
@@ -856,20 +915,26 @@ export async function discussGoal(
     ctx.network.find((s) => s.id === form.storeId)?.tradeName ??
     ctx.stores.find((s) => s.id === form.storeId)?.tradeName ??
     "";
-  let reply = formatGoalProposal(form, storeName, assembly);
-  if (copiedLadder) {
-    reply = `Copiei escada, bônus e grupos da meta de ${monthYearTitle(sourceWin!.from)}. ${reply}`;
+
+  const parts: string[] = [];
+  if (suggestionBlocks.length > 0) {
+    parts.push(...suggestionBlocks);
+  } else if (bias && bias.events.length > 0 && !isConfirm && assembly.path == null && lockedTarget == null) {
+    parts.push(bias.summary);
   }
-  if (suggestionNote) {
-    reply = `${suggestionNote} ${reply}`;
-  } else if (bias && bias.events.length > 0 && !isConfirm && assembly.path == null) {
-    reply = `${bias.summary} ${reply}`;
+  if (copiedLadder) {
+    parts.push(`Copiei escada, bônus e grupos da meta de ${monthYearTitle(sourceWin!.from)}.`);
+  }
+  // Resumo curto só quando não estamos no meio da oferta de valor (evita parede de texto).
+  if (suggestionBlocks.length === 0 || basicsReady) {
+    parts.push(formatGoalProposal(form, storeName, assembly));
   }
   if (configOffer) {
-    reply = `${reply} ${configOffer}`;
+    parts.push(configOffer);
   } else {
     const nextQ = nextAssemblyQuestion(form, assembly);
-    if (nextQ) reply = `${reply} ${nextQ}`;
+    if (nextQ) parts.push(nextQ);
   }
+  const reply = parts.filter(Boolean).join("\n\n");
   return { reply, draft: { form, pendingConfigCopy, assembly } };
 }
