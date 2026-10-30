@@ -9,8 +9,12 @@ import {
   looksLikeAcceptConfigCopy,
   looksLikeAskValueSuggestion,
   looksLikeBareCopyAccept,
+  looksLikeChooseCopyPath,
+  looksLikeChooseFreshPath,
+  looksLikeChooseRecommendedPath,
   looksLikeConfirmMount,
   looksLikeDeclineConfigCopy,
+  looksLikeExplicitConfigCopy,
   looksLikeGoalConversation,
   looksLikeAskGroupWeightAdvice,
   looksLikeInspectGoalDraft,
@@ -25,12 +29,14 @@ import {
   formatGoalFactsForModel,
   mergeGoalUtterance,
   parseConfigSourceMonth,
+  parseGoalAssemblyPath,
   parseGoalPeriod,
   parseGoalTarget,
   parseGroupsDistributionChoice,
   parseSpreadUnidentifiedChoice,
   pickConfigSourceStore,
   pickGoalTargetStore,
+  speakGoalAssemblyPathOffer,
   speakGoalDraftConfig,
   speakGoalWeightAdvice,
   validateGoalDraft,
@@ -288,7 +294,7 @@ describe("leaked goal facts", () => {
     expect(ask).not.toMatch(/m[eê]s\?|qual m[eê]s/);
   });
 
-  it("checklist depois do valor ainda pede config (nao so R$)", () => {
+  it("checklist depois do valor ainda pede caminho de montagem (nao so R$)", () => {
     const draft = {
       form: {
         ...emptyGoalForm("a"),
@@ -304,8 +310,8 @@ describe("leaked goal facts", () => {
       },
     };
     const pending = goalAssemblyPendingSteps(draft);
-    expect(pending[0]).toMatch(/copiar|zero/i);
-    expect(pending.some((p) => /escada|desafio|grupos|rateio|rascunho/i.test(p))).toBe(true);
+    expect(pending[0]).toMatch(/caminho|recomenda|zero|copiar/i);
+    expect(pending[0]).toMatch(/aceitar valor/i);
   });
 
   it("discussGoal aceita copiar escada de outubro e sai do passo de copia", async () => {
@@ -325,19 +331,17 @@ describe("leaked goal facts", () => {
         path: null as const,
       },
     };
-    const { draft } = await discussGoal(
-      "Vamos copiar a mesma escada do mes de Outubro",
-      ctx,
-      prev,
-    );
+    const q = "Vamos copiar a mesma escada do mes de Outubro";
+    expect(looksLikeExplicitConfigCopy(q)).toBe(true);
+    expect(parseGoalAssemblyPath(q)).toBe("copy");
+    const { draft } = await discussGoal(q, ctx, prev);
     expect(draft.assembly?.path).toBe("copy");
-    expect(draft.pendingConfigCopy).toBeNull();
     // Sem meta no banco de teste → copyStatus failed (não finge 2 níveis ok).
     expect(draft.copyStatus).toBe("failed");
     expect(goalAssemblyPendingSteps(draft).some((p) => /buscar|falhou|cópia/i.test(p))).toBe(true);
   });
 
-  it('discussGoal "Sim" na oferta de copia avanca sem repetir', async () => {
+  it('discussGoal "Sim" solto com path null nao seleciona copia', async () => {
     const prev = {
       form: {
         ...emptyGoalForm("a"),
@@ -355,11 +359,9 @@ describe("leaked goal facts", () => {
       },
     };
     const { draft } = await discussGoal("Sim", ctx, prev);
-    expect(draft.assembly?.path).toBe("copy");
-    expect(draft.pendingConfigCopy).toBeNull();
-    expect(goalAssemblyPendingSteps(draft).some((p) => /copiar escada\/config da meta anterior/i.test(p))).toBe(
-      false,
-    );
+    expect(draft.assembly?.path).toBeNull();
+    expect(draft.copyStatus == null || draft.copyStatus !== "ok").toBe(true);
+    expect(goalAssemblyPendingSteps(draft)[0]).toMatch(/caminho|recomenda|zero/i);
   });
 
   it("discussGoal copia outubro + ultimo nivel R$ nao aplica 260k como meta-base sem escada", async () => {
@@ -411,7 +413,7 @@ describe("leaked goal facts", () => {
     expect(draft.copyStatus === "failed" || draft.copyStatus === "ok").toBe(true);
   });
 
-  it("Sim nao reaproveita R$ antigo do historico", async () => {
+  it("Sim solto nao copia; copiar outubro sim, sem reaproveitar R$ do historico", async () => {
     const prev = {
       form: {
         ...emptyGoalForm("a"),
@@ -429,8 +431,19 @@ describe("leaked goal facts", () => {
       },
       userLockedTarget: true,
     };
-    const blob = ["user: meta de 250 mil", "jarvis: copiar outubro?", "user: Sim"].join("\n");
-    const { draft } = await discussGoal(blob, ctx, prev);
+    const bare = await discussGoal(
+      ["user: meta de 250 mil", "jarvis: como prefere seguir?", "user: Sim"].join("\n"),
+      ctx,
+      prev,
+    );
+    expect(bare.draft.form.target).toBe(250_000);
+    expect(bare.draft.assembly?.path).toBeNull();
+
+    const { draft } = await discussGoal(
+      ["user: meta de 250 mil", "jarvis: como prefere seguir?", "user: Copiar outubro"].join("\n"),
+      ctx,
+      prev,
+    );
     expect(draft.form.target).toBe(250_000);
     expect(draft.assembly?.path).toBe("copy");
   });
@@ -869,7 +882,7 @@ describe("P0 proposta 244600 vs 257000", () => {
     expect(spokenReply).toBeNull();
   });
 
-  it("vamos seguir a mesma faixa aceita proposta", async () => {
+  it("vamos seguir a mesma faixa aceita proposta sem escolher caminho", async () => {
     const prev = {
       form: {
         ...emptyGoalForm("a"),
@@ -882,7 +895,7 @@ describe("P0 proposta 244600 vs 257000", () => {
         ...emptyGoalAssembly(),
         periodConfirmed: true,
         valueDiscussed: true,
-        path: null as "copy" | "fresh" | null,
+        path: null as "copy" | "recommended" | "fresh" | null,
       },
       proposedTarget: 244_600,
       userLockedTarget: false,
@@ -890,7 +903,10 @@ describe("P0 proposta 244600 vs 257000", () => {
     };
     const { draft, spokenReply } = await discussGoal("Vamos seguir a mesma faixa", ctx, prev);
     expect(draft.form.target).toBe(244_600);
-    expect(spokenReply).toMatch(/Apliquei|244/i);
+    expect(draft.assembly?.path).toBeNull();
+    expect(draft.copyStatus == null || draft.copyStatus !== "ok").toBe(true);
+    expect(spokenReply).toMatch(/244\.600|244600|recomenda|do zero|Copiar/i);
+    expect(spokenReply).not.toMatch(/Vou seguir com (isso|a c[oó]pia)|copiar a escada/i);
   });
 
   it("pedir salvar cria pendingCommit sem shouldCommit", async () => {
@@ -1151,5 +1167,204 @@ describe("continuidade copia outubro → novembro", () => {
     expect(t3.draft.form.tiers).toHaveLength(4);
     expect(speakGoalDraftConfig(t3.draft, { facet: "levels" })).toMatch(/Meta desafio/);
     expect(speakGoalDraftConfig(t3.draft, { facet: "levels" })).toMatch(/110%/);
+  });
+});
+
+describe("caminhos de montagem copy | recommended | fresh", () => {
+  const valueReady = {
+    form: {
+      ...emptyGoalForm("a"),
+      name: "Novembro 2026",
+      startsOn: "2026-11-01",
+      endsOn: "2026-11-30",
+      target: 244_600,
+    },
+    pendingConfigCopy: { from: "2026-10-01", to: "2026-10-31" } as {
+      from: string;
+      to: string;
+    } | null,
+    assembly: {
+      ...emptyGoalAssembly(),
+      periodConfirmed: true,
+      valueDiscussed: true,
+      path: null as "copy" | "recommended" | "fresh" | null,
+    },
+    userLockedTarget: true,
+    proposedTarget: 244_600,
+  };
+
+  const sampleHistory = [
+    {
+      startsOn: "2026-10-01",
+      tierMode: "GROUP" as const,
+      tiers: [
+        { name: "Meta", minAttainmentPct: 50, commissionPct: 1.5, bonus: 50, managerPct: 0.5 },
+        { name: "Super", minAttainmentPct: 75, commissionPct: 2, bonus: 50 },
+        { name: "Hiper", minAttainmentPct: 100, commissionPct: 2.5, bonus: 50 },
+        { name: "Desafio", minAttainmentPct: 110, commissionPct: 3, bonus: 50 },
+      ],
+      groups: [
+        { shiftId: "m", name: "Turno 1", pct: 45 },
+        { shiftId: "t", name: "Turno 2", pct: 55 },
+      ],
+      spreadUnidentified: true,
+      name: "Outubro 2026",
+    },
+    {
+      startsOn: "2026-09-01",
+      tierMode: "GROUP" as const,
+      tiers: [
+        { name: "Meta", minAttainmentPct: 50, commissionPct: 1.5, bonus: 50, managerPct: 0.5 },
+        { name: "Super", minAttainmentPct: 75, commissionPct: 2, bonus: 50 },
+        { name: "Hiper", minAttainmentPct: 100, commissionPct: 2.5, bonus: 50 },
+        { name: "Desafio", minAttainmentPct: 110, commissionPct: 3, bonus: 50 },
+      ],
+      groups: [
+        { shiftId: "m", name: "Turno 1", pct: 45 },
+        { shiftId: "t", name: "Turno 2", pct: 55 },
+      ],
+      spreadUnidentified: true,
+      name: "Setembro 2026",
+    },
+  ];
+
+  it("1. aceitar valor recomendado nao seleciona caminho", async () => {
+    expect(looksLikeExplicitConfigCopy("Vamos seguir a mesma faixa")).toBe(false);
+    expect(parseGoalAssemblyPath("Vamos seguir a mesma faixa")).toBeNull();
+    const prev = {
+      ...valueReady,
+      form: { ...valueReady.form, target: null as number | null },
+      userLockedTarget: false,
+    };
+    const { draft, spokenReply } = await discussGoal("Vamos seguir a mesma faixa", ctx, prev);
+    expect(draft.form.target).toBe(244_600);
+    expect(draft.assembly?.path).toBeNull();
+    expect(spokenReply).toMatch(/recomenda|do zero|Copiar/i);
+  });
+
+  it("2. selecionar copiar usa configuracao anterior", async () => {
+    expect(parseGoalAssemblyPath("Copiar outubro")).toBe("copy");
+    const { draft } = await discussGoal("Copiar outubro", ctx, valueReady);
+    expect(draft.assembly?.path).toBe("copy");
+    // Sem meta no banco de teste → failed, mas o caminho ficou copy (não recommended/fresh).
+    expect(draft.copyStatus).toBe("failed");
+    expect(draft.form.target).toBe(244_600);
+  });
+
+  it("3. selecionar recomendado gera proposta nova baseada em dados", async () => {
+    expect(parseGoalAssemblyPath("Criar com recomendações")).toBe("recommended");
+    const { draft, spokenReply } = await discussGoal("Criar com recomendações", ctx, valueReady, {
+      recentConfigs: sampleHistory,
+    });
+    expect(draft.assembly?.path).toBe("recommended");
+    expect(draft.form.target).toBe(244_600);
+    expect(draft.form.tiers).toHaveLength(4);
+    expect(draft.form.groups).toHaveLength(2);
+    expect(draft.assembly?.confirmedTiers).toBe(false);
+    expect(draft.copyStatus == null || draft.copyStatus !== "ok").toBe(true);
+    expect(spokenReply).toMatch(/recomendad|padr[aã]o|n[aã]o [eé] c[oó]pia/i);
+  });
+
+  it("4. selecionar do zero nao copia automaticamente dados anteriores", async () => {
+    expect(parseGoalAssemblyPath("Criar do zero")).toBe("fresh");
+    const { draft, spokenReply } = await discussGoal("Criar do zero", ctx, valueReady);
+    expect(draft.assembly?.path).toBe("fresh");
+    expect(draft.form.target).toBe(244_600);
+    expect(draft.form.startsOn).toBe("2026-11-01");
+    expect(draft.copyStatus).toBeNull();
+    expect(draft.copiedFrom).toBeNull();
+    expect(draft.form.groups).toHaveLength(0);
+    expect(spokenReply).toMatch(/do zero|Estrutura/i);
+  });
+
+  it("5. gestor informa configuracao completa em uma unica mensagem", async () => {
+    const prev = {
+      ...valueReady,
+      pendingConfigCopy: null,
+      assembly: {
+        ...emptyGoalAssembly(),
+        periodConfirmed: true,
+        valueDiscussed: true,
+        path: "fresh" as const,
+      },
+    };
+    const { draft } = await discussGoal(
+      "Quero divisão por grupos, com rateio de venda sem vendedor e serve a escada",
+      ctx,
+      prev,
+    );
+    expect(draft.assembly?.path).toBe("fresh");
+    expect(draft.assembly?.confirmedGroups).toBe(true);
+    expect(draft.assembly?.confirmedSpread).toBe(true);
+    expect(draft.assembly?.confirmedTiers).toBe(true);
+    expect(draft.form.target).toBe(244_600);
+  });
+
+  it("6. gestor muda de caminho antes de salvar", async () => {
+    const afterRec = await discussGoal("Criar com recomendações", ctx, valueReady, {
+      recentConfigs: sampleHistory,
+    });
+    expect(afterRec.draft.assembly?.path).toBe("recommended");
+    expect(afterRec.draft.form.groups.length).toBeGreaterThan(0);
+    const switched = await discussGoal("Na verdade criar do zero", ctx, afterRec.draft);
+    expect(switched.draft.assembly?.path).toBe("fresh");
+    expect(switched.draft.form.target).toBe(244_600);
+    expect(switched.draft.form.startsOn).toBe("2026-11-01");
+    expect(switched.draft.form.groups).toHaveLength(0);
+    expect(switched.draft.copyStatus).toBeNull();
+  });
+
+  it("7. gestor solicita recomendacao durante o modo do zero", async () => {
+    const fresh = await discussGoal("Criar do zero", ctx, valueReady);
+    expect(fresh.draft.assembly?.path).toBe("fresh");
+    const { draft, spokenReply } = await discussGoal("Quero suas recomendações", ctx, fresh.draft, {
+      recentConfigs: sampleHistory,
+    });
+    expect(draft.assembly?.path).toBe("recommended");
+    expect(draft.form.target).toBe(244_600);
+    expect(spokenReply).toMatch(/recomendad|padr[aã]o/i);
+  });
+
+  it("8. historico insuficiente no modo recomendado", async () => {
+    const { draft, spokenReply } = await discussGoal("Criar com recomendações", ctx, valueReady, {
+      recentConfigs: [],
+    });
+    expect(draft.assembly?.path).toBeNull();
+    expect(draft.form.target).toBe(244_600);
+    expect(spokenReply).toMatch(/hist[oó]rico insuficiente|do zero|copiar/i);
+  });
+
+  it("9. nenhuma alteracao automatica sem autorizacao", async () => {
+    const { draft, shouldCommit } = await discussGoal("Criar com recomendações", ctx, valueReady, {
+      recentConfigs: sampleHistory,
+    });
+    expect(draft.assembly?.confirmedMount).toBe(false);
+    expect(draft.assembly?.confirmedTiers).toBe(false);
+    expect(draft.pendingCommit).toBeFalsy();
+    expect(shouldCommit).toBeFalsy();
+  });
+
+  it("10. valores aceitos permanecem consistentes em todos os caminhos", async () => {
+    const offer = speakGoalAssemblyPathOffer({
+      target: 244_600,
+      destLabel: "novembro de 2026",
+      hasPrior: true,
+      priorLabel: "outubro de 2026",
+    });
+    expect(offer).toMatch(/Copiar/);
+    expect(offer).toMatch(/recomenda/);
+    expect(offer).toMatch(/do zero/);
+    expect(looksLikeChooseCopyPath("Copiar outubro")).toBe(true);
+    expect(looksLikeChooseRecommendedPath("Criar com recomendações")).toBe(true);
+    expect(looksLikeChooseFreshPath("Criar do zero")).toBe(true);
+
+    for (const msg of ["Copiar outubro", "Criar com recomendações", "Criar do zero"] as const) {
+      const { draft } = await discussGoal(msg, ctx, valueReady, {
+        recentConfigs: sampleHistory,
+      });
+      expect(draft.form.target).toBe(244_600);
+      expect(draft.form.startsOn).toBe("2026-11-01");
+      expect(draft.form.storeId).toBe("a");
+    }
   });
 });

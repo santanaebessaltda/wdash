@@ -455,7 +455,7 @@ export function interpretGoalOpStructural(text: string, ctx: GoalOpIntentContext
 
   // Origem / referência: “use outubro como referência”, “copiar outubro”, fato sobre outubro.
   const originRef =
-    /como referencia|como referência|usar?\s+\w+\s+como|tendo em vista|basead|copiar?\s+(a\s+)?(configura|escada|meta)|mesma configura|igual (a |ao )?/.test(
+    /como referencia|como referência|usar?\s+\w+\s+como|tendo em vista|basead|copiar?\s+(a\s+)?(mesma\s+)?(configura|escada|meta)|vamos copiar|quero copiar|mesma (escada|configura)|igual (a |ao )?/.test(
       p,
     ) ||
     (/(janeiro|fevereiro|marco|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)/.test(p) &&

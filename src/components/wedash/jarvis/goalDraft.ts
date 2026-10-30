@@ -20,6 +20,7 @@ import {
   inferConfigPatternFromHistory,
   parseGoalCopyIntent,
   suggestGroupWeightsFromSales,
+  type ConfigPatternSource,
   type GoalCopyIntent,
 } from "./goalConfigIntel";
 import {
@@ -64,14 +65,22 @@ export type GoalDraftForm = {
   managerOn: boolean;
 };
 
+/** Caminho de montagem da config — distinto do aceite do valor-alvo. */
+export type GoalAssemblyPath = "copy" | "recommended" | "fresh";
+
 /** Checklist antes de gravar o rascunho em Metas — montagem guiada no chat. */
 export type GoalAssembly = {
   /** Gestor confirmou o mês (não inferir sozinho e empurrar número). */
   periodConfirmed: boolean;
   /** Já falou valor ou pediu sugestão — aí sim sugerimos/fechamos alvo. */
   valueDiscussed: boolean;
-  /** copy = veio de meta anterior; fresh = montar do zero; null = ainda decidindo. */
-  path: "copy" | "fresh" | null;
+  /**
+   * copy = reutiliza config anterior fielmente;
+   * recommended = propõe config nova a partir do histórico (não é cópia automática);
+   * fresh = gestor monta do zero;
+   * null = valor ok, caminho ainda não escolhido.
+   */
+  path: GoalAssemblyPath | null;
   confirmedGroups: boolean;
   confirmedSpread: boolean;
   confirmedTiers: boolean;
@@ -170,24 +179,109 @@ export function goalCanCommit(draft: GoalDraft): boolean {
   return goalCanPersist(draft);
 }
 
-/** Aceite depois da oferta de copiar config do mês anterior (sim curto ou “vamos copiar a escada…”). */
-export function looksLikeAcceptConfigCopy(text: string): boolean {
+/**
+ * Intenção explícita de copiar config (escada/grupos/mês de origem).
+ * “Mesma faixa” / aceite de valor NÃO entram aqui.
+ */
+export function looksLikeExplicitConfigCopy(text: string): boolean {
   const p = norm(text).trim();
   if (looksLikeDeclineConfigCopy(text)) return false;
+  if (/mesma faixa|seguir a (mesma )?faixa|faixa (recomend|sugerid)/.test(p) && !/escada|config|copia|copiar/.test(p)) {
+    return false;
+  }
   return (
-    /^(sim|pode|quero|copia|ok)(\b|,|$)/.test(p) ||
-    /pode copiar|quero (que )?copie|vamos copiar|quero copiar|copia sim|copia isso|copia dela/.test(p) ||
-    /copiar (a |o |a mesma |o mesmo )?(escada|config|meta)|mesma escada|mesma configura|aproveitar (a )?mesma/.test(
+    /^(copia|copiar)(\b|,|$)/.test(p) ||
+    /pode copiar|quero (que )?copie|vamos copiar|quero copiar|copia sim|copia isso|copia dela|copiar outubro|copia (de |do )?outubro|copiando/.test(
       p,
     ) ||
-    (/\b(copia|copiar)\b/.test(p) && /escada|config|meta|outubro|mes passado|anterior|mesma/.test(p))
+    /copiar (a |o |a mesma |o mesmo )?(escada|config|meta|configura)|copiando .{0,24}(escada|config|meta|outubro)|mesma escada|mesma configura|aproveitar (a )?(mesma )?(escada|config|meta|configura)|repetir (a )?(config|escada|meta)|configura[cç][aã]o (de )?outubro|configura[cç][aã]o anterior/.test(
+      p,
+    ) ||
+    (/\b(copia|copiar|copiando)\b/.test(p) && /escada|config|meta|outubro|mes passado|anterior|mesma/.test(p))
   );
 }
 
-/** “Sim/pode/ok” curto — só vale como aceite de cópia se houver oferta pendente. */
+/** Aceite de cópia: explícito, ou “sim” curto só depois de path=copy já escolhido. */
+export function looksLikeAcceptConfigCopy(text: string): boolean {
+  if (looksLikeDeclineConfigCopy(text)) return false;
+  return looksLikeExplicitConfigCopy(text) || looksLikeBareCopyAccept(text);
+}
+
+/** “Sim/pode/ok” curto — só vale como aceite de cópia se path já for copy. */
 export function looksLikeBareCopyAccept(text: string): boolean {
   const p = norm(text).trim();
   return /^(sim|pode|quero|ok)(\b|,|$)/.test(p);
+}
+
+/** Escolhe o caminho “copiar configuração”. */
+export function looksLikeChooseCopyPath(text: string): boolean {
+  return looksLikeExplicitConfigCopy(text);
+}
+
+/** Escolhe o caminho “criar com recomendações do JARVIS”. */
+export function looksLikeChooseRecommendedPath(text: string): boolean {
+  const p = norm(text).trim();
+  // Aceite do valor-alvo (“aceito a recomendada”) ≠ caminho de montagem.
+  if (
+    /aceito (a |o )?(proposta|recomend|valor)|aplica (a |o )?recomend|topa a recomend|mesma faixa|seguir a (mesma )?faixa/.test(
+      p,
+    ) &&
+    !/configura|caminho|criar|montar|grupos|niveis|escada|pesos/.test(p)
+  ) {
+    return false;
+  }
+  return (
+    /criar com recomenda|montar com recomenda|configura[cç][aã]o recomendad|suas recomenda|recomenda[cç][oõ]es (do |do jarvis )?|caminho recomendad|op[cç][aã]o recomendad|quero (a |sua |a sua )?recomend|vamos (de |com )?(a )?recomendad|usa (sua |a )?recomend|criar recomendad|com as recomenda|com recomenda[cç][oõ]es/.test(
+      p,
+    ) || /^(recomendad|com recomenda)/.test(p)
+  );
+}
+
+/** Escolhe o caminho “criar do zero”. */
+export function looksLikeChooseFreshPath(text: string): boolean {
+  const p = norm(text).trim();
+  return /do zero|montar (tudo )?do zero|criar do zero|come[cç]ar do zero|passo a passo|sem copia|nova configura|prefiro montar|quero montar (do zero|eu mesmo)|do absoluto zero/.test(
+    p,
+  );
+}
+
+/** Interpreta escolha explícita de caminho de montagem. null = ainda não escolheu. */
+export function parseGoalAssemblyPath(text: string): GoalAssemblyPath | null {
+  if (looksLikeChooseFreshPath(text)) return "fresh";
+  if (looksLikeChooseRecommendedPath(text)) return "recommended";
+  if (looksLikeChooseCopyPath(text)) return "copy";
+  return null;
+}
+
+/** Oferta dos três caminhos — JARVIS pode sugerir, nunca executa sozinho. */
+export function speakGoalAssemblyPathOffer(opts: {
+  target: number;
+  destLabel: string;
+  priorLabel?: string | null;
+  hasPrior: boolean;
+}): string {
+  const head =
+    `Perfeito, vamos trabalhar com ${brlCent(opts.target)} para ${opts.destLabel}.\n\n` +
+    `Agora precisamos definir como a equipe vai trabalhar essa meta.\n\n`;
+  if (opts.hasPrior) {
+    const prior = opts.priorLabel ?? "a meta anterior";
+    return (
+      head +
+      `Podemos repetir a configuração de ${prior}, montar uma nova com minhas recomendações ou começar totalmente do zero.\n\n` +
+      `Minha sugestão é criar uma configuração recomendada: aproveitamos o que já funciona nas premiações e revisamos os pesos dos turnos de acordo com as vendas recentes.\n\n` +
+      `Como prefere seguir?\n\n` +
+      `· Copiar ${prior}\n` +
+      `· Criar com recomendações\n` +
+      `· Criar do zero`
+    );
+  }
+  return (
+    head +
+    `Não achei meta anterior para copiar nesta filial. Podemos montar com minhas recomendações ou começar do zero.\n\n` +
+    `Como prefere seguir?\n\n` +
+    `· Criar com recomendações\n` +
+    `· Criar do zero`
+  );
 }
 
 /** Pediu para ver o que está no rascunho (não buscar meta publicada do destino). */
@@ -346,7 +440,10 @@ export function speakGoalDraftConfig(
     return `No rascunho de ${dest} (${alvo}):\n\n` + snap.chatBlocks.join("\n\n");
   }
 
-  return `Ainda não tenho uma configuração no rascunho de ${dest}. Quer copiar a meta anterior ou montar do zero?`;
+  return (
+    `Ainda não tenho uma configuração no rascunho de ${dest}. ` +
+    `Quer copiar a meta anterior, criar com recomendações ou montar do zero?`
+  );
 }
 
 /** Análise de pesos — nunca reabre a narrativa de cópia. */
@@ -421,7 +518,7 @@ export function parseSpreadUnidentifiedChoice(text: string): boolean | null {
   if (/sem rateio|nao ratear|não ratear|nao (quero )?marcar|não (quero )?marcar|deixa (desligado|off|sem)|nao precisa|não precisa/.test(p)) {
     return false;
   }
-  if (/ratear|rateio|marcar|com rateio|sim.*(rate|identif|vendedor)/.test(p)) return true;
+  if (/ratear|rateia|rateio|marcar|com rateio|sim.*(rate|identif|vendedor)/.test(p)) return true;
   if (/^(sim|pode|quero|ok)(\b|,|$)/.test(p)) return true;
   if (/^(nao|não)(\b|,|$)/.test(p)) return false;
   return null;
@@ -429,13 +526,19 @@ export function parseSpreadUnidentifiedChoice(text: string): boolean | null {
 
 export function looksLikeConfirmTiers(text: string): boolean {
   const p = norm(text).trim();
-  if (/nao|não|muda|altera|troca|outro nivel|outra escada/.test(p) && !/nao precisa mudar|não precisa mudar/.test(p)) {
-    if (/^(nao|não)(\b|,|$)/.test(p)) return false;
-    if (/muda|altera|troca/.test(p)) return false;
+  if (
+    /^(nao|não)(\b|,|$)/.test(p) ||
+    (/\b(muda|altera|troca)\b/.test(p) &&
+      /escada|niveis|níveis/.test(p) &&
+      !/nao precisa mudar|não precisa mudar/.test(p))
+  ) {
+    return false;
   }
   return (
     /^(sim|pode|ok|confirma|confirmo|fechado|isso|pode ser)(\b|,|$)/.test(p) ||
-    /confirma (a |os )?(escada|niveis|níveis)|escada (ok|boa|fechada)|niveis ok|níveis ok|pode manter/.test(p)
+    /confirma (a |os )?(escada|niveis|níveis)|serve (a |os |essa |esta )?(escada|niveis|níveis)|(a |os |essa |esta )?(escada|niveis|níveis) serve|escada (ok|boa|fechada|padrao|padrão)|niveis ok|níveis ok|pode manter|mantem a escada|mantém a escada/.test(
+      p,
+    )
   );
 }
 
@@ -1308,12 +1411,26 @@ export function naturalGoalAskFromDraft(draft: GoalDraft): string {
     return `${month} na mesa.\n\nDeixa eu cruzar histórico e sazonal e já te trago uma proposta — sem você precisar chutar número.`;
   }
   if (a.path === null) {
-    return `Ficou ${brlCent(form.target!)}.\n\nCopia a escada da meta anterior dessa filial, ou monta do zero?`;
+    return speakGoalAssemblyPathOffer({
+      target: form.target!,
+      destLabel: form.startsOn ? monthYearTitle(form.startsOn) : "a meta",
+      hasPrior: draft.pendingConfigCopy != null,
+      priorLabel: draft.pendingConfigCopy
+        ? monthYearTitle(draft.pendingConfigCopy.from)
+        : null,
+    });
   }
-  if (a.path === "fresh" && !a.confirmedGroups) {
-    return "Divisão por grupo: rateia entre os grupos, ou loja inteira?";
+  if (a.path === "recommended" && !a.confirmedTiers) {
+    return (
+      `Proposta recomendada no rascunho — ainda sem gravar.\n\n` +
+      speakGoalDraftConfig(draft, { facet: "full" }) +
+      `\n\nConfirma essa configuração, ou quer ajustar algo?`
+    );
   }
-  if (a.path === "fresh" && !a.confirmedSpread) {
+  if ((a.path === "fresh" || a.path === "recommended") && !a.confirmedGroups) {
+    return "Estrutura: meta individual, por grupos ou geral da loja?";
+  }
+  if ((a.path === "fresh" || a.path === "recommended") && !a.confirmedSpread) {
     return "Venda sem vendedor identificado: rateia na equipe do dia, ou deixa de fora?";
   }
   if (a.path === "fresh" && !a.confirmedTiers) {
@@ -1453,7 +1570,7 @@ export function formatGoalFactsForModel(
     checklist_pendente: pending,
     proximo_passo_sugerido: nextHint,
     instrucao:
-      "FONTE DA VERDADE = alvo_centavos (aplicado) e proposedTarget (so proposta). Nunca diga que aplicou proposedTarget sem aceite. commit_draft SO se pode_gravar_rascunho (pendingCommit.authorized). Nao invente R$.",
+      "FONTE DA VERDADE = alvo_centavos (aplicado) e proposedTarget (so proposta). Nunca diga que aplicou proposedTarget sem aceite. Aceitar valor NÃO escolhe caminho de montagem. Se path=null, ofereça os 3 caminhos e espere escolha explícita — NÃO anuncie nem execute cópia sozinho. commit_draft SO se pode_gravar_rascunho (pendingCommit.authorized). Nao invente R$.",
     extras: extras.map((e) => e.trim()).filter(Boolean),
   };
   // Sem prosa em PT: o modelo copia texto longo. Sinal curto + JSON.
@@ -1488,12 +1605,19 @@ export function goalAssemblyPendingSteps(draft: GoalDraft): string[] {
     pending.push("definir valor-alvo (R$) no rascunho");
   }
   if (a.periodConfirmed && form.storeId && a.valueDiscussed && form.target != null) {
-    if (a.path === null) pending.push("copiar escada/config da meta anterior ou montar do zero");
+    if (a.path === null) {
+      pending.push(
+        "escolher caminho: copiar config anterior, criar com recomendações do JARVIS, ou montar do zero (aceitar valor ≠ escolher caminho)",
+      );
+    }
     if (draft.copyStatus === "failed") {
       pending.push("buscar de novo a escada/grupos do mês indicado (cópia falhou)");
     }
+    if (a.path === "recommended" && !a.confirmedTiers) {
+      pending.push("confirmar configuração recomendada (não é cópia automática)");
+    }
     if (a.path === "fresh") {
-      if (!a.confirmedGroups) pending.push("divisão: grupos vs loja inteira");
+      if (!a.confirmedGroups) pending.push("estrutura: individual / grupos / geral");
       if (!a.confirmedSpread) pending.push("venda sem vendedor identificado (rateio ou fora)");
       if (!a.confirmedTiers) {
         pending.push(`escada/níveis (inclui nível desafio %): ${formatTiersBrief(form.tiers)}`);
@@ -1503,7 +1627,12 @@ export function goalAssemblyPendingSteps(draft: GoalDraft): string[] {
       pending.push(
         `conferir escada copiada (${form.tiers.length} níveis · ${form.tierMode} · ${form.groups.length} grupos) e salvar rascunho`,
       );
-    } else if (a.path != null && !a.confirmedMount && draft.copyStatus !== "failed") {
+    } else if (
+      a.path != null &&
+      !a.confirmedMount &&
+      draft.copyStatus !== "failed" &&
+      !(a.path === "recommended" && !a.confirmedTiers)
+    ) {
       pending.push("confirmação para salvar o rascunho em Metas");
     }
   }
@@ -1539,6 +1668,11 @@ export type DiscussGoalOpts = {
    * O modelo NÃO muta o rascunho — só o motor aplica o plano.
    */
   intent?: GoalOpIntent | null;
+  /**
+   * Fontes de histórico para o caminho “recommended” (testes / injeção).
+   * Se omitido, busca metas recentes da filial.
+   */
+  recentConfigs?: ConfigPatternSource[] | null;
 };
 
 export type DiscussGoalResult = {
@@ -1857,17 +1991,36 @@ export async function discussGoal(
     proposedTarget = lockedTarget;
   }
 
-  // Copia: prioriza a fala do Gestor (não o histórico da IA).
-  // Fato sobre mês de origem NÃO reabre cópia nem muda destino.
+  // Caminho de montagem (copy | recommended | fresh) — separado do aceite do valor.
+  const pathChoice = parseGoalAssemblyPath(lastUser);
+  const switchingPath =
+    pathChoice != null && assembly.path != null && pathChoice !== assembly.path;
+
+  // Copia: só com intenção explícita de copiar / path=copy — nunca por aceite de valor.
+  // freezeDestinationPeriod bloqueia reentrada por FATO de escada; pedido explícito de cópia passa.
   const skipCopyReentry =
     opPlan.freezeDestinationPeriod &&
-    (opIntent.entity === "ladder" || opIntent.periodRole === "mention");
-  // Se já copiou com sucesso, NÃO reentrar por "sim" solto (destrói o estado).
+    (opIntent.entity === "ladder" || opIntent.periodRole === "mention") &&
+    pathChoice !== "copy" &&
+    !looksLikeExplicitConfigCopy(lastUser);
+  const selectingCopy =
+    !skipCopyReentry &&
+    !justAcceptedProposal &&
+    (pathChoice === "copy" ||
+      looksLikeExplicitConfigCopy(lastUser) ||
+      (looksLikeBareCopyAccept(lastUser) &&
+        prev?.assembly?.path === "copy" &&
+        prev.copyStatus !== "ok" &&
+        prev.pendingConfigCopy != null));
+
   let sourceWin = skipCopyReentry
     ? null
-    : parseConfigSourceMonth(lastUser, ctx.today, form.startsOn);
+    : selectingCopy
+      ? parseConfigSourceMonth(lastUser, ctx.today, form.startsOn)
+      : null;
   if (
     !sourceWin &&
+    selectingCopy &&
     opIntent.periodMonth &&
     (opIntent.entity === "period_origin" ||
       (opIntent.periodRole === "origin" && /copiar|copia|mesma configura|referencia|referência/.test(qn)))
@@ -1876,7 +2029,6 @@ export async function discussGoal(
     sourceWin = { from, to: endOfMonth(from) };
   }
   if (!sourceWin && !skipCopyReentry && looksLikeLadderCopyCorrection(lastUser)) {
-    // “Outubro tem mais níveis / por grupo” → rebusca a fonte (oferta, mês citado ou mês anterior).
     sourceWin =
       prev?.pendingConfigCopy ??
       (prev?.copiedFrom
@@ -1892,20 +2044,11 @@ export async function discussGoal(
       if (prior) sourceWin = { from: prior.from, to: prior.to };
     }
   }
-  // "Sim" / "vamos copiar" — usa oferta pendente ou busca a meta anterior.
-  if (!sourceWin && looksLikeAcceptConfigCopy(lastUser)) {
-    const bare = looksLikeBareCopyAccept(lastUser);
-    if (bare && prev?.pendingConfigCopy) {
-      sourceWin = prev.pendingConfigCopy;
-    } else if (bare && prev?.copyStatus === "ok") {
-      // Já copiou — "sim" é confirmação de outro passo, não nova cópia.
-      sourceWin = null;
-    } else if (!bare || prev?.pendingConfigCopy) {
-      sourceWin = prev?.pendingConfigCopy ?? null;
-      if (!sourceWin && form.storeId && form.startsOn) {
-        const prior = await findPriorGoalForStore(ctx, form.storeId, form.startsOn);
-        if (prior) sourceWin = { from: prior.from, to: prior.to };
-      }
+  if (!sourceWin && selectingCopy) {
+    sourceWin = prev?.pendingConfigCopy ?? null;
+    if (!sourceWin && form.storeId && form.startsOn) {
+      const prior = await findPriorGoalForStore(ctx, form.storeId, form.startsOn);
+      if (prior) sourceWin = { from: prior.from, to: prior.to };
     }
   }
   // Já tem cópia ok e o Gestor só inspeciona — nunca rebuscar destino (novembro).
@@ -1919,14 +2062,32 @@ export async function discussGoal(
   }
 
   let copiedLadder = false;
-  let copyStatus: GoalDraft["copyStatus"] = prev?.copyStatus ?? null;
-  let copiedFrom: GoalCopiedFrom | null = prev?.copiedFrom ?? null;
-  let copyIntent: GoalCopyIntent | null = prev?.copyIntent ?? null;
+  let copyStatus: GoalDraft["copyStatus"] = switchingPath && pathChoice !== "copy"
+    ? null
+    : (prev?.copyStatus ?? null);
+  let copiedFrom: GoalCopiedFrom | null =
+    switchingPath && pathChoice !== "copy" ? null : (prev?.copiedFrom ?? null);
+  let copyIntent: GoalCopyIntent | null =
+    switchingPath && pathChoice !== "copy" ? null : (prev?.copyIntent ?? null);
   let configSnapshotBlocks: string[] = [];
   let weightAdviceBlocks: string[] = [];
   let patternBlocks: string[] = [];
+  let pathOfferBlocks: string[] = [];
+  let recommendedJustApplied = false;
   let skipAssemblyParse = false;
-  if (sourceWin) {
+
+  const selectingRecommended =
+    !justAcceptedProposal &&
+    (pathChoice === "recommended" ||
+      (assembly.path === "fresh" && looksLikeChooseRecommendedPath(lastUser)));
+  const selectingFresh =
+    !justAcceptedProposal &&
+    (pathChoice === "fresh" ||
+      (assembly.path == null &&
+        looksLikeDeclineConfigCopy(lastUser) &&
+        /monta (do )?zero|sem copia|nova configura|prefiro montar|quero montar|do zero/.test(qn)));
+
+  if (sourceWin && (selectingCopy || looksLikeLadderCopyCorrection(lastUser))) {
     const pool = ctx.network.length > 0 ? ctx.network : ctx.stores;
     const matched = matchStoresInText(lastUser, pool);
     const source = pickConfigSourceStore(lastUser, matched);
@@ -1936,7 +2097,6 @@ export async function discussGoal(
     copiedLadder = copied.ok;
     copyStatus = copied.ok ? "ok" : "failed";
     if (copied.ok && copied.copiedFrom) copiedFrom = copied.copiedFrom;
-    // Só aplica desafio +N% se ESTA fala do Gestor pediu — não o histórico da IA.
     if (
       copied.ok &&
       looksLikeGoalLadderTalk(lastUser) &&
@@ -1948,7 +2108,6 @@ export async function discussGoal(
     if (copied.ok) {
       const snap = buildGoalConfigSnapshot(form, form.target);
       configSnapshotBlocks = snap.chatBlocks;
-      // Pesos: só recomenda (nunca aplica). Em cópia exacta, pergunta se quer avaliar.
       if (form.groups.length >= 2 && form.storeId) {
         const weights = await suggestGroupWeightsFromSales(ctx, form.storeId, form.groups);
         if (weights?.chatBlocks.length) {
@@ -1972,68 +2131,28 @@ export async function discussGoal(
         confirmedTiers: true,
         confirmedMount: false,
       };
+    } else if (prev?.copyStatus === "ok" && prev.form.tiers.length > 0 && !switchingPath) {
+      form = prev.form;
+      copyStatus = "ok";
+      copiedFrom = prev.copiedFrom ?? copiedFrom;
+      assembly = prev.assembly ?? assembly;
+      logGoalCopy("copy_retry_kept_prev", {
+        originFrom: sourceWin.from,
+        destFrom: form.startsOn,
+      });
     } else {
-      // Falha: não apagar escada já ok de um turno anterior.
-      if (prev?.copyStatus === "ok" && prev.form.tiers.length > 0) {
-        form = prev.form;
-        copyStatus = "ok";
-        copiedFrom = prev.copiedFrom ?? copiedFrom;
-        assembly = prev.assembly ?? assembly;
-        logGoalCopy("copy_retry_kept_prev", {
-          originFrom: sourceWin.from,
-          destFrom: form.startsOn,
-        });
-      } else {
-        assembly = {
-          ...assembly,
-          path: "copy",
-          confirmedGroups: false,
-          confirmedSpread: false,
-          confirmedTiers: false,
-          confirmedMount: false,
-        };
-      }
+      assembly = {
+        ...assembly,
+        path: "copy",
+        confirmedGroups: false,
+        confirmedSpread: false,
+        confirmedTiers: false,
+        confirmedMount: false,
+      };
     }
     skipAssemblyParse = true;
-  } else if (
-    assembly.path == null &&
-    looksLikeDeclineConfigCopy(lastUser) &&
-    (prev?.pendingConfigCopy != null ||
-      /monta (do )?zero|sem copia|nova configura|prefiro montar|quero montar/.test(qn))
-  ) {
-    assembly = {
-      ...emptyGoalAssembly(),
-      periodConfirmed: true,
-      valueDiscussed: assembly.valueDiscussed || form.target != null,
-      path: "fresh",
-    };
-    copyStatus = null;
-    skipAssemblyParse = true;
-    if (form.storeId && form.startsOn) {
-      const recent = await fetchRecentGoalConfigs(ctx, form.storeId, form.startsOn);
-      const inferred = inferConfigPatternFromHistory(recent);
-      if (inferred) {
-        form = applyConfigPatternToForm(form, inferred.pattern);
-        patternBlocks = inferred.chatBlocks;
-        const snap = buildGoalConfigSnapshot(form, form.target);
-        configSnapshotBlocks = snap.chatBlocks;
-        if (form.groups.length >= 2) {
-          assembly = {
-            ...assembly,
-            confirmedGroups: true,
-            confirmedSpread: true,
-            confirmedTiers: false,
-            confirmedMount: false,
-          };
-        }
-      }
-    }
-  } else if (
-    assembly.path == null &&
-    looksLikeAcceptConfigCopy(lastUser) &&
-    (prev?.pendingConfigCopy != null || form.target != null)
-  ) {
-    // Aceitou copiar mas não achou janela — marca falha pra não fingir 2 níveis default.
+  } else if (selectingCopy && !sourceWin) {
+    // Pediu copiar mas não achou janela — marca falha; não finge escada default.
     copyStatus = "failed";
     assembly = {
       ...assembly,
@@ -2044,6 +2163,90 @@ export async function discussGoal(
       confirmedMount: false,
     };
     skipAssemblyParse = true;
+  } else if (selectingRecommended) {
+    copyStatus = null;
+    copiedFrom = null;
+    copyIntent = null;
+    assembly = {
+      ...assembly,
+      path: "recommended",
+      confirmedGroups: false,
+      confirmedSpread: false,
+      confirmedTiers: false,
+      confirmedMount: false,
+    };
+    skipAssemblyParse = true;
+    const recent =
+      opts?.recentConfigs != null
+        ? opts.recentConfigs
+        : form.storeId && form.startsOn
+          ? await fetchRecentGoalConfigs(ctx, form.storeId, form.startsOn)
+          : [];
+    const inferred = inferConfigPatternFromHistory(recent);
+    if (inferred) {
+      form = applyConfigPatternToForm(form, inferred.pattern);
+      patternBlocks = [
+        ...inferred.chatBlocks,
+        "Isso é proposta recomendada a partir do histórico — não é cópia fiel de um mês. Confirme ou ajuste antes de gravar.",
+      ];
+      configSnapshotBlocks = buildGoalConfigSnapshot(form, form.target).chatBlocks;
+      recommendedJustApplied = true;
+      if (form.groups.length >= 2 && form.storeId) {
+        const weights = await suggestGroupWeightsFromSales(ctx, form.storeId, form.groups);
+        if (weights?.chatBlocks.length) {
+          weightAdviceBlocks = [
+            ...weights.chatBlocks,
+            "Pesos sugeridos pela venda recente — ainda não aplicados no rascunho.",
+          ];
+        }
+      }
+      assembly = {
+        ...assembly,
+        path: "recommended",
+        confirmedGroups: form.groups.length > 0,
+        confirmedSpread: true,
+        confirmedTiers: false,
+        confirmedMount: false,
+      };
+    } else {
+      patternBlocks = [
+        "Não tenho histórico suficiente nesta filial para montar uma configuração recomendada com confiança.",
+        "Prefere copiar uma meta específica (se houver) ou montar do zero comigo, passo a passo?",
+      ];
+      assembly = {
+        ...assembly,
+        path: null,
+        confirmedGroups: false,
+        confirmedSpread: false,
+        confirmedTiers: false,
+        confirmedMount: false,
+      };
+    }
+  } else if (selectingFresh) {
+    // Do zero: não aplica padrão histórico sozinho (isso é o caminho recommended).
+    const keepTarget = form.target;
+    const keepStarts = form.startsOn;
+    const keepEnds = form.endsOn;
+    const keepStore = form.storeId;
+    const keepName = form.name;
+    form = {
+      ...emptyGoalForm(keepStore),
+      name: keepName,
+      startsOn: keepStarts,
+      endsOn: keepEnds,
+      target: keepTarget,
+    };
+    form = ensureGoalName(form);
+    assembly = {
+      ...emptyGoalAssembly(),
+      periodConfirmed: true,
+      valueDiscussed: keepTarget != null,
+      path: "fresh",
+    };
+    copyStatus = null;
+    copiedFrom = null;
+    copyIntent = null;
+    skipAssemblyParse = false; // permite parsear grupos/níveis na mesma fala
   }
 
   const period =
@@ -2082,8 +2285,9 @@ export async function discussGoal(
   form = ensureGoalName(form);
   const basicsReady = goalDraftReady(form);
 
-  let pendingConfigCopy: GoalDraft["pendingConfigCopy"] = null;
-  let configOffer: string | null = null;
+  let pendingConfigCopy: GoalDraft["pendingConfigCopy"] =
+    assembly.path === "copy" && copyStatus === "ok" ? null : (prev?.pendingConfigCopy ?? null);
+  let pathOfferPriorLabel: string | null = null;
   if (
     basicsReady &&
     assembly.valueDiscussed &&
@@ -2093,44 +2297,63 @@ export async function discussGoal(
     form.startsOn
   ) {
     const prior = await findPriorGoalForStore(ctx, form.storeId, form.startsOn);
-    // Nunca reofereça cópia no mesmo turno em que o Gestor já aceitou/recusou.
-    if (prior && !looksLikeDeclineConfigCopy(lastUser) && !looksLikeAcceptConfigCopy(lastUser)) {
+    if (prior) {
+      // Referência disponível para o caminho copy — NÃO seleciona path nem executa cópia.
       pendingConfigCopy = { from: prior.from, to: prior.to };
-      configOffer =
-        `Em ${monthYearTitle(prior.from)} essa filial já tinha meta (${brlCent(prior.target)}` +
-        (prior.groups > 0 ? `, ${prior.groups} grupos` : "") +
-        `). Quer aproveitar a mesma escada/bônus/grupos, ou montamos do zero?`;
-      skipAssemblyParse = true;
-    } else if (!prior) {
-      assembly = { ...assembly, path: "fresh" };
-      skipAssemblyParse = true;
-      if (form.storeId && form.startsOn && patternBlocks.length === 0) {
-        const recent = await fetchRecentGoalConfigs(ctx, form.storeId, form.startsOn);
-        const inferred = inferConfigPatternFromHistory(recent);
-        if (inferred) {
-          form = applyConfigPatternToForm(form, inferred.pattern);
-          patternBlocks = inferred.chatBlocks;
-          configSnapshotBlocks = buildGoalConfigSnapshot(form, form.target).chatBlocks;
-        }
-      }
+      pathOfferPriorLabel = monthYearTitle(prior.from);
+    } else {
+      pendingConfigCopy = null;
     }
+    pathOfferBlocks = [
+      speakGoalAssemblyPathOffer({
+        target: form.target!,
+        destLabel: monthYearTitle(form.startsOn),
+        hasPrior: prior != null,
+        priorLabel: pathOfferPriorLabel,
+      }),
+    ];
   }
 
-  // Montagem guiada (fresh): grupos → rateio → níveis → confirma montar.
-  if (basicsReady && assembly.path === "fresh" && !pendingConfigCopy && !skipAssemblyParse) {
+  // Confirma proposta do caminho recommended.
+  if (
+    basicsReady &&
+    assembly.path === "recommended" &&
+    !assembly.confirmedTiers &&
+    !recommendedJustApplied &&
+    /^(sim|pode|ok|fechado|confirma|confirmo|serve|topa)(\b|,|$)/.test(qn)
+  ) {
+    assembly = {
+      ...assembly,
+      confirmedGroups: true,
+      confirmedSpread: true,
+      confirmedTiers: true,
+      confirmedMount: false,
+    };
+    skipAssemblyParse = true;
+  }
+
+  // Montagem guiada (fresh): estrutura → rateio → níveis — vários slots na mesma fala.
+  if (basicsReady && assembly.path === "fresh" && !skipAssemblyParse) {
     if (!assembly.confirmedGroups) {
       const choice = parseGroupsDistributionChoice(lastUser);
       if (choice != null) {
-        if (choice) form = { ...form, tierMode: form.tierMode === "GENERAL" ? "GROUP" : form.tierMode };
+        if (choice) {
+          form = {
+            ...form,
+            tierMode: form.tierMode === "GENERAL" ? "GROUP" : form.tierMode === "INDIVIDUAL" ? "GROUP" : form.tierMode,
+          };
+        }
         assembly = { ...assembly, confirmedGroups: true };
       }
-    } else if (!assembly.confirmedSpread) {
+    }
+    if (assembly.confirmedGroups && !assembly.confirmedSpread) {
       const choice = parseSpreadUnidentifiedChoice(lastUser);
       if (choice != null) {
         form = { ...form, spreadUnidentified: choice };
         assembly = { ...assembly, confirmedSpread: true };
       }
-    } else if (!assembly.confirmedTiers) {
+    }
+    if (assembly.confirmedGroups && assembly.confirmedSpread && !assembly.confirmedTiers) {
       if (looksLikeConfirmTiers(lastUser)) {
         assembly = { ...assembly, confirmedTiers: true };
       }
@@ -2365,7 +2588,7 @@ export async function discussGoal(
   if (patternBlocks.length) {
     extras.push(`padrao_historico:\n${patternBlocks.join("\n")}`);
     extras.push(
-      "instrucao_fala: Diferencie padrao identificado de recomendacao nova. Nao diga que e a melhor config so por ser recente. Confirme a escada antes de gravar.",
+      "instrucao_fala: Diferencie herdado, recomendado e alteracao sugerida. Nao diga que copiou. Confirme a escada antes de gravar.",
     );
   }
   if (configSnapshotBlocks.length) {
@@ -2379,7 +2602,17 @@ export async function discussGoal(
       `config_copia_falhou: nao achei meta de ORIGEM em ${monthYearTitle(sourceWin.from)} (nao e o mes de destino ${form.startsOn ? monthYearTitle(form.startsOn) : "?"}). Nao invente escada.`,
     );
   }
-  if (configOffer) extras.push(`oferta_copiar_config: ${configOffer}`);
+  if (pathOfferBlocks.length) {
+    extras.push(`oferta_caminho_montagem:\n${pathOfferBlocks.join("\n")}`);
+    extras.push(
+      "instrucao_fala: path ainda null. Ofereça copiar / recomendações / do zero. NÃO execute cópia. NÃO diga 'vou seguir com a cópia'.",
+    );
+  }
+  if (assembly.path === null && form.target != null) {
+    extras.push(
+      "instrucao_fala: Valor já definido. Próximo passo = escolha de caminho (copy|recommended|fresh), não reabrir valor nem anunciar cópia.",
+    );
+  }
 
   let spokenReply: string | null = null;
   const copyJustApplied = Boolean(sourceWin && (copiedLadder || copyStatus === "failed"));
@@ -2443,12 +2676,44 @@ export async function discussGoal(
     spokenReply = speakGoalDraftConfig(draftOut, {
       facet: copyStatus === "ok" ? "copyJustApplied" : "full",
     });
+  } else if (recommendedJustApplied && patternBlocks.length) {
+    spokenReply = scrubTechnicalSpeech(
+      `Montei uma configuração recomendada para ${form.startsOn ? monthYearTitle(form.startsOn) : "a meta"}` +
+        (form.target != null ? ` (${brlCent(form.target)})` : "") +
+        `.\n\n` +
+        patternBlocks.join("\n\n") +
+        (configSnapshotBlocks.length ? `\n\n${configSnapshotBlocks.join("\n\n")}` : "") +
+        (weightAdviceBlocks.length ? `\n\n${weightAdviceBlocks.join("\n\n")}` : "") +
+        `\n\nNada foi gravado. Confirma essa proposta, ajusta algum ponto, ou prefere outro caminho?`,
+    );
+  } else if (patternBlocks.length && assembly.path === null && selectingRecommended) {
+    spokenReply = scrubTechnicalSpeech(patternBlocks.join("\n\n"));
   } else if (looksLikeInspectGoalDraft(lastUser)) {
     spokenReply = speakGoalDraftConfig(draftOut, { facet: goalInspectFacet(lastUser) });
+  } else if (justAcceptedProposal && form.target != null && assembly.path === null) {
+    spokenReply =
+      pathOfferBlocks[0] ??
+      speakGoalAssemblyPathOffer({
+        target: form.target,
+        destLabel: form.startsOn ? monthYearTitle(form.startsOn) : "a meta",
+        hasPrior: pendingConfigCopy != null,
+        priorLabel: pendingConfigCopy ? monthYearTitle(pendingConfigCopy.from) : null,
+      });
   } else if (justAcceptedProposal && form.target != null) {
     spokenReply =
-      `Apliquei ${brlCent(form.target)} no rascunho.\n\n` +
-      buildGoalConfigSnapshot(form, form.target).chatBlocks.join("\n\n");
+      `Apliquei ${brlCent(form.target)} no rascunho.` +
+      (assembly.path != null
+        ? `\n\n${buildGoalConfigSnapshot(form, form.target).chatBlocks.join("\n\n")}`
+        : "");
+  } else if (pathOfferBlocks.length > 0 && form.target != null && assembly.path === null) {
+    spokenReply = pathOfferBlocks[0] ?? null;
+  } else if (selectingFresh && assembly.path === "fresh") {
+    spokenReply =
+      `Ok — vamos montar do zero para ${form.startsOn ? monthYearTitle(form.startsOn) : "a meta"}` +
+      (form.target != null ? ` com ${brlCent(form.target)}` : "") +
+      `.\n\n` +
+      `Estrutura: meta individual, por grupos ou geral da loja? ` +
+      `Se quiser, já me diga grupos, níveis, bônus e rateio na mesma mensagem.`;
   }
 
   return {
