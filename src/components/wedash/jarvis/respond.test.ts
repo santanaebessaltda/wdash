@@ -4,6 +4,7 @@ import { classifyIntent, jarvisReply } from "./respond";
 describe("classifyIntent", () => {
   it("reconhece cumprimento no fallback local", () => {
     expect(classifyIntent("Oi JARVIS")).toBe("greeting");
+    expect(classifyIntent("Opa")).toBe("greeting");
   });
 
   it("reconhece desafio, meta, escala e pedidos de sair do chat", () => {

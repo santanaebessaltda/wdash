@@ -58,7 +58,7 @@ function contextNote(ctx: JarvisContext, session?: JarvisLlmSession | null): str
     `Sazonal/feriados a considerar sozinho (meta/desafio): ${compactSeasonalContext(ctx.today, 2)}.`,
     "Interprete a intenção pelo sentido + histórico. O app não classifica palavra-chave.",
     "Você escreve TODA a fala. Tools só executam. Nunca use travessão (—).",
-    "Small talk: humano, pelo nome; zero tool; sem relatório inventado.",
+    "Cumprimento/small talk (oi, opa, e aí, fala…): responda humano pelo nome; ZERO tools; ZERO relatório de vendas.",
     "Gravar rascunho/card = commit_draft. Descartar = discard_draft. Pedido de abrir outra tela = responda no chat, sem navegar.",
   ];
   if (session?.goalDraftSummary) {
