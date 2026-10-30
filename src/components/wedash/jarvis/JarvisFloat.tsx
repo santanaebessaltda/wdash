@@ -8,13 +8,11 @@ import { padBottom } from "@/lib/safeArea";
 import { paths } from "@/router/paths";
 import { SendIcon } from "@/pages/apps/icons";
 import { ChallengeProposalCard } from "./ChallengeProposalCard";
-import { GoalProposalCard } from "./GoalProposalCard";
 import { ScheduleProposalCard } from "./ScheduleProposalCard";
 import {
   challengeDraftReady,
   missingChallengeLabels,
 } from "./challengeDraft";
-import { goalDraftReady, missingGoalLabels, validateGoalDraft } from "./goalDraft";
 import {
   missingScheduleLabels,
   scheduleDraftReady,
@@ -149,17 +147,6 @@ export function JarvisFloat() {
                       busy={j.commitBusy}
                       onAuthorize={j.authorizeChallenge}
                       onDiscard={j.discardChallenge}
-                    />
-                  ) : null}
-                  {j.goalDraft ? (
-                    <GoalProposalCard
-                      form={j.goalDraft.form}
-                      storeName={j.storeNameFor(j.goalDraft.form.storeId)}
-                      ready={goalDraftReady(j.goalDraft.form)}
-                      missing={missingGoalLabels(validateGoalDraft(j.goalDraft.form))}
-                      busy={j.commitBusy}
-                      onAuthorize={j.authorizeGoal}
-                      onDiscard={j.discardGoal}
                     />
                   ) : null}
                   {j.scheduleDraft ? (

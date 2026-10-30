@@ -248,7 +248,7 @@ Leitura **não** pede confirmação. Escrita **sempre** pede.
 **Metas e Desafios — cobertura total, criação conjunta:**
 - O JARVIS não fica preso a um atalho (ex.: só “estoque parado”). Ele **discute e monta junto** com o Gestor, cobrindo **todos os cenários** que a UI já permite.
 - **Desafios:** modos (Disputa / Mínimo), métricas (quantidade, valor, P.A., ticket, índice), escopos (tudo / produtos / categorias), piso de vendas, prêmios (dinheiro / item / pódio), gerência, datas, loja(s) — o mesmo modelo do editor atual. Origem da ideia pode ser estoque parado, sazonalidade, histórico de vendas, pedido do Gestor, etc.; o fechamento dos campos é conversa + card de proposta.
-- **Metas:** loja/período/equipe, níveis, premiação, rateio, competência — mesmos campos do CRUD; o JARVIS **já embute sozinho** feriados e sazonal do período (Black Friday, Natal, Dia das Mães, Carnaval…) na sugestão de valor (+ histórico), sem o Gestor precisar guiar; só grava após OK/rascunho.
+- **Metas:** discussão **só texto no chat** (sem card). JARVIS embute sozinho sazonal/feriado na sugestão; grava rascunho em Performance > Metas só com confirmação explícita (“cria a meta” / Autorizo) + link.
 - **Desafio/Escala:** card de proposta no chat (Autorizar / Descartar). **Meta:** rascunho direto em Metas após confirmação (+ link no chat).
 
 **Análises (leitura, sem OK):** vendas dos últimos meses; produtos parados no estoque (insumo para desafio); datas sazonais (Dia das Mães, Black Friday, Natal…); comparação entre filiais; o que os números da tela ainda não dizem (evolução do `insight.ts` / EQUIP-06, com LLM quando houver backend).

@@ -548,8 +548,8 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
         setScheduleDraft(null);
         scheduleDraftRef.current = null;
         const { reply: answer, draft } = await discussGoal(q, ctx, goalDraftRef.current);
-        setGoalDraft(draft);
         goalDraftRef.current = draft;
+        setGoalDraft(null);
         setCreatedItem(null);
         finish(answer);
         return;
@@ -642,8 +642,9 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
               .join("\n");
             const { draft } = await discussGoal(historyBlob || q, ctx, goalDraftRef.current);
             if (gen !== replyGen.current) return;
-            setGoalDraft(draft);
+            // Meta: so texto no chat — memoria no ref; grava em Metas so na confirmacao.
             goalDraftRef.current = draft;
+            setGoalDraft(null);
             setChallengeDraft(null);
             challengeDraftRef.current = null;
             setScheduleDraft(null);
@@ -651,7 +652,7 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
             setCreatedItem(null);
             if (!goalDraftReady(draft.form)) {
               finish(
-                `Quase — ainda falta ${missingGoalLabels(validateGoalDraft(draft.form)).join(", ")} pra eu gravar o rascunho.`,
+                `Quase — ainda falta ${missingGoalLabels(validateGoalDraft(draft.form)).join(", ")} pra eu gravar em Metas.`,
               );
               return;
             }
@@ -709,7 +710,7 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
 
         applyPeriodHint();
 
-        let goalSavedAsDraft = false;
+        let goalTextReply: string | null = null;
         for (const effect of llm.sideEffects) {
           if (effect.kind === "draft_challenge") {
             setGoalDraft(null);
@@ -726,29 +727,13 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
             challengeDraftRef.current = null;
             setScheduleDraft(null);
             scheduleDraftRef.current = null;
-            const { draft } = await discussGoal(effect.request || q, ctx, goalDraftRef.current);
+            const { draft, reply } = await discussGoal(effect.request || q, ctx, goalDraftRef.current);
             if (gen !== replyGen.current) return;
-            setGoalDraft(draft);
+            // So texto no chat — sem card; memoria so no ref pra continuar o fio.
             goalDraftRef.current = draft;
+            setGoalDraft(null);
             setCreatedItem(null);
-            // Confirmacao com draft pronto → rascunho em Metas, sem depender do card.
-            if (classifyIntent(q) === "authorize" && goalDraftReady(draft.form) && !commitBusy) {
-              setCommitBusy(true);
-              const res = await commitGoal(session.tenantId, draft.form, { published: false });
-              setCommitBusy(false);
-              if (gen !== replyGen.current) return;
-              if (res.ok) {
-                setGoalDraft(null);
-                goalDraftRef.current = null;
-                setCreatedItem({ kind: "goal", id: res.id, name: res.name, asDraft: true });
-                goalSavedAsDraft = true;
-                finish(
-                  `Pronto — rascunho “${res.name}” gravado em Metas. Abre o link pra revisar e publicar quando quiser.`,
-                );
-              } else {
-                finish(res.reason);
-              }
-            }
+            goalTextReply = reply;
           } else if (effect.kind === "draft_schedule") {
             setChallengeDraft(null);
             challengeDraftRef.current = null;
@@ -764,14 +749,14 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
 
         applyPeriodHint();
 
-        if (!goalSavedAsDraft) finish(llm.content);
+        // Preferir o texto da discussao de meta (sazonal/sugestao) ao content generico da tool.
+        finish(goalTextReply ?? llm.content);
       })();
     },
     [
       authorizeChallenge,
       authorizeGoal,
       authorizeSchedule,
-      commitBusy,
       location.pathname,
       location.search,
       navigate,

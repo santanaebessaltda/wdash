@@ -43,7 +43,7 @@ function contextNote(ctx: JarvisContext, session?: JarvisLlmSession | null): str
     "Ao montar meta ou desafio, ja leve sazonal/feriado na sugestao de valor — o Gestor nao precisa lembrar de Black Friday, Natal, Dia das Maes etc.",
   ];
   if (session?.goalDraftSummary) {
-    lines.push(`Rascunho de META aberto no chat: ${session.goalDraftSummary}. Continuacao (nivel, %, outubro, valor) = draft_goal, nao draft_challenge. Confirmacao (criar/autorizar) = draft_goal; o app grava rascunho em Metas.`);
+    lines.push(`Proposta de META em discussao (so texto no chat, sem card): ${session.goalDraftSummary}. Continuacao = draft_goal. Confirmacao (cria a meta/autorizo) grava rascunho em Metas — nao invente que ja gravou.`);
   }
   if (session?.challengeDraftSummary) {
     lines.push(`Rascunho de DESAFIO (produto/disputa) aberto: ${session.challengeDraftSummary}.`);

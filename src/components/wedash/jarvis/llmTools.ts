@@ -42,8 +42,7 @@ export async function runJarvisTool(
       };
     case "draft_goal":
       return {
-        content:
-          "Rascunho de meta sera montado no app (com historico + sazonal/feriados do periodo embutidos na sugestao de valor). Se for confirmacao completa, grava rascunho em Metas.",
+        content: "Proposta de meta em texto no chat (sem card). So grava rascunho em Metas se o Gestor confirmar cria/autorizo.",
         sideEffect: { kind: "draft_goal", request: question },
       };
     case "draft_schedule":
