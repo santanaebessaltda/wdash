@@ -46,9 +46,11 @@ function contextNote(ctx: JarvisContext, session?: JarvisLlmSession | null): str
       : ctx.stores.map((s) => `${s.tradeName || s.name} (${s.code || s.id})`).join("; ");
   const lines = [
     `Hoje: ${ctx.today}. Filiais no escopo: ${stores}. Tenant: ${ctx.tenantId}.`,
+    `Gestor (chame pelo primeiro nome): ${ctx.managerFirstName || "Gestor"}.`,
     `Sazonal/feriados a considerar sozinho (meta/desafio): ${compactSeasonalContext(ctx.today, 2)}.`,
     "Interprete a intenção pelo histórico + mensagem atual. Não roteie por palavra isolada.",
     "Você escreve TODA a fala ao Gestor. Tools só trazem dado/estado. Nunca use travessão (—).",
+    "Cumprimento (oi/e aí): cumprimente pelo nome e pergunte o que precisa. NÃO liste menu (vendas, estoque, meta…).",
     "Ao montar meta ou desafio, ja leve sazonal/feriado na sugestao de valor quando couber (1 frase).",
   ];
   if (session?.goalDraftSummary) {

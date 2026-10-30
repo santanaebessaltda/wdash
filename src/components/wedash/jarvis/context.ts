@@ -1,6 +1,7 @@
 import { calendarTodayIso } from "@/data/wedash/clock";
 import { storesForSession, type Store } from "@/data/wedash/stores";
 import type { Session } from "@/session/session";
+import { firstNameFrom } from "./greeting";
 
 export type JarvisStoreRef = {
   id: string;
@@ -18,6 +19,8 @@ export type JarvisContext = {
   /** Todas as lojas do acesso — para casar nome no texto mesmo com Topbar filtrada. */
   network: JarvisStoreRef[];
   today: string;
+  /** Primeiro nome do Gestor (cumprimento). */
+  managerFirstName: string;
 };
 
 /** Palavras genericas demais para casar como nome de filial. */
@@ -44,6 +47,7 @@ export function jarvisContextFromSession(session: Session, scopeStoreIds: string
     stores,
     network,
     today: calendarTodayIso(),
+    managerFirstName: firstNameFrom(session.name || ""),
   };
 }
 

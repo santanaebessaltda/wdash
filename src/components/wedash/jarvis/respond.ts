@@ -180,13 +180,16 @@ export function classifyIntent(raw: string): JarvisIntent {
   return "unknown";
 }
 
-export function jarvisReply(question: string): string {
+export function jarvisReply(question: string, firstName?: string): string {
   const intent = classifyIntent(question);
+  const name = (firstName || "").trim();
   switch (intent) {
     case "greeting":
-      return "E aí. Tô no chat: vendas, estoque, meta, desafio, escala. Por onde vamos?";
+      return name ? `E aí, ${name}! O que você precisa?` : "E aí! O que você precisa?";
     case "capability":
-      return "No chat eu leio a base, monto e ajusto meta, desafio e escala, e passo números. Gravar só depois do seu Autorizar no card, sem te mandar pra outra tela.";
+      return name
+        ? `${name}, eu te ajudo com números, meta, desafio e escala aqui no chat. O que você quer olhar?`
+        : "Te ajudo com números, meta, desafio e escala aqui no chat. O que você quer olhar?";
     case "analyze_sales":
       return "Deixa eu olhar as vendas aí…";
     case "analyze_goal":

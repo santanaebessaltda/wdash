@@ -81,6 +81,13 @@ describe("classifyIntent", () => {
 });
 
 describe("jarvisReply", () => {
+  it("cumprimenta pelo nome sem listar menu", () => {
+    const text = jarvisReply("Oi", "Romeu");
+    expect(text).toMatch(/Romeu/);
+    expect(text.toLowerCase()).toMatch(/precisa/);
+    expect(text.toLowerCase()).not.toMatch(/estoque/);
+  });
+
   it("menciona autorização no desafio", () => {
     const text = jarvisReply("Quero montar um desafio");
     expect(text.toLowerCase()).toMatch(/autoriz/);

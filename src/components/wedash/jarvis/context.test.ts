@@ -51,6 +51,7 @@ describe("resolveStoresInQuestion", () => {
       stores: [centro],
       network: [sb, centro],
       today: "2026-10-29",
+      managerFirstName: "Romeu",
     };
     expect(resolveStoresInQuestion("meta de outubro da SB EMPREENDIMENTOS", ctx).map((s) => s.id)).toEqual([
       "sb",
@@ -64,6 +65,7 @@ describe("resolveStoresInQuestion", () => {
       stores: [centro],
       network: [sb, centro],
       today: "2026-10-29",
+      managerFirstName: "Romeu",
     };
     expect(resolveStoresInQuestion("qual a meta de outubro?", ctx).map((s) => s.id)).toEqual(["centro"]);
   });

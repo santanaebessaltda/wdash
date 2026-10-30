@@ -21,11 +21,10 @@ export async function jarvisAnswer(question: string, ctx: JarvisContext): Promis
     case "seasonal":
       return loadSeasonalBrief(ctx.today);
     case "capability":
-      return (
-        "Eu leio a mesma base do Dashboard, aponto sazonal e monto meta, desafio e escala com você. " +
-        "Também te levo pra qualquer tela do menu. Gravar só depois do seu Autorizar — pode perguntar vendas, estoque parado ou o que vem de sazonal."
-      );
+      return jarvisReply(question, ctx.managerFirstName);
+    case "greeting":
+      return jarvisReply(question, ctx.managerFirstName);
     default:
-      return jarvisReply(question);
+      return jarvisReply(question, ctx.managerFirstName);
   }
 }

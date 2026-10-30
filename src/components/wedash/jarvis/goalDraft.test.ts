@@ -29,6 +29,7 @@ const ctx = {
   stores: [{ id: "a", name: "CAMPO GRANDE", tradeName: "Shopping Campo Grande", code: "00010" }],
   network: [{ id: "a", name: "CAMPO GRANDE", tradeName: "Shopping Campo Grande", code: "00010" }],
   today: "2026-10-29",
+  managerFirstName: "Romeu",
 };
 
 describe("parseGoalPeriod", () => {
@@ -184,6 +185,7 @@ describe("fonte vs destino da meta", () => {
     stores: [centro],
     network: [sb, centro],
     today: "2026-10-29",
+    managerFirstName: "Romeu",
   };
   const q =
     "Quero seguir a mesma configuração de Outubro da filial SB EMPREENDIMENTOS porém aqui pra Loja, Meta Individual";
