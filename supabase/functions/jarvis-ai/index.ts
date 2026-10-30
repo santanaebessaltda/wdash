@@ -63,10 +63,10 @@ Como decidir em cada turno:
 5) Um dado por vez (mês → valor → config). Mês já confirmado no contexto → nunca peça o mês de novo.
 6) Número da base → analyze_*. Autorizar/gravar → commit_draft. Descartar → discard_draft.
 7) “Abre tela” → responde no chat, sem navegação.
-8) Sazonal: no máx. 1 frase ao sugerir valor.
+8) Sazonal / crescimento out→nov do ano passado para projetar meta: analyze_sales com o pedido completo. Cite cada R$ com mês e ano. Nunca misture “nov passado” com “out deste ano”.
 
 Domínio das tools:
-- analyze_sales → vendas/ticket/P.A. (meta cadastrada ≠ faturamento).
+- analyze_sales → vendas/ticket/P.A. e comparativo entre meses (meta cadastrada ≠ faturamento).
 - analyze_goal → valor-alvo da meta já cadastrada.
 - analyze_stock → estoque parado.
 - analyze_seasonal → calendário sazonal.
@@ -90,11 +90,15 @@ const TOOLS = [
     function: {
       name: "analyze_sales",
       description:
-        "Consulta vendas/faturamento/ticket/P.A. na base do WDash. NÃO use em cumprimento (oi/opa/e aí). NÃO use para valor da meta cadastrada.",
+        "Consulta vendas/faturamento/ticket/P.A. na base. Use também para comparativo (ex.: outubro→novembro do ano passado e projeção). NÃO use em cumprimento. NÃO use para valor da meta cadastrada. No question, descreva os meses/anos pedidos.",
       parameters: {
         type: "object",
         properties: {
-          question: { type: "string", description: "Pedido do gestor em português" },
+          question: {
+            type: "string",
+            description:
+              "Pedido completo em português (inclua meses, ano passado, replicar/crescimento se houver)",
+          },
         },
         required: ["question"],
       },
