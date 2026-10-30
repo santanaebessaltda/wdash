@@ -687,25 +687,23 @@ export async function suggestGoalTarget(
     const rationale = `${baseBits.join(" + ")}; ${growthLabel}; ${sazonalBit}`;
 
     const chatBlocks: string[] = [
-      `Olha, uma ideia de meta: ${brlCent(amount)}.`,
-      `Base: ${baseBits.join("; ")}. ${growthLabel.charAt(0).toUpperCase()}${growthLabel.slice(1)}.`,
+      `Eu iria de ${brlCent(amount)}.`,
+      `${baseBits.join("; ")}. ${growthLabel.charAt(0).toUpperCase()}${growthLabel.slice(1)}.`,
     ];
-    if (bias.events.length > 0) {
-      chatBlocks.push(`${bias.summary} ${sazonalBit.charAt(0).toUpperCase()}${sazonalBit.slice(1)}.`);
-    }
     if (priorGoal && priorGoal.target > 0) {
-      const delta = amount - priorGoal.target;
-      const deltaPct = Math.round((delta / priorGoal.target) * 100);
+      const deltaPct = Math.round(((amount - priorGoal.target) / priorGoal.target) * 100);
       chatBlocks.push(
-        `A meta de ${monthYearTitle(priorGoal.from)} foi ${brlCent(priorGoal.target)}` +
+        `Na meta de ${monthYearTitle(priorGoal.from)} vocês tinham ${brlCent(priorGoal.target)}` +
           (deltaPct === 0
-            ? " — estou sugerindo algo na mesma faixa."
+            ? " — fico na mesma faixa."
             : deltaPct > 0
-              ? ` — essa sugestão fica cerca de ${deltaPct}% acima.`
-              : ` — essa sugestão fica cerca de ${Math.abs(deltaPct)}% abaixo.`),
+              ? ` — isso aqui fica uns ${deltaPct}% acima.`
+              : ` — isso aqui fica uns ${Math.abs(deltaPct)}% abaixo.`),
       );
+    } else if (bias.events.length > 0 && sazonalPct !== 0) {
+      chatBlocks.push(`Sazonal do mês: ${sazonalBit}.`);
     }
-    chatBlocks.push("O que acha desse valor? Pode falar outro número ou pedir pra subir/baixar.");
+    chatBlocks.push("Faz sentido pra você, ou prefere outro número?");
 
     return { amount, rationale, seasonalSummary: bias.summary, chatBlocks };
   } catch {
@@ -730,16 +728,15 @@ export function formatGoalProposal(form: GoalDraftForm, storeName: string, assem
   ];
   if (form.spreadUnidentified) bits.push("rateio sem identificação");
   if (form.groups.length > 0) bits.push(`${form.groups.length} grupos`);
-  const base = `Resumo: ${bits.join(" · ")}.`;
   if (!goalDraftReady(form)) {
     const missing = missingGoalLabels(validateGoalDraft(form));
-    return `${base}\n\nAinda falta: ${missing.join(", ")}. Pode falar o valor, a filial ou o mês.`;
+    return `Ainda estamos sem ${missing.join(", ")} — manda quando puder.`;
   }
   const a = assembly ?? emptyGoalAssembly();
   if (goalCanCommit({ form, assembly: a })) {
-    return `${base}\n\nFechado pra mim. Diz "cria a meta" / Autorizo — eu salvo como rascunho em Metas; você revisa e publica lá.`;
+    return `Pra mim fechou (${bits.join(" · ")}). Se autorizar, eu gravo o rascunho em Metas pra você revisar.`;
   }
-  return base;
+  return "";
 }
 
 function nextAssemblyQuestion(form: GoalDraftForm, assembly: GoalAssembly): string | null {
@@ -747,31 +744,26 @@ function nextAssemblyQuestion(form: GoalDraftForm, assembly: GoalAssembly): stri
   if (assembly.path === null) return null;
   if (assembly.path === "fresh") {
     if (!assembly.confirmedGroups) {
-      return "Quer distribuição por grupos (quanto % da meta pra cada grupo), ou deixa sem divisão por grupo?";
+      return "E a divisão por grupo — você quer ratear a meta entre os grupos, ou deixa a loja inteira?";
     }
     if (!assembly.confirmedSpread) {
-      return "Quer ratear vendas sem vendedor identificado entre quem estava na loja naquele dia?";
+      return "Venda sem vendedor identificado: rateia na equipe do dia, ou deixa de fora?";
     }
     if (!assembly.confirmedTiers) {
-      return `Confirma esses níveis de premiação? ${formatTiersBrief(form.tiers)}. Pode dizer "confirma" ou pedir pra ajustar.`;
+      return `Escada que estou pensando: ${formatTiersBrief(form.tiers)}. Serve, ou você mexe em algum nível?`;
     }
   }
   if (!assembly.confirmedMount) {
-    const groupsBit =
-      form.groups.length > 0
-        ? `${form.groups.length} grupos`
-        : assembly.path === "fresh"
-          ? "sem divisão por grupos no rascunho (dá pra completar no editor)"
-          : "grupos como na meta copiada";
-    const spreadBit = form.spreadUnidentified ? "com rateio sem identificação" : "sem rateio sem identificação";
     return (
-      `Posso montar o rascunho com isso? Alvo ${form.target != null ? brlCent(form.target) : "—"}; ` +
-      `${spreadBit}; ${groupsBit}; escada: ${formatTiersBrief(form.tiers)}. ` +
-      `Diz "pode montar" / "sim" — só depois eu gravo em Metas.`
+      `Se estiver bom pra você (${form.target != null ? brlCent(form.target) : "alvo ainda solto"}), ` +
+      `é só dizer que pode montar o rascunho — aí você revisa em Metas antes de publicar.`
     );
   }
   return null;
 }
+
+/** gate = pergunta obrigatória; suggest = números calculados; talk = fala curta; silent = deixa o LLM falar. */
+export type GoalDiscussVoice = "gate" | "suggest" | "talk" | "silent";
 
 /** Ultima fala do user — o historico no Autorizar nao pode confirmar o checklist sozinho. */
 export function lastUserUtterance(text: string): string {
@@ -785,7 +777,7 @@ export async function discussGoal(
   question: string,
   ctx: JarvisContext,
   prev: GoalDraft | null,
-): Promise<{ reply: string; draft: GoalDraft }> {
+): Promise<{ reply: string; draft: GoalDraft; voice: GoalDiscussVoice }> {
   const prevStarts = prev?.form.startsOn ?? null;
   let form = prev?.form ?? emptyGoalForm(ctx.stores.length === 1 ? ctx.stores[0]!.id : "");
   let assembly: GoalAssembly = { ...(prev?.assembly ?? emptyGoalAssembly()) };
@@ -825,14 +817,13 @@ export async function discussGoal(
     if (!form.storeId && ctx.stores.length === 1) form = { ...form, storeId: ctx.stores[0]!.id };
     const tipLabel = monthYearTitle(form.startsOn!);
     return {
-      reply:
-        `Beleza — vamos montar a meta.\n\n` +
-        `De qual mês a gente tá falando? Posso seguir com ${tipLabel}, ou você fala outro.`,
+      reply: `Boa. Qual mês você quer fechar? Eu iria de ${tipLabel} — topa, ou tem outro em mente?`,
       draft: {
         form: { ...form, target: null },
         pendingConfigCopy: null,
         assembly: { ...assembly, periodConfirmed: false, valueDiscussed: false },
       },
+      voice: "gate",
     };
   }
 
@@ -840,8 +831,9 @@ export async function discussGoal(
   if (!form.storeId && ctx.stores.length === 1) form = { ...form, storeId: ctx.stores[0]!.id };
   if (!form.storeId && (ctx.network.length > 1 || ctx.stores.length > 1)) {
     return {
-      reply: `Ok, ${monthYearTitle(form.startsOn!)}.\n\nDe qual filial? Fala o nome da loja.`,
+      reply: `${monthYearTitle(form.startsOn!)} então. Qual filial a gente usa?`,
       draft: { form, pendingConfigCopy: null, assembly },
+      voice: "gate",
     };
   }
 
@@ -849,21 +841,20 @@ export async function discussGoal(
     qn,
   );
 
-  // Ainda sem valor: pergunta o que o Gestor tem em mente (nao despeja sugestão).
+  // Ainda sem valor: conversa — nao despeja sugestão.
   if (lockedTarget == null && !asksSuggestion && !assembly.valueDiscussed && form.target == null && !isConfirm) {
     const bias = seasonalBiasForPeriod(form.startsOn!, form.endsOn!);
     const teaser =
       bias.events.length > 0
-        ? `\n\nNesse mês tem ${bias.events
-            .slice(0, 3)
+        ? ` Em ${monthYearTitle(form.startsOn!)} pesa ${bias.events
+            .slice(0, 2)
             .map((e) => e.name)
-            .join(", ")}${bias.events.length > 3 ? "…" : ""} — isso costuma mexer no alvo.`
+            .join(" e ")}${bias.events.length > 2 ? "…" : ""}.`
         : "";
     return {
-      reply:
-        `Ok, ${monthYearTitle(form.startsOn!)}.${teaser}\n\n` +
-        `O que você tem em mente de valor? Pode falar um número, ou pedir pra eu sugerir com base no histórico.`,
+      reply: `Fechado, ${monthYearTitle(form.startsOn!)}.${teaser} O que você tá pensando de valor — ou quer que eu chute com o histórico?`,
       draft: { form: { ...form, target: null }, pendingConfigCopy: null, assembly },
+      voice: "gate",
     };
   }
 
@@ -950,10 +941,9 @@ export async function discussGoal(
     if (prior && !looksLikeDeclineConfigCopy(lastUser)) {
       pendingConfigCopy = { from: prior.from, to: prior.to };
       configOffer =
-        `Tem meta em ${monthYearTitle(prior.from)} nessa filial (${prior.tiers} níveis` +
+        `Em ${monthYearTitle(prior.from)} essa filial já tinha meta (${brlCent(prior.target)}` +
         (prior.groups > 0 ? `, ${prior.groups} grupos` : "") +
-        `, alvo ${brlCent(prior.target)}). Quer que eu copie a configuração (escada, bônus e grupos)?` +
-        `\n\nSe não, a gente monta do zero — grupos, rateio sem identificação e níveis.`;
+        `). Quer aproveitar a mesma escada/bônus/grupos, ou montamos do zero?`;
       skipAssemblyParse = true;
     } else {
       assembly = { ...assembly, path: "fresh" };
@@ -1001,28 +991,31 @@ export async function discussGoal(
     "";
 
   const parts: string[] = [];
+  let voice: GoalDiscussVoice = "silent";
   if (suggestionBlocks.length > 0) {
     parts.push(...suggestionBlocks);
+    voice = "suggest";
   }
   if (copiedLadder) {
-    parts.push(`Copiei escada, bônus e grupos da meta de ${monthYearTitle(sourceWin!.from)}.`);
-  }
-  // Resumo só depois que valor entrou na conversa (evita parede de texto no começo).
-  if (assembly.valueDiscussed && suggestionBlocks.length === 0) {
-    parts.push(formatGoalProposal(form, storeName, assembly));
-  } else if (assembly.valueDiscussed && basicsReady && suggestionBlocks.length > 0 && configOffer) {
-    // sugestão já trouxe valor; configOffer vem em seguida
-  } else if (assembly.valueDiscussed && basicsReady && suggestionBlocks.length === 0) {
-    parts.push(formatGoalProposal(form, storeName, assembly));
+    parts.push(`Pronto — trouxe a escada/bônus/grupos de ${monthYearTitle(sourceWin!.from)}.`);
+    if (voice === "silent") voice = "talk";
   }
   if (configOffer) {
     parts.push(configOffer);
+    if (voice === "silent") voice = "talk";
   } else if (assembly.valueDiscussed) {
     const nextQ = nextAssemblyQuestion(form, assembly);
-    if (nextQ) parts.push(nextQ);
+    if (nextQ) {
+      parts.push(nextQ);
+      if (voice === "silent") voice = "talk";
+    } else {
+      const summary = formatGoalProposal(form, storeName, assembly);
+      if (summary) {
+        parts.push(summary);
+        if (voice === "silent") voice = "talk";
+      }
+    }
   }
-  const reply =
-    parts.filter(Boolean).join("\n\n") ||
-    formatGoalProposal(form, storeName, assembly);
-  return { reply, draft: { form, pendingConfigCopy, assembly } };
+  const reply = parts.filter(Boolean).join("\n\n");
+  return { reply, draft: { form, pendingConfigCopy, assembly }, voice };
 }

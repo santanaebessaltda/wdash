@@ -762,13 +762,21 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
             challengeDraftRef.current = null;
             setScheduleDraft(null);
             scheduleDraftRef.current = null;
-            const { draft, reply } = await discussGoal(effect.request || q, ctx, goalDraftRef.current);
+            const { draft, reply, voice } = await discussGoal(effect.request || q, ctx, goalDraftRef.current);
             if (gen !== replyGen.current) return;
             // So texto no chat — sem card; memoria so no ref pra continuar o fio.
             goalDraftRef.current = draft;
             setGoalDraft(null);
             setCreatedItem(null);
-            goalTextReply = reply;
+            // gate/suggest: roteiro com números/perguntas; senao deixa o LLM conversar.
+            if (voice === "gate" || voice === "suggest" || (voice === "talk" && reply && !llm.content.trim())) {
+              goalTextReply = reply;
+            } else if (voice === "talk" && reply && llm.content.trim()) {
+              // LLM fala; se o roteiro tem um nudge (ex.: copiar config), anexa em bolha separada.
+              goalTextReply = `${llm.content.trim()}\n\n${reply}`;
+            } else {
+              goalTextReply = null; // usa llm.content
+            }
           } else if (effect.kind === "draft_schedule") {
             setChallengeDraft(null);
             challengeDraftRef.current = null;
