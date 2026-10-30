@@ -45,6 +45,7 @@ export function JarvisFloat() {
   if (!j.allowed) return null;
 
   const busy = j.mode === "thinking" || j.dictating || j.dictateBusy;
+  const empty = j.messages.length === 0 && j.mode === "idle";
   // Portal no body: o shell é position:fixed + overflow hidden; FAB no miolo some da tela.
   return createPortal(
     <div
