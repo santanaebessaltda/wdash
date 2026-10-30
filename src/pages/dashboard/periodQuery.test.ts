@@ -10,7 +10,9 @@ describe("periodo na URL", () => {
     expect(routeShowsPeriod(paths.team)).toBe(true);
     expect(routeShowsPeriod(paths.goals)).toBe(true);
     expect(routeShowsPeriod(paths.management.challenges)).toBe(true);
+    expect(routeShowsPeriod(paths.management.schedule)).toBe(true);
     expect(searchForRoute(paths.team, "?filial=f1&periodo=hoje&aba=desafios")).toBe("?filial=f1&periodo=hoje&aba=desafios");
+    expect(searchForRoute(paths.management.schedule, "?filial=f1&periodo=esteMes")).toBe("?filial=f1&periodo=esteMes");
     expect(searchForRoute(paths.overview, "filial=f1&periodo=personalizado&de=2026-10-01&ate=2026-10-11")).toBe(
       "?filial=f1&periodo=personalizado&de=2026-10-01&ate=2026-10-11",
     );
@@ -28,8 +30,9 @@ describe("periodo na URL", () => {
     expect(searchForRoute(paths.operation.branch, "")).toBe("");
   });
 
-  it("não leva o mês da Escala para outra tela nem de volta pelo menu", () => {
+  it("não leva o mês legado da Escala para outra tela nem de volta pelo menu", () => {
     expect(searchForRoute(paths.management.schedule, "?filial=f1&month=2026-11")).toBe("?filial=f1");
+    expect(searchForRoute(paths.management.schedule, "?filial=f1&periodo=hoje&month=2026-11")).toBe("?filial=f1&periodo=hoje");
     expect(searchForRoute(paths.team, "?filial=f1&periodo=hoje&month=2026-11")).toBe("?filial=f1&periodo=hoje");
     expect(searchForRoute(paths.stock.inventory, "?month=2026-11")).toBe("");
   });

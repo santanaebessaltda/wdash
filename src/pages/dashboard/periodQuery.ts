@@ -8,10 +8,11 @@ const PERIOD_ROUTES = new Set<string>([
   paths.team,
   paths.goals,
   paths.management.challenges,
+  paths.management.schedule,
 ]);
 
 const PERIOD_KEYS = ["period", "from", "to", "periodo", "de", "ate"] as const;
-/** Só da Escala e só no F5 na própria URL — menu / troca de tela não leva. */
+/** Parâmetro legado da Escala (`month=`) — menu / troca de tela não leva. */
 const PAGE_LOCAL_KEYS = ["month"] as const;
 
 export function routeShowsPeriod(pathname: string): boolean {

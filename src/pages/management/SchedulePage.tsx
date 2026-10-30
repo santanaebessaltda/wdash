@@ -1,17 +1,25 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "react-router-dom";
-import { Accordion, Alert, Badge, Button, Card, Checkbox, Modal, PageHeader, Select, useToast } from "@/components/ui";
+import { Accordion, Alert, Badge, Button, Card, Checkbox, DateRangePicker, Modal, PageHeader, Select, useToast } from "@/components/ui";
+import type { DateRange, DateRangeChangeMeta } from "@/components/ui/DateRangePicker";
 import { ColorLegend, type LegendItem } from "@/components/wedash/ColorLegend";
 import { ScheduleCardsSkeleton } from "@/components/wedash/LoadingSkeletons";
 import { PersonAvatar } from "@/components/wedash/PersonAvatar";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
-import { MonthStep, monthNavBtn } from "@/pages/cash-close/MonthYearPicker";
+import {
+  applyPeriodDateChange,
+  dateRangeFromManagementPeriod,
+  managementScheduleWindow,
+  periodActivePresetId,
+  periodDisplayLabel,
+} from "@/pages/dashboard/periodPicker";
+import { useScope } from "@/pages/dashboard/useScope";
 import { HeaderFilters } from "@/pages/stock/shared";
 import { useScopedStores } from "@/pages/operation/shared";
 import { Icon, icons } from "@/pages/users/Icons";
 import { cn } from "@/lib/cn";
 import { filterCacheGet, filterCacheSet } from "@/lib/filterCache";
 import { useFilterSkeleton } from "@/lib/useFilterSkeleton";
+import { dateToIso } from "@/lib/format";
 import { calendarTodayIso } from "@/data/wedash/clock";
 import { addDays, addMonths, endOfMonth, isoToDate, startOfMonth } from "@/data/wedash/engine/format";
 import { fetchGoals } from "@/data/wedash/goalsRepo";
@@ -23,12 +31,6 @@ import { deleteSchedule, fetchCompDue, fetchPreviousSnapshot, fetchSchedule, pat
 import { ScheduleWizard, type ScheduleWizardValue, type WizardBranch } from "./ScheduleWizard";
 
 const MONTHS = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
-const VIEW_OPTIONS = [
-  { id: "month", label: "Mês" },
-  { id: "week", label: "Semana" },
-  { id: "day", label: "Dia" },
-] as const;
-type ScheduleViewMode = (typeof VIEW_OPTIONS)[number]["id"];
 const SCHEDULE_LEGEND: LegendItem[] = [
   { key: "work", color: "bg-ok", label: "T · Trabalha" },
   { key: "off", color: "bg-chip-gray", label: "F · Folga" },
@@ -48,40 +50,7 @@ function monthLabel(iso: string): string {
   return `${MONTHS[date.getMonth()]} de ${date.getFullYear()}`;
 }
 
-/** `month=2026-11` ou `2026-11-01` na URL — F5 mantém o mês da grade. */
-function monthFromParam(raw: string | null, fallback: string): string {
-  if (!raw) return fallback;
-  const key = raw.slice(0, 7);
-  if (!/^\d{4}-\d{2}$/.test(key)) return fallback;
-  const month = Number(key.slice(5, 7));
-  if (month < 1 || month > 12) return fallback;
-  return `${key}-01`;
-}
-
-/** Semana começando no domingo, como no Calendar. */
-function startOfWeek(iso: string): string {
-  return addDays(iso, -weekday(iso));
-}
-
-function dayHeading(iso: string): string {
-  const date = isoToDate(iso);
-  return `${date.getDate()} de ${MONTHS[date.getMonth()].toLocaleLowerCase("pt-BR")} de ${date.getFullYear()}`;
-}
-
-function viewHeading(mode: ScheduleViewMode, focusDay: string, monthStart: string): string {
-  if (mode === "month") return monthLabel(monthStart);
-  if (mode === "day") return dayHeading(focusDay);
-  const from = startOfWeek(focusDay);
-  const to = addDays(from, 6);
-  const a = isoToDate(from);
-  const b = isoToDate(to);
-  if (a.getMonth() === b.getMonth() && a.getFullYear() === b.getFullYear()) {
-    return `${a.getDate()} a ${b.getDate()} de ${MONTHS[a.getMonth()].toLocaleLowerCase("pt-BR")} de ${a.getFullYear()}`;
-  }
-  return `${dayHeading(from)} a ${dayHeading(to)}`;
-}
-
-/** Dias do mês civil — a grade sempre usa essa largura (semana/dia só destaca o foco). */
+/** Dias do mês civil — largura da grade de cada card. */
 function monthDates(monthStart: string): string[] {
   const list: string[] = [];
   const last = endOfMonth(monthStart);
@@ -89,14 +58,10 @@ function monthDates(monthStart: string): string[] {
   return list;
 }
 
-/** Recorte de foco (semana/dia) — usado para escurecer o que fica fora, sem tirar coluna. */
-function focusDatesFor(mode: ScheduleViewMode, focusDay: string, monthStart: string): string[] {
-  if (mode === "day") return [focusDay];
-  if (mode === "week") {
-    const from = startOfWeek(focusDay);
-    return Array.from({ length: 7 }, (_, index) => addDays(from, index));
-  }
-  return monthDates(monthStart);
+/** Escala pode olhar meses futuros (meta / geração): calendário até +12 meses. */
+function maxPickerDate(today: string): Date {
+  const d = isoToDate(today);
+  return isoToDate(endOfMonth(dateToIso(new Date(d.getFullYear(), d.getMonth() + 12, 1))));
 }
 
 function dayTitle(iso: string, holiday: string | null): string {
@@ -368,30 +333,22 @@ function scheduleCacheReady(c: BranchSchedule[] | null): c is BranchSchedule[] {
 export function SchedulePage() {
   const { show } = useToast();
   const { session, storeRows } = useScopedStores();
-  const [params, setParams] = useSearchParams();
+  const { scope, setScope } = useScope();
   const many = storeRows.length > 1;
   const today = calendarTodayIso();
-  const [monthStart, setMonthStart] = useState(() => monthFromParam(params.get("month"), startOfMonth(today)));
-  const [focusDay, setFocusDay] = useState(() => {
-    const month = monthFromParam(params.get("month"), startOfMonth(today));
-    return month === startOfMonth(today) ? today : month;
-  });
-  const [viewMode, setViewMode] = useState<ScheduleViewMode>("month");
+  const janela = useMemo(() => managementScheduleWindow(scope.period, today), [scope.period, today]);
+  const dateRange = useMemo(() => dateRangeFromManagementPeriod(scope.period), [scope.period]);
+  const rangeFrom = startOfMonth(janela.from);
+  const rangeTo = endOfMonth(janela.to);
+  const windowMonths = useMemo(() => monthStarts(rangeFrom, janela.to), [rangeFrom, janela.to]);
+  const windowMonthSet = useMemo(() => new Set(windowMonths), [windowMonths]);
+  const monthStart = windowMonths[0] ?? rangeFrom;
   /** Mostra dias dos meses vizinhos até a última FC do mês. */
   const [showNeighbors, setShowNeighbors] = useState(true);
   const monthStartRef = useRef(monthStart);
   monthStartRef.current = monthStart;
-
-  // Mês na URL (`?month=2026-11`) para o F5 não voltar ao mês atual.
-  useEffect(() => {
-    const want = monthStart.slice(0, 7);
-    if (params.get("month") === want) return;
-    const next = new URLSearchParams(params);
-    next.set("month", want);
-    setParams(next, { replace: true });
-  }, [monthStart, params, setParams]);
-  const rangeFrom = monthStart;
-  const rangeTo = endOfMonth(monthStart);
+  const scopeRef = useRef(scope);
+  scopeRef.current = scope;
   const [views, setViews] = useState<BranchSchedule[]>([]);
   const [error, setError] = useState(false);
   const [wizardStoreId, setWizardStoreId] = useState<string | null>(null);
@@ -405,52 +362,29 @@ export function SchedulePage() {
   const [replaceError, setReplaceError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
   const storeIds = storeRows.map((row) => row.id).join(",");
-  const filterKey = `schedule:${session.tenantId}:${storeIds}:${monthStart}`;
+  const filterKey = `schedule:${session.tenantId}:${storeIds}:${janela.from}:${janela.to}`;
   const { showSkeleton, settle } = useFilterSkeleton(filterKey);
   const reloadGen = useRef(0);
   const storesRef = useRef(storeRows);
   storesRef.current = storeRows;
 
-  const prevMonth = addMonths(monthStart, -1);
-  const nextMonth = addMonths(monthStart, 1);
-  const weekStart = startOfWeek(focusDay);
-  const boardDates = useMemo(() => monthDates(monthStart), [monthStart]);
-  const focusDates = useMemo(() => focusDatesFor(viewMode, focusDay, monthStart), [viewMode, focusDay, monthStart]);
-  const rangeHeading = viewHeading(viewMode, focusDay, monthStart);
-
-  function goPrev() {
-    if (viewMode === "month") {
-      setMonthStart(prevMonth);
-      setFocusDay(prevMonth === startOfMonth(today) ? today : prevMonth);
-      return;
-    }
-    if (viewMode === "week") {
-      const nextFocus = addDays(weekStart, -7);
-      setFocusDay(nextFocus);
-      setMonthStart(startOfMonth(nextFocus));
-      return;
-    }
-    const nextFocus = addDays(focusDay, -1);
-    setFocusDay(nextFocus);
-    setMonthStart(startOfMonth(nextFocus));
+  function onDateChange(r: DateRange, meta?: DateRangeChangeMeta) {
+    setScope(applyPeriodDateChange(scope, r, meta));
   }
 
-  function goNext() {
-    if (viewMode === "month") {
-      setMonthStart(nextMonth);
-      setFocusDay(nextMonth === startOfMonth(today) ? today : nextMonth);
+  function focusMonth(nextMonth: string) {
+    const start = startOfMonth(nextMonth);
+    const current = scopeRef.current;
+    if (start === startOfMonth(today)) {
+      setScope({ ...current, period: { kind: "thisMonth" } });
       return;
     }
-    if (viewMode === "week") {
-      const nextFocus = addDays(weekStart, 7);
-      setFocusDay(nextFocus);
-      setMonthStart(startOfMonth(nextFocus));
-      return;
-    }
-    const nextFocus = addDays(focusDay, 1);
-    setFocusDay(nextFocus);
-    setMonthStart(startOfMonth(nextFocus));
+    setScope({
+      ...current,
+      period: { kind: "custom", start, end: endOfMonth(start) },
+    });
   }
+
   const wizardView = views.find((view) => view.store.id === wizardStoreId) ?? null;
   const dayView = dayOpen ? views.find((view) => view.store.id === dayOpen.storeId && view.months.length > 0) ?? null : null;
   const dayEdit = dayOpen && dayView ? resolveDayEditContext(dayView, dayOpen.day, dayOpen.sellerId, dayOpen.ownerMonth) : null;
@@ -471,10 +405,7 @@ export function SchedulePage() {
       if (stop) return;
       const spans: GoalSpan[] = rows.map((row) => ({ startsOn: row.startsOn, endsOn: row.endsOn }));
       const open = scheduleStartMonth(today, spans);
-      if (monthStartRef.current < open) {
-        setMonthStart(open);
-        setFocusDay(open === startOfMonth(today) ? today : open);
-      }
+      if (monthStartRef.current < open) focusMonth(open);
     });
     return () => {
       stop = true;
@@ -499,8 +430,8 @@ export function SchedulePage() {
     }
     void (async () => {
       try {
-        // Anterior + atual + seguinte (setas e prévia das FC no mês seguinte).
-        const covered = monthStarts(addMonths(rangeFrom, -1), endOfMonth(addMonths(rangeFrom, 1)));
+        // Vizinhos do intervalo (prévia das FC no mês anterior/seguinte).
+        const covered = monthStarts(addMonths(rangeFrom, -1), endOfMonth(addMonths(startOfMonth(janela.to), 1)));
         const years = [...new Set(covered.map((month) => Number(month.slice(0, 4))))];
         const [seed, ...nationals] = await Promise.all([loadHolidaySeed(), ...years.map((year) => loadNationalHolidays(year))]);
         const national = nationals.flat();
@@ -548,7 +479,7 @@ export function SchedulePage() {
     return () => {
       stop = true;
     };
-  }, [storeRows, rangeFrom, rangeTo, session.tenantId, reloadKey, filterKey, settle]);
+  }, [storeRows, rangeFrom, rangeTo, janela.to, session.tenantId, reloadKey, filterKey, settle]);
 
   function scheduleOn(view: BranchSchedule, day: string): StoredSchedule | null {
     return view.months.find((item) => item.monthStart === startOfMonth(day))?.schedule ?? null;
@@ -690,10 +621,7 @@ export function SchedulePage() {
         const days = [...item.days.filter((row) => startOfMonth(row.day) !== result.monthStart), ...result.days];
         return { ...item, months, days };
       }));
-      if (monthStart !== result.monthStart) {
-        setMonthStart(result.monthStart);
-        setFocusDay(result.monthStart === startOfMonth(today) ? today : result.monthStart);
-      }
+      if (!windowMonths.includes(result.monthStart)) focusMonth(result.monthStart);
       show(
         kept > 0
           ? `Escala salva. ${kept} ${kept === 1 ? "dia ajustado foi mantido" : "dias ajustados foram mantidos"}.`
@@ -736,12 +664,16 @@ export function SchedulePage() {
     );
   }
 
-  const registered = views.filter((view) => view.months.some((item) => item.monthStart === monthStart));
+  const registered = views.filter((view) => view.months.some((item) => windowMonthSet.has(item.monthStart)));
   const withTeam = views.filter((view) => view.people.length > 0);
   const creatable = withTeam.filter((view) => !view.months.some((item) => item.monthStart === monthStart));
   const scheduleCards = registered
-    .flatMap((view) => view.months.filter((item) => item.monthStart === monthStart).map((item) => ({ view, item })))
-    .sort((a, b) => (a.view.store.tradeName || a.view.store.name).localeCompare(b.view.store.tradeName || b.view.store.name, "pt-BR"));
+    .flatMap((view) => view.months.filter((item) => windowMonthSet.has(item.monthStart)).map((item) => ({ view, item })))
+    .sort(
+      (a, b) =>
+        a.item.monthStart.localeCompare(b.item.monthStart) ||
+        (a.view.store.tradeName || a.view.store.name).localeCompare(b.view.store.tradeName || b.view.store.name, "pt-BR"),
+    );
 
   function openCreate() {
     const target = creatable[0] ?? withTeam[0];
@@ -801,43 +733,16 @@ export function SchedulePage() {
     <div>
       <PageHeader
         crumbs={[{ label: "Escala" }]}
-        title={monthLabel(monthStart)}
+        title="Escala"
         actions={
           <HeaderFilters>
-            {/* No celular: Mês/Semana/Dia + setas na mesma linha (padrão Apps → Calendar). */}
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="flex gap-1 rounded-[11px] border border-line bg-bg-2 p-1">
-                {VIEW_OPTIONS.map((option) => (
-                  <button
-                    key={option.id}
-                    type="button"
-                    onClick={() => setViewMode(option.id)}
-                    className={cn(
-                      "rounded-lg px-3 py-1.5 text-[12.5px] font-bold transition-colors",
-                      viewMode === option.id ? "bg-acc text-white" : "text-t1 hover:text-t0",
-                    )}
-                  >
-                    {option.label}
-                  </button>
-                ))}
-              </div>
-              <button
-                type="button"
-                className={monthNavBtn}
-                aria-label={viewMode === "month" ? "Mês anterior" : viewMode === "week" ? "Semana anterior" : "Dia anterior"}
-                onClick={goPrev}
-              >
-                <MonthStep dir="anterior" />
-              </button>
-              <button
-                type="button"
-                className={monthNavBtn}
-                aria-label={viewMode === "month" ? "Próximo mês" : viewMode === "week" ? "Próxima semana" : "Próximo dia"}
-                onClick={goNext}
-              >
-                <MonthStep dir="proximo" />
-              </button>
-            </div>
+            <DateRangePicker
+              value={dateRange}
+              onChange={onDateChange}
+              displayLabel={periodDisplayLabel(scope.period)}
+              activePresetId={periodActivePresetId(scope.period)}
+              maxDate={maxPickerDate(today)}
+            />
             {storeRows.length > 0 ? (
               <Button icon={<Icon d={icons.plus} size={16} />} disabled={showSkeleton || withTeam.length === 0} onClick={openCreate}>
                 Nova escala
@@ -847,9 +752,6 @@ export function SchedulePage() {
         }
       />
       {storeRows.length > 0 ? <ColorLegend className="mb-4" mark="square" items={SCHEDULE_LEGEND} /> : null}
-      {viewMode !== "month" && registered.length > 0 ? (
-        <p className="mb-4 text-[13px] font-semibold text-t1">{rangeHeading}</p>
-      ) : null}
       <div className="min-w-0 pb-8">
         {error ? <Alert className="mb-4" variant="danger" title="Não foi possível carregar a escala. Tente novamente." /> : null}
         {storeRows.length === 0 ? (
@@ -898,11 +800,7 @@ export function SchedulePage() {
                   .map((row) => row.holidayDate);
                 const dates = showNeighbors
                   ? boardDatesWithNeighbors(item.monthStart, [...compRows, ...prevCompRows], prevHolidayDates, true)
-                  : boardDates.filter((iso) => startOfMonth(iso) === item.monthStart);
-                const active =
-                  viewMode === "month"
-                    ? undefined
-                    : new Set(focusDates.filter((iso) => dates.includes(iso)));
+                  : monthDates(item.monthStart);
                 const realDays = view.days.filter((row) => dates.includes(row.day));
                 const dueList = [
                   ...item.schedule.compDue,
@@ -941,7 +839,6 @@ export function SchedulePage() {
                     </div>
                     <ScheduleBoard
                       dates={dates}
-                      activeDates={active}
                       today={today}
                       section={{
                         storeId: view.store.id,
