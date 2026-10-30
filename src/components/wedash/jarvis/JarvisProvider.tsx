@@ -635,7 +635,9 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
           challengeDraftRef.current = null;
           setScheduleDraft(null);
           scheduleDraftRef.current = null;
-          const { draft, reply: toolReply } = await discussGoal(request || q, ctx, goalDraftRef.current);
+          // Sempre o turno do Gestor: o arg da tool parafraseia e perde "copiar/outubro".
+          const utterance = q.trim() || request;
+          const { draft, reply: toolReply } = await discussGoal(utterance, ctx, goalDraftRef.current);
           goalDraftRef.current = draft;
           setGoalDraft(null);
           setCreatedItem(null);

@@ -76,13 +76,17 @@ export function goalCanCommit(draft: GoalDraft): boolean {
   );
 }
 
-/** Aceite curto depois da oferta de copiar config do mês anterior. */
+/** Aceite depois da oferta de copiar config do mês anterior (sim curto ou “vamos copiar a escada…”). */
 export function looksLikeAcceptConfigCopy(text: string): boolean {
   const p = norm(text).trim();
   if (looksLikeDeclineConfigCopy(text)) return false;
   return (
     /^(sim|pode|quero|copia|ok)(\b|,|$)/.test(p) ||
-    /pode copiar|quero (que )?copie|copia (a |a )?config|sim,? (pode|copia|quero)|copia sim|copia isso|copia dela/.test(p)
+    /pode copiar|quero (que )?copie|vamos copiar|quero copiar|copia sim|copia isso|copia dela/.test(p) ||
+    /copiar (a |o |a mesma |o mesmo )?(escada|config|meta)|mesma escada|mesma configura|aproveitar (a )?mesma/.test(
+      p,
+    ) ||
+    (/\b(copia|copiar)\b/.test(p) && /escada|config|meta|outubro|mes passado|anterior|mesma/.test(p))
   );
 }
 
@@ -400,9 +404,13 @@ export function parseConfigSourceMonth(
   const p = norm(text);
   // Nao copiar por "pode seguir" / "seguir a conversa" — so pedido explicito de config/escada.
   const wantsCopy =
-    /mesma configura|mesma escada|mesmo modo|copiar (a |o )?(configura|escada|meta)|copia (a |o )?(configura|escada|meta)|quero copiar|pode copiar|sim,? copia|copia (sim|isso|dela|de)|igual (a |ao |a meta |ao mes )?de |configura[cç][aã]o de |escada de /.test(
+    /mesma configura|mesma escada|mesmo modo|vamos copiar|quero copiar|pode copiar|sim,? copia|copia (sim|isso|dela|de)|igual (a |ao |a meta |ao mes )?de |configura[cç][aã]o de |escada de /.test(
       p,
-    ) || /\bcopia\b/.test(p) && /configura|escada|grupo|bonus|bônus|nivel|outubro|mes passado/.test(p);
+    ) ||
+    /copiar (a |o |a mesma |o mesmo )?(configura|escada|meta)|copia (a |o |a mesma |o mesmo )?(configura|escada|meta)/.test(
+      p,
+    ) ||
+    (/\b(copia|copiar)\b/.test(p) && /configura|escada|grupo|bonus|bônus|nivel|outubro|mes passado|mesma/.test(p));
   if (!wantsCopy) return null;
 
   if (/mes passado/.test(p)) {
@@ -843,7 +851,7 @@ export function formatGoalFactsForModel(
     checklist_pendente: pending,
     proximo_passo_sugerido: nextHint,
     instrucao:
-      "Avance UM item do checklist_pendente por turno (fale humano). Sempre chame draft_goal neste fio. Nunca diga 'vou preparar/montar' sem ter chamado draft_goal. commit_draft so se pode_gravar_rascunho.",
+      "Avance UM item do checklist_pendente[0] (fale humano). Se path ja e copy/fresh, NUNCA repergunte copiar vs zero. Se o Gestor ja respondeu o passo, chame draft_goal e avance — nao peca 'confirma isso?' do mesmo item. Sempre draft_goal neste fio. commit_draft so se pode_gravar_rascunho.",
     extras: extras.map((e) => e.trim()).filter(Boolean),
   };
   // Sem prosa em PT: o modelo copia texto longo. Sinal curto + JSON.
@@ -1008,8 +1016,10 @@ export async function discussGoal(
     assembly = { ...assembly, valueDiscussed: true };
   }
 
-  // Copia de config so se o Gestor pediu (ou aceitou a oferta).
-  let sourceWin = parseConfigSourceMonth(question, ctx.today, form.startsOn);
+  // Copia: prioriza a fala do Gestor (o arg da tool pode parafrasear e perder "outubro/copiar").
+  let sourceWin =
+    parseConfigSourceMonth(lastUser, ctx.today, form.startsOn) ??
+    parseConfigSourceMonth(question, ctx.today, form.startsOn);
   if (!sourceWin && prev?.pendingConfigCopy && looksLikeAcceptConfigCopy(lastUser)) {
     sourceWin = prev.pendingConfigCopy;
   }

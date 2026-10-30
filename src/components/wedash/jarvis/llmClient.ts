@@ -82,7 +82,7 @@ function contextNote(ctx: JarvisContext, session?: JarvisLlmSession | null): str
       lines.push(`Campos ainda incompletos: ${session.goalDraftMissing}.`);
     }
     lines.push(
-      "Nao diga 'vou preparar' sem draft_goal. Avance checklist: periodo, filial, valor, copiar/zero, grupos, rateio, escada/desafio %, ok para rascunho.",
+      "Nao diga 'vou preparar' sem draft_goal. Avance checklist[0] so. Se path ja e copy/fresh, nao repergunte copiar vs zero.",
     );
   }
   if (session?.challengeDraftSummary) {

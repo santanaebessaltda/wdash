@@ -105,6 +105,10 @@ describe("parseConfigSourceMonth", () => {
       from: "2026-10-01",
       to: "2026-10-31",
     });
+    expect(parseConfigSourceMonth("Vamos copiar a mesma escada do mes de Outubro", "2026-10-29")).toEqual({
+      from: "2026-10-01",
+      to: "2026-10-31",
+    });
   });
 
   it("não copia por 'pode seguir' sem pedido de config", () => {
@@ -116,6 +120,7 @@ describe("looksLikeAcceptConfigCopy", () => {
   it("aceita sim curto e recusa não", () => {
     expect(looksLikeAcceptConfigCopy("sim")).toBe(true);
     expect(looksLikeAcceptConfigCopy("pode copiar")).toBe(true);
+    expect(looksLikeAcceptConfigCopy("Vamos copiar a mesma escada do mes de Outubro")).toBe(true);
     expect(looksLikeAcceptConfigCopy("não")).toBe(false);
     expect(looksLikeDeclineConfigCopy("não")).toBe(true);
     expect(looksLikeDeclineConfigCopy("monta do zero")).toBe(true);
@@ -289,5 +294,34 @@ describe("leaked goal facts", () => {
     const pending = goalAssemblyPendingSteps(draft);
     expect(pending[0]).toMatch(/copiar|zero/i);
     expect(pending.some((p) => /escada|desafio|grupos|rateio|rascunho/i.test(p))).toBe(true);
+  });
+
+  it("discussGoal aceita copiar escada de outubro e sai do passo de copia", async () => {
+    const prev = {
+      form: {
+        ...emptyGoalForm("a"),
+        name: "Novembro 2026",
+        startsOn: "2026-11-01",
+        endsOn: "2026-11-30",
+        target: 250_000,
+      },
+      pendingConfigCopy: { from: "2026-10-01", to: "2026-10-31" },
+      assembly: {
+        ...emptyGoalAssembly(),
+        periodConfirmed: true,
+        valueDiscussed: true,
+        path: null as const,
+      },
+    };
+    const { draft } = await discussGoal(
+      "Vamos copiar a mesma escada do mes de Outubro",
+      ctx,
+      prev,
+    );
+    expect(draft.assembly?.path).toBe("copy");
+    expect(draft.pendingConfigCopy).toBeNull();
+    const pending = goalAssemblyPendingSteps(draft);
+    expect(pending.some((p) => /copiar|zero/i.test(p))).toBe(false);
+    expect(pending[0]).toMatch(/rascunho/i);
   });
 });
