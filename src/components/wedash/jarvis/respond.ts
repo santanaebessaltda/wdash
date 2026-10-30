@@ -122,6 +122,32 @@ export function looksLikeLeaveChatRequest(raw: string): boolean {
 export const STAY_IN_CHAT_REPLY =
   "Aqui no chat a gente resolve — vendas, meta, desafio, escala. Me pede o que precisa; não te mando pra outra tela.";
 
+/** Confirmacao explicita de gravar — nao confundir com "pode seguir a escala/config". */
+export function looksLikeAuthorizeConfirm(raw: string): boolean {
+  const p = normalizeIntentText(raw);
+  if (
+    /autorizo|pode criar|pode gravar|fechado pode|vamos criar|cria(r)? (essa |a )?meta|ok(,| )?vamos criar|salva(r)? (o )?rascunho/.test(
+      p,
+    )
+  ) {
+    return true;
+  }
+  // "pode seguir" so se for fechar o rascunho, nao "seguir a mesma escala/config".
+  if (/pode seguir/.test(p) && !/escala|configura|escada|nivel|modo|meta de|mesma/.test(p)) {
+    return true;
+  }
+  if (/^(confirma|fechado|pode|ok|manda|fecha)[!?.]*$/.test(p.trim())) return true;
+  return false;
+}
+
+/** Ainda negociando valor/filial — nao gravar rascunho. */
+export function looksLikeStillDiscussing(raw: string): boolean {
+  const p = normalizeIntentText(raw);
+  return /na verdade|porem|acho que|melhorar|suger|quanto (seria|fica|fica a)|e se |outra filial|no caso da|mudar (a |o )?(filial|loja|valor|meta)|trocar (a |o )?(filial|loja)|da pra (subir|melhorar|aumentar)|da para (subir|melhorar|aumentar)/.test(
+    p,
+  );
+}
+
 export function classifyIntent(raw: string): JarvisIntent {
   const p = normalizeIntentText(raw);
 
@@ -129,11 +155,8 @@ export function classifyIntent(raw: string): JarvisIntent {
   if (/o que (voce|vc) (faz|pode)|como (voce|vc) funciona|suas habilidades|no que (voce|vc) ajuda/.test(p)) {
     return "capability";
   }
-  if (
-    /autorizo|pode criar|pode gravar|confirma|pode seguir|fechado pode|vamos criar|cria(r)? (essa |a )?meta|ok(,| )?vamos criar|salva(r)? (o )?rascunho/.test(
-      p,
-    )
-  ) {
+  // Autorizar so em confirmacao curta — "pode seguir a mesma escala" NAO grava rascunho.
+  if (looksLikeAuthorizeConfirm(p) && !looksLikeStillDiscussing(p)) {
     return "authorize";
   }
   if (looksLikeLeaveChatRequest(p)) return "stay_in_chat";

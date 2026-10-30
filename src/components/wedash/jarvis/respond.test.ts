@@ -60,6 +60,16 @@ describe("classifyIntent", () => {
     expect(classifyIntent("Autorizo")).toBe("authorize");
     expect(classifyIntent("Ok vamos criar essa meta")).toBe("authorize");
     expect(classifyIntent("cria a meta")).toBe("authorize");
+    expect(classifyIntent("pode seguir assim")).toBe("authorize");
+  });
+
+  it("nao grava rascunho quando ainda esta mudando contexto ou valor", () => {
+    expect(
+      classifyIntent(
+        "Na verdade no caso da minha filial do norte sul, pode seguir a mesma escala dela que de Outubro em novembro, porem acho que da pra melhorar o valor da meta",
+      ),
+    ).not.toBe("authorize");
+    expect(classifyIntent("pode seguir a mesma escala de outubro")).toBe("goal");
   });
 });
 
