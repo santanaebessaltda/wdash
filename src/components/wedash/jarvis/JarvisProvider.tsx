@@ -608,6 +608,7 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
           content: m.text,
         }));
 
+      let goalTurnApplied = false;
       const llmSession = (): JarvisLlmSession => {
         const draft = goalDraftRef.current;
         const g = draft?.form;
@@ -623,6 +624,8 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
           goalDraftMissing: missing.length ? missing.join(", ") : null,
           goalPeriodConfirmed: a?.periodConfirmed ?? null,
           goalNextStep: pending.length ? pending.join(" → ") : null,
+          goalAssemblyPath: a?.path ?? null,
+          goalTurnApplied,
           challengeDraftSummary: c ? `${c.name || "sem nome"} · modo ${c.mode} · métrica ${c.metric}` : null,
           scheduleDraftSummary: s ? `${s.monthStart || "?"} · loja ${s.storeId || "?"}` : null,
           longTermMemory: memoryTextRef.current,
@@ -726,6 +729,19 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
         const facts = await loadJarvisMemory(ctx.tenantId, ctx.membershipId);
         if (gen !== replyGen.current) return;
         memoryTextRef.current = formatMemoryForModel(facts);
+
+        // Fio de meta aberto: aplica a fala no rascunho ANTES do modelo
+        // ("sim" / copiar avança mesmo se a IA esquecer draft_goal).
+        if (goalDraftRef.current) {
+          const beforePath = goalDraftRef.current.assembly?.path ?? null;
+          const beforePending = goalAssemblyPendingSteps(goalDraftRef.current).join("|");
+          const { draft } = await discussGoal(q, ctx, goalDraftRef.current);
+          if (gen !== replyGen.current) return;
+          goalDraftRef.current = draft;
+          const afterPending = goalAssemblyPendingSteps(draft).join("|");
+          goalTurnApplied =
+            (draft.assembly?.path ?? null) !== beforePath || afterPending !== beforePending;
+        }
 
         // Só prompt + tools. Sem script local de conversa.
         const llm = await jarvisLlmTurn(history, ctx, q, llmSession, llmHooks());

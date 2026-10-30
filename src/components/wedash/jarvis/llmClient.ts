@@ -34,6 +34,10 @@ export type JarvisLlmSession = {
   /** true = Gestor já escolheu o mês — NÃO perguntar de novo. */
   goalPeriodConfirmed?: boolean | null;
   goalNextStep?: string | null;
+  /** copy | fresh | null — se já definido, não reperguntar copiar vs zero. */
+  goalAssemblyPath?: string | null;
+  /** A fala deste turno já atualizou o rascunho (ex.: “sim” na cópia). */
+  goalTurnApplied?: boolean | null;
   challengeDraftSummary?: string | null;
   scheduleDraftSummary?: string | null;
   /** Memória de longo prazo (não some com Apagar conversa). */
@@ -75,8 +79,18 @@ function contextNote(ctx: JarvisContext, session?: JarvisLlmSession | null): str
     } else {
       lines.push("Mes ainda nao confirmado.");
     }
+    if (session.goalAssemblyPath) {
+      lines.push(
+        `Caminho da meta ja definido: ${session.goalAssemblyPath}. NUNCA pergunte de novo se copia escada ou monta do zero.`,
+      );
+    }
     if (session.goalNextStep) {
       lines.push(`Proximo passo da meta (um por vez): ${session.goalNextStep}`);
+    }
+    if (session.goalTurnApplied) {
+      lines.push(
+        "A fala DESTE turno ja foi aplicada no rascunho. Fale SO o proximo passo acima. NUNCA repita a pergunta anterior (ex.: copiar vs zero).",
+      );
     }
     if (session.goalDraftMissing) {
       lines.push(`Campos ainda incompletos: ${session.goalDraftMissing}.`);

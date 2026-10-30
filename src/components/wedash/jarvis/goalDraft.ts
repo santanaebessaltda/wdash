@@ -1020,8 +1020,13 @@ export async function discussGoal(
   let sourceWin =
     parseConfigSourceMonth(lastUser, ctx.today, form.startsOn) ??
     parseConfigSourceMonth(question, ctx.today, form.startsOn);
-  if (!sourceWin && prev?.pendingConfigCopy && looksLikeAcceptConfigCopy(lastUser)) {
-    sourceWin = prev.pendingConfigCopy;
+  // "Sim" / "vamos copiar" — usa oferta pendente ou busca a meta anterior (mesmo se a IA só falou a oferta).
+  if (!sourceWin && assembly.path == null && looksLikeAcceptConfigCopy(lastUser)) {
+    sourceWin = prev?.pendingConfigCopy ?? null;
+    if (!sourceWin && form.storeId && form.startsOn) {
+      const prior = await findPriorGoalForStore(ctx, form.storeId, form.startsOn);
+      if (prior) sourceWin = { from: prior.from, to: prior.to };
+    }
   }
   let copiedLadder = false;
   let skipAssemblyParse = false;
@@ -1045,12 +1050,32 @@ export async function discussGoal(
       confirmedMount: false,
     };
     skipAssemblyParse = true;
-  } else if (prev?.pendingConfigCopy && looksLikeDeclineConfigCopy(lastUser)) {
+  } else if (
+    assembly.path == null &&
+    looksLikeDeclineConfigCopy(lastUser) &&
+    (prev?.pendingConfigCopy != null ||
+      /monta (do )?zero|sem copia|nova configura|prefiro montar|quero montar/.test(qn))
+  ) {
     assembly = {
       ...emptyGoalAssembly(),
       periodConfirmed: true,
-      valueDiscussed: true,
+      valueDiscussed: assembly.valueDiscussed || form.target != null,
       path: "fresh",
+    };
+    skipAssemblyParse = true;
+  } else if (
+    assembly.path == null &&
+    looksLikeAcceptConfigCopy(lastUser) &&
+    (prev?.pendingConfigCopy != null || form.target != null)
+  ) {
+    // Aceitou copiar mas não achou meta anterior — fecha o passo com a escada atual.
+    assembly = {
+      ...assembly,
+      path: "copy",
+      confirmedGroups: true,
+      confirmedSpread: true,
+      confirmedTiers: true,
+      confirmedMount: false,
     };
     skipAssemblyParse = true;
   }
@@ -1094,14 +1119,15 @@ export async function discussGoal(
     form.startsOn
   ) {
     const prior = await findPriorGoalForStore(ctx, form.storeId, form.startsOn);
-    if (prior && !looksLikeDeclineConfigCopy(lastUser)) {
+    // Nunca reofereça cópia no mesmo turno em que o Gestor já aceitou/recusou.
+    if (prior && !looksLikeDeclineConfigCopy(lastUser) && !looksLikeAcceptConfigCopy(lastUser)) {
       pendingConfigCopy = { from: prior.from, to: prior.to };
       configOffer =
         `Em ${monthYearTitle(prior.from)} essa filial já tinha meta (${brlCent(prior.target)}` +
         (prior.groups > 0 ? `, ${prior.groups} grupos` : "") +
         `). Quer aproveitar a mesma escada/bônus/grupos, ou montamos do zero?`;
       skipAssemblyParse = true;
-    } else {
+    } else if (!prior) {
       assembly = { ...assembly, path: "fresh" };
       skipAssemblyParse = true;
     }

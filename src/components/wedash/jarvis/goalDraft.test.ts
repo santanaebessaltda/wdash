@@ -324,4 +324,27 @@ describe("leaked goal facts", () => {
     expect(pending.some((p) => /copiar|zero/i.test(p))).toBe(false);
     expect(pending[0]).toMatch(/rascunho/i);
   });
+
+  it('discussGoal "Sim" na oferta de copia avanca sem repetir', async () => {
+    const prev = {
+      form: {
+        ...emptyGoalForm("a"),
+        name: "Novembro 2026",
+        startsOn: "2026-11-01",
+        endsOn: "2026-11-30",
+        target: 250_000,
+      },
+      pendingConfigCopy: { from: "2026-10-01", to: "2026-10-31" },
+      assembly: {
+        ...emptyGoalAssembly(),
+        periodConfirmed: true,
+        valueDiscussed: true,
+        path: null as const,
+      },
+    };
+    const { draft } = await discussGoal("Sim", ctx, prev);
+    expect(draft.assembly?.path).toBe("copy");
+    expect(draft.pendingConfigCopy).toBeNull();
+    expect(goalAssemblyPendingSteps(draft).some((p) => /copiar|zero/i.test(p))).toBe(false);
+  });
 });
