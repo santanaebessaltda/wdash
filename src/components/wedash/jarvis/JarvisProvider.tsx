@@ -27,7 +27,9 @@ import {
   discussGoal,
   formatGoalFactsForModel,
   goalCanCommit,
+  looksLikeLeakedGoalFacts,
   missingGoalLabels,
+  naturalGoalAskFromDraft,
   validateGoalDraft,
   type GoalDraft,
 } from "./goalDraft";
@@ -692,10 +694,11 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
               },
             );
             if (gen !== replyGen.current) return;
+            const raw = llm.ok ? llm.content.trim() : "";
             finish(
-              llm.ok && llm.content.trim()
-                ? llm.content
-                : "Me fala mais um detalhe pra gente fechar.",
+              raw && !looksLikeLeakedGoalFacts(raw)
+                ? raw
+                : naturalGoalAskFromDraft(draft),
             );
           })();
           return;
@@ -797,8 +800,17 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
 
         applyPeriodHint();
 
-        // Hooks ja aplicaram rascunhos; sideEffects so marcam que rodou draft_*.
-        finish(llm.content.trim() || "Me fala mais um detalhe?");
+        // Hooks ja aplicaram rascunhos; nunca mostre estado interno da tool no chat.
+        const raw = llm.content.trim();
+        if (raw && !looksLikeLeakedGoalFacts(raw)) {
+          finish(raw);
+          return;
+        }
+        if (goalDraftRef.current) {
+          finish(naturalGoalAskFromDraft(goalDraftRef.current));
+          return;
+        }
+        finish("Me fala mais um detalhe?");
       })();
     },
     [

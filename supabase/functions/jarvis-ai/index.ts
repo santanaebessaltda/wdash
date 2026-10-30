@@ -77,7 +77,7 @@ Regras:
 - Desafio/escala: card + Autorizar. Nunca diga que gravou sozinho.
 - Não invente número. Use EXATAMENTE a filial que a tool nomeou.
 - No request de draft_*, descreva o pedido + o já combinado no histórico.
-- Depois de draft_goal, leia o estado interno da tool e fale como humano (pergunte o que falta, confirme o que fechou). Não recite o estado como lista.`;
+- Depois de draft_goal, leia o retorno da tool (pode vir como [INTERNAL_GOAL_STATE] JSON) e FALE como humano. PROIBIDO colar o bloco interno, listar campos (alvo_centavos, periodConfirmed, faltando, etc.) ou dizer "estado interno". Ex.: se falta mês → "Vamos lá!! Qual mês você quer fechar?". Se falta valor → pergunte o valor. Uma pergunta, pare.`;
 
 const TOOLS = [
   {

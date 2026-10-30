@@ -10,6 +10,8 @@ import {
   looksLikeAskValueSuggestion,
   looksLikeConfirmMount,
   looksLikeDeclineConfigCopy,
+  looksLikeLeakedGoalFacts,
+  naturalGoalAskFromDraft,
   mergeGoalUtterance,
   parseConfigSourceMonth,
   parseGoalPeriod,
@@ -196,5 +198,22 @@ describe("fonte vs destino da meta", () => {
     const form = mergeGoalUtterance(emptyGoalForm(""), q, multi);
     expect(form.storeId).toBe("centro");
     expect(form.tierMode).toBe("INDIVIDUAL");
+  });
+});
+
+describe("leaked goal facts", () => {
+  it("detecta vazamento do estado interno", () => {
+    expect(looksLikeLeakedGoalFacts("Estado interno da proposta de META...")).toBe(true);
+    expect(looksLikeLeakedGoalFacts("[INTERNAL_GOAL_STATE] {\"faltando\":[]}")).toBe(true);
+    expect(looksLikeLeakedGoalFacts("Vamos lá!! Qual mês você quer fechar?")).toBe(false);
+  });
+
+  it("nudge humano quando periodo nao confirmado", () => {
+    const draft = {
+      form: { ...emptyGoalForm("a"), startsOn: "2026-11-01", endsOn: "2026-11-30" },
+      pendingConfigCopy: null,
+      assembly: { ...emptyGoalAssembly(), periodConfirmed: false },
+    };
+    expect(naturalGoalAskFromDraft(draft).toLowerCase()).toMatch(/m[eê]s/);
   });
 });

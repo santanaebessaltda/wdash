@@ -711,7 +711,51 @@ export async function suggestGoalTarget(
   }
 }
 
-/** Resumo interno para a IA (não é falado no chat). */
+/** Detecta se o modelo colou o estado interno da tool na bolha (bug). */
+export function looksLikeLeakedGoalFacts(text: string): boolean {
+  const t = text.trim();
+  if (!t) return false;
+  if (/\[INTERNAL_GOAL_STATE\]|Estado interno da proposta|alvo_centavos:|periodConfirmed:|proximo_passo_sugerido:/.test(t)) {
+    return true;
+  }
+  return /faltando:/.test(t) && /valueDiscussed:/.test(t);
+}
+
+/** Fala humana de emergência quando o modelo vazou o estado interno. */
+export function naturalGoalAskFromDraft(draft: GoalDraft): string {
+  const form = draft.form;
+  const a = draft.assembly ?? emptyGoalAssembly();
+  if (!a.periodConfirmed) {
+    const tip = form.startsOn ? monthYearTitle(form.startsOn) : null;
+    return tip
+      ? `Vamos lá!!\n\nQual mês você quer fechar? Eu iria de ${tip}. Topa, ou tem outro em mente?`
+      : `Vamos lá!!\n\nQual mês você quer fechar?`;
+  }
+  if (!form.storeId) {
+    return form.startsOn
+      ? `${monthYearTitle(form.startsOn)} então. Qual filial a gente usa?`
+      : "Qual filial a gente usa?";
+  }
+  if (!a.valueDiscussed || form.target == null) {
+    const month = form.startsOn ? monthYearTitle(form.startsOn) : "esse mês";
+    return `Fechado, ${month}.\n\nQual valor você está pensando? Ou prefere que eu chute com o histórico?`;
+  }
+  if (a.path === "fresh" && !a.confirmedGroups) {
+    return "E a divisão por grupo: rateia entre os grupos, ou deixa a loja inteira?";
+  }
+  if (a.path === "fresh" && !a.confirmedSpread) {
+    return "Venda sem vendedor identificado: rateia na equipe do dia, ou deixa de fora?";
+  }
+  if (a.path === "fresh" && !a.confirmedTiers) {
+    return `Escada que estou pensando: ${formatTiersBrief(form.tiers)}. Serve?`;
+  }
+  if (!a.confirmedMount) {
+    return "Se estiver bom, é só dizer que pode montar o rascunho.";
+  }
+  return "Me fala mais um detalhe pra gente fechar a meta.";
+}
+
+/** Resumo interno para a IA (nunca mostrar no chat). */
 export function formatGoalFactsForModel(
   draft: GoalDraft,
   storeName: string,
@@ -725,33 +769,34 @@ export function formatGoalFactsForModel(
       : "a definir";
   const missing = !goalDraftReady(form) ? missingGoalLabels(validateGoalDraft(form)) : [];
   const nextHint = nextAssemblyHint(form, a);
-  const lines = [
-    "Estado interno da proposta de META (fale naturalmente; NÃO recite como checklist):",
-    `nome: ${form.name || "Nova meta"}`,
-    `filial: ${storeName || form.storeId || "?"}`,
-    `periodo: ${period}`,
-    `alvo_centavos: ${form.target ?? "null"}`,
-    `alvo_formatado: ${form.target != null ? brlCent(form.target) : "null"}`,
-    `modo: ${form.tierMode}`,
-    `niveis: ${formatTiersBrief(form.tiers)}`,
-    `grupos: ${form.groups.length}`,
-    `rateio_sem_id: ${form.spreadUnidentified ? "sim" : "nao"}`,
-    `faltando: ${missing.length ? missing.join(", ") : "nada"}`,
-    `periodConfirmed: ${a.periodConfirmed}`,
-    `valueDiscussed: ${a.valueDiscussed}`,
-    `path: ${a.path ?? "null"}`,
-    `confirmedGroups: ${a.confirmedGroups}`,
-    `confirmedSpread: ${a.confirmedSpread}`,
-    `confirmedTiers: ${a.confirmedTiers}`,
-    `confirmedMount: ${a.confirmedMount}`,
-    `pode_gravar_rascunho: ${goalCanCommit(draft) ? "sim" : "nao"}`,
-    `pendingConfigCopy: ${draft.pendingConfigCopy ? `${draft.pendingConfigCopy.from}..${draft.pendingConfigCopy.to}` : "null"}`,
-  ];
-  if (nextHint) lines.push(`proximo_passo_sugerido: ${nextHint}`);
-  for (const e of extras) {
-    if (e.trim()) lines.push(e.trim());
-  }
-  return lines.join("\n");
+  const payload = {
+    nome: form.name || "Nova meta",
+    filial: storeName || form.storeId || "?",
+    periodo: period,
+    alvo_centavos: form.target,
+    alvo_formatado: form.target != null ? brlCent(form.target) : null,
+    modo: form.tierMode,
+    niveis: formatTiersBrief(form.tiers),
+    grupos: form.groups.length,
+    rateio_sem_id: form.spreadUnidentified,
+    faltando: missing,
+    periodConfirmed: a.periodConfirmed,
+    valueDiscussed: a.valueDiscussed,
+    path: a.path,
+    confirmedGroups: a.confirmedGroups,
+    confirmedSpread: a.confirmedSpread,
+    confirmedTiers: a.confirmedTiers,
+    confirmedMount: a.confirmedMount,
+    pode_gravar_rascunho: goalCanCommit(draft),
+    pendingConfigCopy: draft.pendingConfigCopy,
+    proximo_passo_sugerido: nextHint,
+    extras: extras.map((e) => e.trim()).filter(Boolean),
+  };
+  return (
+    "[INTERNAL_GOAL_STATE] Dados só para você redigir a fala. NUNCA cole este bloco (nem chaves/campos) na resposta ao Gestor. " +
+    "Escreva 1–3 frases humanas; se faltar algo, pergunte só isso.\n" +
+    JSON.stringify(payload)
+  );
 }
 
 /** @deprecated use formatGoalFactsForModel — mantido para testes/legado. */

@@ -67,6 +67,7 @@ describe("classifyIntent", () => {
     expect(classifyIntent("Precisava criar a meta da minha loja")).toBe("goal");
     expect(classifyIntent("Quero criar a meta de novembro")).toBe("goal");
     expect(classifyIntent("Preciso criar a meta")).toBe("goal");
+    expect(classifyIntent("Vamos criar a meta da minha loja")).toBe("goal");
   });
 
   it("nao grava rascunho quando ainda esta mudando contexto ou valor", () => {

@@ -127,7 +127,7 @@ export function looksLikeAuthorizeConfirm(raw: string): boolean {
   const p = normalizeIntentText(raw);
   // Pedido de comecar a montar nao e autorizacao.
   if (
-    /precis[oa]|queria|quero |gostaria|preciso |bora (montar|criar)|vamos montar|montar (a |uma )?meta|criar (a |uma )?meta (da|de|pra|para|do|neste|desse)/.test(
+    /precis[oa]|queria|quero |gostaria|preciso |bora (montar|criar)|vamos montar|vamos criar (a |uma )?meta|montar (a |uma )?meta|criar (a |uma )?meta( |$)/.test(
       p,
     ) &&
     !/autorizo|pode criar|pode gravar|ok(,| )?vamos criar|ok(,| )?pode|salva(r)? (o )?rascunho/.test(p)
