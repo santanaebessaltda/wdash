@@ -39,7 +39,7 @@ import {
   type JarvisLlmSession,
   type LlmChatMessage,
 } from "./llmClient";
-import { clearJarvisMemory, formatMemoryForModel, loadJarvisMemory } from "./memoryRepo";
+import { formatMemoryForModel, loadJarvisMemory } from "./memoryRepo";
 import { commitSchedule } from "./scheduleCommit";
 import {
   discussSchedule,
@@ -126,8 +126,6 @@ type JarvisApi = {
   cancelDictate: () => void;
   reply: (q: string) => void;
   clearChat: () => void;
-  /** Apaga só a memória de longo prazo (não o thread). */
-  clearMemory: () => void;
   authorizeChallenge: () => void;
   authorizeGoal: () => void;
   authorizeSchedule: () => void;
@@ -770,7 +768,7 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
   );
 
   const clearChat = useCallback(() => {
-    // Invalida turnos em voo. Não apaga memória de longo prazo (clearMemory).
+    // Invalida turnos em voo. Memória de longo prazo fica (só tools remember/forget).
     replyGen.current += 1;
     cancelDictate();
     setMessages([]);
@@ -788,19 +786,6 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
     setCreatedItem(null);
     setCommitBusy(false);
   }, [cancelDictate]);
-
-  const clearMemory = useCallback(() => {
-    if (!session) return;
-    void (async () => {
-      const res = await clearJarvisMemory(session.tenantId, session.membershipId);
-      memoryTextRef.current = "Nenhuma memória de longo prazo ainda.";
-      if (!res.ok) {
-        setMicHint(`Não consegui esquecer: ${res.reason}`);
-        return;
-      }
-      speakAnswer("Beleza. Esqueci o que tinha guardado de você. O chat continua aí.");
-    })();
-  }, [session, speakAnswer]);
 
   useEffect(() => {
     return () => {
@@ -830,7 +815,6 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
       cancelDictate,
       reply,
       clearChat,
-      clearMemory,
       authorizeChallenge: () => void authorizeChallenge(),
       authorizeGoal: () => void authorizeGoal(),
       authorizeSchedule: () => void authorizeSchedule(),
@@ -860,7 +844,6 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
       cancelDictate,
       challengeDraft,
       clearChat,
-      clearMemory,
       commitBusy,
       createdItem,
       dictateBusy,

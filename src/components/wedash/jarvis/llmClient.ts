@@ -56,6 +56,7 @@ function contextNote(ctx: JarvisContext, session?: JarvisLlmSession | null): str
       : ctx.stores.map((s) => `${s.tradeName || s.name} (${s.code || s.id})`).join("; ");
   const lines = [
     `Hoje: ${ctx.today}. Filiais no escopo: ${stores}. Tenant: ${ctx.tenantId}.`,
+    `Datas relativas (ano passado, mês passado, últimos N meses) usam a data de Hoje acima — interprete você.`,
     `Gestor (chame pelo primeiro nome): ${ctx.managerFirstName || "Gestor"}.`,
     `Sazonal/feriados a considerar sozinho (meta/desafio): ${compactSeasonalContext(ctx.today, 2)}.`,
     "Voce redige toda a fala. Tools so executam. Cumprimento = zero tools. Nunca use travessao (—).",

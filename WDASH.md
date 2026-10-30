@@ -227,10 +227,10 @@ Inspiração de UX: [Néctar](https://www.meu-nectar.com/) (conversa humana, res
 
 **Tom:** informal, humano — curto, confirma o que fez, sem jargão de produto.
 
-**Roteamento (DECIDIDO — 2026-10-30 — fala só no prompt; chat = OpenAI; agente + memória — 2026-10-30):** turno pelo **OpenAI** (`jarvis-ai` action `chat`, `OPENAI_API_KEY`, `gpt-4o-mini` ou `JARVIS_CHAT_MODEL`). **Toda a conversa** = SYSTEM_PROMPT + tools (loop até 6 rodadas). Tools: `analyze_*` / `draft_*` / `commit_draft` / `discard_draft` / **`remember_fact` / `forget_fact`**. Memória de longo prazo em `jarvis_memory` (por tenant + membership); **Apagar conversa** zera o thread, **não** a memória; menu **Esquecer o que sei de você** limpa os fatos. `analyze_sales` com mês/ano e comparativo out→nov. Sem keyword routing de papo. STT = Whisper; TTS OpenAI (ou Gemini se configurado).
+**Roteamento (DECIDIDO — 2026-10-30 — fala só no prompt; chat = OpenAI; agente + memória — 2026-10-30):** turno pelo **OpenAI** (`jarvis-ai` action `chat`, `OPENAI_API_KEY`, `gpt-4o-mini` ou `JARVIS_CHAT_MODEL`). **Toda a conversa** = SYSTEM_PROMPT + tools (loop até 6 rodadas). Tools: `analyze_*` / `draft_*` / `commit_draft` / `discard_draft` / **`remember_fact` / `forget_fact`**. Memória de longo prazo em `jarvis_memory` (por tenant + membership), por baixo dos panos; **Apagar conversa** zera só o thread. Datas relativas usam `Hoje` no contexto (sem engessar ano). STT = Whisper; TTS OpenAI (ou Gemini se configurado).
 
 **Superfície (DECIDIDO — 2026-10-29):**
-- **Botão flutuante** no canto inferior direito (só Gestor) — painel no estilo Apps > Chat do Vela (thread + composer); mic = ditado; **Apagar conversa** zera o thread (`sessionStorage`); **Esquecer o que sei de você** zera a memória de longo prazo. **Fora do menu.** `/chat-ia` e `/jarvis` → Visão geral. **Filial:** Topbar.
+- **Botão flutuante** no canto inferior direito (só Gestor) — painel no estilo Apps > Chat do Vela (thread + composer); mic = ditado; **Apagar conversa** zera o thread (`sessionStorage`). Memória de longo prazo só via tools. **Fora do menu.** `/chat-ia` e `/jarvis` → Visão geral. **Filial:** Topbar.
 - Sem navegação/rolagem por comando.
 
 **Leituras no chat:** vendas, **meta cadastrada** (valor-alvo ≠ faturamento), estoque parado, sazonal — resposta no painel flutuante (período da pergunta pode gravar em sessionStorage para o Dashboard se o Gestor abrir depois). Pedido “quanto é a meta?” usa `analyze_goal` / `loadGoalBrief`, não `analyze_sales`.

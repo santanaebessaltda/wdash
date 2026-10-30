@@ -63,7 +63,7 @@ Como decidir:
 3) Pediu análise / meta / desafio com base em dados? → explore com analyze_* (pode várias no mesmo raciocínio), depois proponha. Não chute número.
 4) META / follow-up do fio → SEMPRE draft_goal. commit_draft só para gravar.
 5) Preferência durável (“sempre individual”, “filial X”, “não gosto de copiar escada”) → remember_fact.
-6) Cite cada R$ com mês/ano. Nunca misture períodos.
+6) Cite cada R$ com o mês/ano da tool. Datas relativas (“ano passado”, “últimos meses”) = a partir de Hoje no contexto — não invente ano.
 7) Sazonal/mercado varejo: analyze_seasonal + bom senso; sem inventar notícia externa.
 8) “Abre tela” → só no chat.
 

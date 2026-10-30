@@ -85,11 +85,6 @@ export function JarvisFloat() {
                     disabled: empty,
                     onClick: () => j.clearChat(),
                   },
-                  {
-                    label: "Esquecer o que sei de você",
-                    danger: true,
-                    onClick: () => j.clearMemory(),
-                  },
                 ]}
                 trigger={
                   <button

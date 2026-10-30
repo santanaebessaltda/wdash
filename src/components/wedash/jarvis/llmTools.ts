@@ -35,7 +35,7 @@ export async function runJarvisTool(
 
   switch (name) {
     case "analyze_sales":
-      return { content: await loadSalesBrief(ctx, question) };
+      return { content: await loadSalesBrief(ctx, question, fallbackQuestion) };
     case "analyze_goal":
       return { content: await loadGoalBrief(ctx, question) };
     case "analyze_stock":

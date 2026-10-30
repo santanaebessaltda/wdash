@@ -94,7 +94,7 @@ function monthWindow(year: number, month: number): SalesWindow {
   };
 }
 
-/** Ano explícito / “ano passado” perto do nome do mês; senão ano civil de hoje. */
+/** Ano explícito; “ano passado” = ano civil de `today` − 1 (vale em 2027, 2030…). */
 export function resolveNamedMonth(
   question: string,
   today: string,
@@ -104,18 +104,20 @@ export function resolveNamedMonth(
   const month = MONTH_NAMES[monthName];
   if (!month) return null;
   const yNow = Number(today.slice(0, 4));
+  const lastYear = yNow - 1;
   const mNow = Number(today.slice(5, 7));
   const reYear = new RegExp(`${monthName}\\s+(?:de\\s+)?(20\\d{2})`);
   const yHit = p.match(reYear);
+  // Ano explícito do Gestor/pedido prevalece (ex.: “novembro 2024”).
   if (yHit) return { year: Number(yHit[1]), month };
   const nearPast = new RegExp(
     `${monthName}.{0,24}ano passado|ano passado.{0,24}${monthName}|${monthName} (do |de )?ano passado`,
   );
   if (nearPast.test(p) || (/ano passado/.test(p) && p.includes(monthName))) {
-    return { year: yNow - 1, month };
+    return { year: lastYear, month };
   }
-  // Mês futuro no calendário deste ano → provavelmente o mesmo mês do ano passado (ex.: nov em out).
-  if (month > mNow) return { year: yNow - 1, month };
+  // Mês ainda não chegou neste ano → tipicamente o mesmo mês do ano passado.
+  if (month > mNow) return { year: lastYear, month };
   return { year: yNow, month };
 }
 
@@ -361,17 +363,98 @@ export function formatSalesComparison(
   return lines.join("\n");
 }
 
-export async function loadSalesBrief(ctx: JarvisContext, question: string): Promise<string> {
-  const stores = resolveStoresInQuestion(question, ctx);
+/** Últimos N meses deste ano vs a mesma janela no ano passado. */
+export function resolveYoYRecentMonths(
+  question: string,
+  today: string,
+): { current: SalesWindow; prior: SalesWindow } | null {
+  const p = normQ(question);
+  if (!/ano passado/.test(p)) return null;
+  if (!/crescimento|queda|variacao|ultim|meses|historico|ideia/.test(p)) return null;
+  // Se já é par out→nov explícito, deixa resolveSalesComparison cuidar.
+  if (
+    /(?:de\s+)?(outubro|novembro).{0,20}(pra|para|a)\s+(outubro|novembro)/.test(p) &&
+    /outubro/.test(p) &&
+    /novembro/.test(p)
+  ) {
+    return null;
+  }
+  const nMatch = p.match(/ultim[oa]s?\s+(\d+)\s*mes/);
+  const months = nMatch ? Math.min(12, Math.max(1, Number(nMatch[1]))) : 3;
+  const yNow = Number(today.slice(0, 4));
+  const fromCur = monthStartOf(shiftMonthStart(today, -(months - 1)));
+  const current: SalesWindow = {
+    from: fromCur,
+    to: today,
+    label: `últimos ${months} meses até ${today} (${yNow})`,
+  };
+  const fromPrior = `${yNow - 1}-${fromCur.slice(5)}`;
+  const toPrior = `${yNow - 1}-${today.slice(5)}`;
+  const prior: SalesWindow = {
+    from: fromPrior,
+    to: toPrior,
+    label: `mesmo período em ${yNow - 1}`,
+  };
+  return { current, prior };
+}
+
+export function formatYoYRecent(
+  storeLabel: string,
+  current: SalesBrief,
+  prior: SalesBrief,
+  today: string,
+): string {
+  const lines = [
+    `COMPARATIVO em ${storeLabel} (hoje no app: ${today}):`,
+    `- ${current.label}: ${brlCent(current.revenue)}, ${current.salesCount.toLocaleString("pt-BR")} vendas.`,
+  ];
+  if (current.byMonth.length) {
+    lines.push(
+      `  Por mês: ${current.byMonth.map((m) => `${fmtMonth(m.month)} ${brlCent(m.revenue)}`).join("; ")}.`,
+    );
+  }
+  lines.push(
+    `- ${prior.label}: ${brlCent(prior.revenue)}, ${prior.salesCount.toLocaleString("pt-BR")} vendas.`,
+  );
+  if (prior.byMonth.length) {
+    lines.push(
+      `  Por mês: ${prior.byMonth.map((m) => `${fmtMonth(m.month)} ${brlCent(m.revenue)}`).join("; ")}.`,
+    );
+  }
+  if (prior.revenue > 0) {
+    const pct = ((current.revenue - prior.revenue) / prior.revenue) * 100;
+    const sign = pct > 0 ? "+" : "";
+    lines.push(
+      `- Variação (mesma janela vs período anterior): ${sign}${pct.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%.`,
+    );
+  }
+  lines.push("Cite cada valor com o mês/ano que a tool indicou.");
+  return lines.join("\n");
+}
+
+export async function loadSalesBrief(
+  ctx: JarvisContext,
+  question: string,
+  userQuestion = "",
+): Promise<string> {
+  // Pedido do Gestor + do modelo: a tool resolve datas relativas a partir de ctx.today.
+  const blob = `${userQuestion}\n${question}`.trim();
+  const stores = resolveStoresInQuestion(blob, ctx);
   try {
-    const cmp = resolveSalesComparison(question, ctx.today);
+    const cmp = resolveSalesComparison(blob, ctx.today);
     if (cmp) {
       const base = await briefForWindow(ctx, stores, cmp.base);
       const next = await briefForWindow(ctx, stores, cmp.next);
       const applyFrom = cmp.applyFrom ? await briefForWindow(ctx, stores, cmp.applyFrom) : null;
       return formatSalesComparison(scopeLabel(stores, ctx.stores), base, next, applyFrom);
     }
-    const window = resolveSalesWindow(question, ctx.today);
+    const yoy = resolveYoYRecentMonths(blob, ctx.today);
+    if (yoy) {
+      const current = await briefForWindow(ctx, stores, yoy.current);
+      const prior = await briefForWindow(ctx, stores, yoy.prior);
+      return formatYoYRecent(scopeLabel(stores, ctx.stores), current, prior, ctx.today);
+    }
+    const window = resolveSalesWindow(blob, ctx.today);
     const brief = await briefForWindow(ctx, stores, window);
     return formatSalesBrief(brief, { concise: window.label === "hoje" || window.label === "esta semana" });
   } catch (e) {

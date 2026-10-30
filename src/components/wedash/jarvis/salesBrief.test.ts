@@ -7,6 +7,7 @@ import {
   resolveNamedMonth,
   resolveSalesComparison,
   resolveSalesWindow,
+  resolveYoYRecentMonths,
 } from "./salesBrief";
 
 const stores = [
@@ -76,6 +77,27 @@ describe("resolveSalesComparison", () => {
       year: 2025,
       month: 11,
     });
+  });
+
+  it("ano explícito do pedido prevalece", () => {
+    expect(resolveNamedMonth("novembro 2024", "2026-10-29", "novembro")).toEqual({
+      year: 2024,
+      month: 11,
+    });
+  });
+});
+
+describe("resolveYoYRecentMonths", () => {
+  it("últimos meses vs mesmo período ano passado", () => {
+    const w = resolveYoYRecentMonths(
+      "ideia de crescimento em vista dos ultimos meses e o ano passado",
+      "2026-10-29",
+    );
+    expect(w).not.toBeNull();
+    expect(w!.current.from).toBe("2026-08-01");
+    expect(w!.current.to).toBe("2026-10-29");
+    expect(w!.prior.from).toBe("2025-08-01");
+    expect(w!.prior.to).toBe("2025-10-29");
   });
 });
 
