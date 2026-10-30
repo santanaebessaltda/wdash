@@ -261,7 +261,7 @@ Leitura **não** pede confirmação. Escrita **sempre** pede.
 
 **Fatia 8–9 (2026-10-29):** sem voz contínua; chat-first; **sem redirecionar páginas** — tools/prompt só no chat.
 
-**Meta = Salvar rascunho (2026-10-30; intenção por turno — 2026-10-30):** Estado operacional (`goalDraft` + `copiedFrom`) no sessionStorage durante a montagem. Cópia só na **origem**. `spokenReply` por intenção (cópia / inspeção / pesos). “Sim” solto não re-copia se já ok. **Apagar tudo** zera rascunho + memória. Gravar → `commit_draft` com `pode_gravar_rascunho`. Sem travessão (“—”).
+**Meta = Salvar rascunho (2026-10-30; contrato P0 — 2026-10-30):** `proposedTarget` ≠ `form.target` (proposta não aplica sozinha). Aceite explícito aplica valor. Simulação de níveis sem mutar. Gravação: `pendingCommit` (fingerprint + resumo) → SIM → `goalCanPersist` → `commitGoal` **sem** reexecutar `discussGoal`. Sucesso fala o R$ de `saveGoal`. “Apagar tudo” zera rascunho + memória. Sem travessão (“—”).
 
 ### Alertas (DECIDIDO — 2026-09-29)
 - **Todo alerta do app usa `Alert`** (`src/components/ui/Alert.tsx`, padrão Components > Alerts do Vela — "Storage almost full" etc.): fundo suave da cor, sem borda, ícone 18px e título em negrito na cor, texto em `text-t1`. Variantes `success · warning · danger · info · accent`; `icon` troca o ícone (Spinner, RadialProgress), `action` = links/botões à direita (`AlertLink` para link de texto), `footer` = conteúdo extra (lista expandida, checkbox).

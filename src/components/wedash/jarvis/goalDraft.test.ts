@@ -146,6 +146,7 @@ describe("goal assembly checklist", () => {
     );
     expect(goalDraftReady(form)).toBe(true);
     expect(goalCanCommit({ form, assembly: emptyGoalAssembly() })).toBe(false);
+    // P0: confirmedMount sozinho não autoriza gravação — precisa pendingCommit.authorized.
     expect(
       goalCanCommit({
         form,
@@ -159,7 +160,7 @@ describe("goal assembly checklist", () => {
           confirmedMount: true,
         },
       }),
-    ).toBe(true);
+    ).toBe(false);
   });
 
   it("looksLikeAskValueSuggestion distingue pedido de sugestão", () => {
@@ -502,7 +503,7 @@ describe("leaked goal facts", () => {
     expect(loadGoalDraftSession()).toBeNull();
   });
 
-  it("goalCanCommit exige confirmacao de montagem", () => {
+  it("goalCanCommit exige pendingCommit.authorized (P0)", () => {
     const form = {
       ...emptyGoalForm("a"),
       name: "Novembro 2026",
@@ -510,23 +511,164 @@ describe("leaked goal facts", () => {
       endsOn: "2026-11-30",
       target: 420_000,
     };
-    expect(
-      goalCanCommit({
-        form,
-        assembly: {
-          ...emptyGoalAssembly(),
-          periodConfirmed: true,
-          valueDiscussed: true,
-          path: "copy",
-          confirmedGroups: true,
-          confirmedSpread: true,
-          confirmedTiers: true,
-          confirmedMount: false,
-        },
-      }),
-    ).toBe(false);
-    expect(
-      goalCanCommit({
+    const assembly = {
+      ...emptyGoalAssembly(),
+      periodConfirmed: true,
+      valueDiscussed: true,
+      path: "copy" as const,
+      confirmedGroups: true,
+      confirmedSpread: true,
+      confirmedTiers: true,
+      confirmedMount: true,
+    };
+    expect(goalCanCommit({ form, assembly })).toBe(false);
+  });
+});
+
+describe("P0 proposta 244600 vs 257000", () => {
+  it("sugestao nao aplica form.target automaticamente", async () => {
+    const prev = {
+      form: {
+        ...emptyGoalForm("a"),
+        name: "Novembro 2026",
+        startsOn: "2026-11-01",
+        endsOn: "2026-11-30",
+        target: 244_600,
+      },
+      assembly: {
+        ...emptyGoalAssembly(),
+        periodConfirmed: true,
+        valueDiscussed: true,
+        path: "copy" as const,
+        confirmedGroups: true,
+        confirmedSpread: true,
+        confirmedTiers: true,
+      },
+      userLockedTarget: true,
+      proposedTarget: null as number | null,
+      copyStatus: "ok" as const,
+    };
+    // Sem DB real suggest pode falhar — se pedir recomendacao com lock, nao deve zerar target sem aceite.
+    const { draft } = await discussGoal("qual valor voce recomenda?", ctx, prev);
+    // Com userLockedTarget e asksSuggestion: proposed pode mudar, form.target permanece ate aceite explicito
+    // (asksSuggestion + locked null clears only when !userLocked in older path; agora nao sobrescreve).
+    expect(draft.form.target).toBe(244_600);
+  });
+
+  it("aceito a recomendada aplica proposedTarget", async () => {
+    const prev = {
+      form: {
+        ...emptyGoalForm("a"),
+        name: "Novembro 2026",
+        startsOn: "2026-11-01",
+        endsOn: "2026-11-30",
+        target: 244_600,
+      },
+      assembly: {
+        ...emptyGoalAssembly(),
+        periodConfirmed: true,
+        valueDiscussed: true,
+        path: "copy" as const,
+        confirmedGroups: true,
+        confirmedSpread: true,
+        confirmedTiers: true,
+      },
+      userLockedTarget: true,
+      proposedTarget: 257_000,
+      copyStatus: "ok" as const,
+    };
+    const { draft, spokenReply } = await discussGoal("aceito a recomendada", ctx, prev);
+    expect(draft.form.target).toBe(257_000);
+    expect(draft.userLockedTarget).toBe(true);
+    expect(spokenReply).toMatch(/257|Apliquei/i);
+  });
+
+  it("simulacao com 257 nao muda rascunho 244600", async () => {
+    const prev = {
+      form: {
+        ...emptyGoalForm("a"),
+        name: "Novembro 2026",
+        startsOn: "2026-11-01",
+        endsOn: "2026-11-30",
+        target: 244_600,
+        groups: [
+          { shiftId: "m", name: "Turno 1", pct: 45 },
+          { shiftId: "t", name: "Turno 2", pct: 55 },
+        ],
+        tiers: [
+          { name: "Meta", minAttainmentPct: 50, commissionPct: 1.5, bonus: 50 },
+          { name: "Super", minAttainmentPct: 75, commissionPct: 2, bonus: 50 },
+        ],
+      },
+      assembly: {
+        ...emptyGoalAssembly(),
+        periodConfirmed: true,
+        valueDiscussed: true,
+        path: "copy" as const,
+        confirmedGroups: true,
+        confirmedSpread: true,
+        confirmedTiers: true,
+      },
+      userLockedTarget: true,
+      proposedTarget: 257_000,
+      copyStatus: "ok" as const,
+    };
+    const { draft, spokenReply } = await discussGoal(
+      "Como ficariam os níveis com R$ 257 mil?",
+      ctx,
+      prev,
+    );
+    expect(draft.form.target).toBe(244_600);
+    expect(spokenReply).toMatch(/257/);
+    expect(spokenReply).toMatch(/não alterei|nao alterei|aplicado continua/i);
+  });
+
+  it("pedir salvar cria pendingCommit sem shouldCommit", async () => {
+    const prev = {
+      form: {
+        ...emptyGoalForm("a"),
+        name: "Novembro 2026",
+        startsOn: "2026-11-01",
+        endsOn: "2026-11-30",
+        target: 257_000,
+        groups: [{ shiftId: "m", name: "T1", pct: 100 }],
+      },
+      assembly: {
+        ...emptyGoalAssembly(),
+        periodConfirmed: true,
+        valueDiscussed: true,
+        path: "copy" as const,
+        confirmedGroups: true,
+        confirmedSpread: true,
+        confirmedTiers: true,
+        confirmedMount: true,
+      },
+      userLockedTarget: true,
+      copyStatus: "ok" as const,
+    };
+    const { draft, shouldCommit, spokenReply } = await discussGoal(
+      "pode salvar o rascunho",
+      ctx,
+      prev,
+    );
+    expect(draft.pendingCommit?.awaitingConfirm).toBe(true);
+    expect(draft.pendingCommit?.authorized).toBe(false);
+    expect(shouldCommit).toBe(false);
+    expect(spokenReply).toMatch(/257|Confira|SIM/i);
+  });
+
+  it("SIM apos pending autoriza shouldCommit", async () => {
+    const form = {
+      ...emptyGoalForm("a"),
+      name: "Novembro 2026",
+      startsOn: "2026-11-01",
+      endsOn: "2026-11-30",
+      target: 257_000,
+      groups: [{ shiftId: "m", name: "T1", pct: 100 }],
+    };
+    const { createPendingCommit } = await import("./goalContract");
+    const pending = createPendingCommit(
+      {
         form,
         assembly: {
           ...emptyGoalAssembly(),
@@ -538,8 +680,63 @@ describe("leaked goal facts", () => {
           confirmedTiers: true,
           confirmedMount: true,
         },
-      }),
-    ).toBe(true);
+      },
+      "Loja",
+    );
+    const prev = {
+      form,
+      assembly: {
+        ...emptyGoalAssembly(),
+        periodConfirmed: true,
+        valueDiscussed: true,
+        path: "copy" as const,
+        confirmedGroups: true,
+        confirmedSpread: true,
+        confirmedTiers: true,
+        confirmedMount: true,
+      },
+      pendingCommit: pending,
+      userLockedTarget: true,
+      copyStatus: "ok" as const,
+    };
+    const { draft, shouldCommit } = await discussGoal("Sim", ctx, prev);
+    expect(draft.pendingCommit?.authorized).toBe(true);
+    expect(shouldCommit).toBe(true);
+  });
+
+  it("deixar 45 e 55 nao cria pendingCommit de save", async () => {
+    const prev = {
+      form: {
+        ...emptyGoalForm("a"),
+        name: "Novembro 2026",
+        startsOn: "2026-11-01",
+        endsOn: "2026-11-30",
+        target: 244_600,
+        groups: [
+          { shiftId: "m", name: "Turno 1", pct: 45 },
+          { shiftId: "t", name: "Turno 2", pct: 55 },
+        ],
+      },
+      assembly: {
+        ...emptyGoalAssembly(),
+        periodConfirmed: true,
+        valueDiscussed: true,
+        path: "copy" as const,
+        confirmedGroups: true,
+        confirmedSpread: true,
+        confirmedTiers: true,
+      },
+      userLockedTarget: true,
+      copyStatus: "ok" as const,
+      pendingCommit: null,
+    };
+    const { draft, shouldCommit } = await discussGoal(
+      "Vamos deixar 45 e 55% mesmo",
+      ctx,
+      prev,
+    );
+    expect(draft.pendingCommit).toBeNull();
+    expect(shouldCommit).toBeFalsy();
   });
 });
 

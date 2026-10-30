@@ -15,6 +15,25 @@ import {
   suggestGroupWeightsFromSales,
   type GoalCopyIntent,
 } from "./goalConfigIntel";
+import {
+  clearPendingCommit,
+  createPendingCommit,
+  looksLikeAcceptProposal,
+  looksLikeAcceptProposalBare,
+  looksLikeAskValueSuggestionP0,
+  looksLikeConfirmPendingSave,
+  looksLikeRequestSave,
+  looksLikeSimulateLevelsAtAmount,
+  looksLikeValueInconsistency,
+  pendingCommitStillValid,
+  speakSimulateLevels,
+  speakValueInconsistency,
+  type GoalLastSave,
+  type GoalPendingCommit,
+} from "./goalContract";
+
+export type { GoalLastSave, GoalPendingCommit } from "./goalContract";
+export { goalDraftFingerprint, pendingCommitStillValid } from "./goalContract";
 
 export type GoalDraftForm = {
   name: string;
@@ -68,10 +87,16 @@ export type GoalDraft = {
   copiedFrom?: GoalCopiedFrom | null;
   /** Idempotência: eager + draft_goal no mesmo turno não reaplicam. */
   lastAppliedTurnId?: string | null;
-  /** Gestor falou R$ explícito nesta negociação — proposta não sobrescreve. */
+  /** Gestor falou R$ explícito ou aceitou proposta — form.target é autoritativo. */
   userLockedTarget?: boolean;
-  /** Última proposta estruturada do motor (cenários + evidências). */
+  /** Última proposta estruturada do motor (cenários + evidências). NÃO grava sozinha. */
   proposal?: GoalIntelligenceResult | null;
+  /** R$ recomendado pelo motor — distinto de form.target até aceite. */
+  proposedTarget?: number | null;
+  /** Confirmação de gravação vinculada à fingerprint do rascunho. */
+  pendingCommit?: GoalPendingCommit | null;
+  /** Último save bem-sucedido nesta sessão de montagem. */
+  lastSave?: GoalLastSave | null;
   /** exact = preservar tudo; reference = pode recomendar ajuste (sem aplicar sozinho). */
   copyIntent?: GoalCopyIntent | null;
 };
@@ -90,22 +115,37 @@ export function emptyGoalAssembly(): GoalAssembly {
 
 /** Pediu sugestão de valor (não só “quero criar meta”). */
 export function looksLikeAskValueSuggestion(text: string): boolean {
-  const p = norm(text);
-  return /suger|propor|ideia de (meta|valor)|quanto (seria|fica|voce|vc)|me (da|dá) (um |uma )?(valor|ideia|numero|número)|pode (suger|calcular|propor)|basead|historico|histórico|nao sei|não sei|sem ideia|voce sugere|você sugere|valor vc sugere|valor voce sugere|da pra melhorar|da para melhorar/.test(
-    p,
-  );
+  return looksLikeAskValueSuggestionP0(text);
 }
 
-/** Form válido + checklist de montagem confirmado. */
-export function goalCanCommit(draft: GoalDraft): boolean {
+/** Config completa o bastante para oferecer “salvar rascunho?”. */
+export function goalConfigReadyForSaveOffer(draft: GoalDraft): boolean {
   const a = draft.assembly ?? emptyGoalAssembly();
   return (
     goalDraftReady(draft.form) &&
     a.confirmedGroups &&
     a.confirmedSpread &&
     a.confirmedTiers &&
-    a.confirmedMount
+    draft.form.target != null
   );
+}
+
+/** Único sinal que autoriza saveGoal: pendingCommit.authorized + fingerprint. */
+export function goalCanPersist(draft: GoalDraft): boolean {
+  const a = draft.assembly ?? emptyGoalAssembly();
+  return (
+    goalDraftReady(draft.form) &&
+    a.confirmedGroups &&
+    a.confirmedSpread &&
+    a.confirmedTiers &&
+    draft.pendingCommit?.authorized === true &&
+    pendingCommitStillValid(draft)
+  );
+}
+
+/** @deprecated use goalCanPersist — nome antigo; agora exige autorização explícita. */
+export function goalCanCommit(draft: GoalDraft): boolean {
+  return goalCanPersist(draft);
 }
 
 /** Aceite depois da oferta de copiar config do mês anterior (sim curto ou “vamos copiar a escada…”). */
@@ -133,7 +173,7 @@ export function looksLikeInspectGoalDraft(text: string): boolean {
   if (looksLikeAskGroupWeightAdvice(text)) return false;
   const p = norm(text).trim();
   return (
-    /como (ficou|esta|saiu|ficaria)/.test(p) ||
+    /como (ficou|ficam|esta|saiu|ficaria)/.test(p) ||
     /mostr[ea](r)? (os |as |a |o )?(niveis?|escada|config|grupo|bonus|resumo)/.test(p) ||
     /o que (voce |vc )?(copiou|montou|fez|aplicou)/.test(p) ||
     /quais? (sao|foram) (os )?(niveis?|grupos)/.test(p) ||
@@ -1346,6 +1386,17 @@ export function formatGoalFactsForModel(
     periodo_destino: period,
     alvo_centavos: form.target,
     alvo_formatado: form.target != null ? brlCent(form.target) : null,
+    proposedTarget: draft.proposedTarget ?? null,
+    proposedTarget_formatado:
+      draft.proposedTarget != null ? brlCent(draft.proposedTarget) : null,
+    pendingCommit: draft.pendingCommit
+      ? {
+          versionId: draft.pendingCommit.versionId,
+          awaitingConfirm: draft.pendingCommit.awaitingConfirm,
+          authorized: draft.pendingCommit.authorized,
+          target: draft.pendingCommit.target,
+        }
+      : null,
     modo: form.tierMode,
     niveis: formatTiersBrief(form.tiers),
     niveis_detalhe: snap.levels.map((l) => ({
@@ -1366,7 +1417,7 @@ export function formatGoalFactsForModel(
     confirmedSpread: a.confirmedSpread,
     confirmedTiers: a.confirmedTiers,
     confirmedMount: a.confirmedMount,
-    pode_gravar_rascunho: goalCanCommit(draft),
+    pode_gravar_rascunho: goalCanPersist(draft),
     pendingConfigCopy: draft.pendingConfigCopy,
     copyStatus: draft.copyStatus ?? null,
     copyIntent: draft.copyIntent ?? null,
@@ -1386,7 +1437,7 @@ export function formatGoalFactsForModel(
     checklist_pendente: pending,
     proximo_passo_sugerido: nextHint,
     instrucao:
-      "FONTE DA VERDADE = este JSON (niveis_detalhe / grupos_detalhe / config_no_rascunho). Se copyStatus=ok, NUNCA busque meta publicada do periodo_destino — a config ja esta no rascunho. Perguntas 'como ficou' / niveis = recite niveis_detalhe. Se copyStatus=failed, admita sem inventar. Nao desvie para sazonalidade ao ser perguntado pela escada. commit_draft so se pode_gravar_rascunho.",
+      "FONTE DA VERDADE = alvo_centavos (aplicado) e proposedTarget (so proposta). Nunca diga que aplicou proposedTarget sem aceite. commit_draft SO se pode_gravar_rascunho (pendingCommit.authorized). Nao invente R$.",
     extras: extras.map((e) => e.trim()).filter(Boolean),
   };
   // Sem prosa em PT: o modelo copia texto longo. Sinal curto + JSON.
@@ -1411,8 +1462,14 @@ export function goalAssemblyPendingSteps(draft: GoalDraft): string[] {
   const pending: string[] = [];
   if (!a.periodConfirmed) pending.push("mês/período da meta");
   if (!form.storeId) pending.push("filial");
-  if (!a.valueDiscussed || form.target == null) {
-    pending.push("proposta de valor-alvo (R$) — JARVIS calcula e propõe, não pergunta o número");
+  if (!a.valueDiscussed && form.target == null && draft.proposedTarget == null) {
+    pending.push("proposta de valor-alvo (R$) — JARVIS calcula e propõe");
+  } else if (form.target == null && draft.proposedTarget != null) {
+    pending.push(
+      `aceitar proposta ${brlCent(draft.proposedTarget)} ou informar outro R$ (proposta ainda não está no rascunho)`,
+    );
+  } else if (!a.valueDiscussed || form.target == null) {
+    pending.push("definir valor-alvo (R$) no rascunho");
   }
   if (a.periodConfirmed && form.storeId && a.valueDiscussed && form.target != null) {
     if (a.path === null) pending.push("copiar escada/config da meta anterior ou montar do zero");
@@ -1472,6 +1529,8 @@ export type DiscussGoalResult = {
   spokenReply?: string | null;
   /** true só quando a cópia rodou neste turno (ok ou failed). */
   copyJustApplied?: boolean;
+  /** Provider deve chamar authorizeGoal sem reinterpretar (pendingCommit.authorized). */
+  shouldCommit?: boolean;
 };
 
 export async function discussGoal(
@@ -1512,6 +1571,10 @@ export async function discussGoal(
   const asksSuggestion = looksLikeAskValueSuggestion(lastUser);
 
   form = mergeGoalUtterance(form, question, ctx);
+  // Simulação cita R$ só para o cenário — merge não pode gravar isso em form.target.
+  if (looksLikeSimulateLevelsAtAmount(lastUser) && prev?.form.target != null) {
+    form = { ...form, target: prev.form.target };
+  }
 
   // Periodo mudou (ex.: maio → novembro): nao reaproveitar valor do mes antigo.
   if (prevStarts && form.startsOn && prevStarts !== form.startsOn && lockedTarget == null) {
@@ -1519,12 +1582,9 @@ export async function discussGoal(
     assembly = { ...emptyGoalAssembly(), periodConfirmed: periodSaidNow };
     userLockedTarget = false;
     proposal = null;
-  } else if (form.target != null && asksSuggestion && lockedTarget == null) {
-    form = { ...form, target: null };
-    userLockedTarget = false;
-    proposal = null;
   }
-  if (lockedTarget != null) {
+  // R$ na fala aplica no rascunho — exceto simulação de níveis (“como ficaria com 257”).
+  if (lockedTarget != null && !looksLikeSimulateLevelsAtAmount(lastUser)) {
     form = { ...form, target: lockedTarget };
     userLockedTarget = true;
   }
@@ -1606,7 +1666,7 @@ export async function discussGoal(
     /autorizo|pode criar|ok pode|ok(,| )?vamos criar|salva(r)? (o )?rascunho|pode montar|monta (o )?rascunho/.test(qn) ||
     /^(ok[, ]*)?(cria(r)?|vamos criar) (essa |a |o )?meta( agora| ja| já)?[!?.]*$/.test(qn);
 
-  // Sem valor ainda (e gestor não travou R$): o sócio PROPÕE.
+  // Sem valor ainda: PROPÕE sem aplicar em form.target (P0).
   if (
     lockedTarget == null &&
     !userLockedTarget &&
@@ -1620,7 +1680,6 @@ export async function discussGoal(
     const suggestedEarly =
       form.storeId ? await suggestGoalTarget(ctx, form.storeId, periodEarly) : null;
     if (suggestedEarly) {
-      form = { ...form, target: suggestedEarly.amount };
       assembly = { ...assembly, valueDiscussed: true };
       proposal = suggestedEarly;
       const storeEarly =
@@ -1628,11 +1687,13 @@ export async function discussGoal(
         ctx.stores.find((s) => s.id === form.storeId)?.tradeName ??
         "";
       const draftProp: GoalDraft = {
-        form,
+        form: { ...form, target: null },
         pendingConfigCopy: null,
         assembly,
         proposal: suggestedEarly,
+        proposedTarget: suggestedEarly.amount,
         userLockedTarget: false,
+        pendingCommit: null,
         lastAppliedTurnId: turnId,
         copyStatus: prev?.copyStatus ?? null,
         copiedFrom: prev?.copiedFrom ?? null,
@@ -1644,10 +1705,14 @@ export async function discussGoal(
           `cenarios: ${suggestedEarly.scenarios.map((s) => `${s.label}=${brlCent(s.amount)}`).join(" · ")}`,
           `confianca: ${suggestedEarly.confidence}`,
           `racional: ${suggestedEarly.rationale}`,
-          "instrucao_fala: LIDERE com a recomendada + 1 insight. Cite as 3 faixas em uma frase. Nao pergunte qual valor o Gestor quer. Nao liste todos os meses.",
+          "instrucao_fala: Apresente a RECOMENDADA como proposta. Deixe claro que ainda NAO entrou no rascunho. Pergunte se aceita (ex.: aceito a recomendada) ou diga outro R$. Nao diga que ja aplicou.",
         ]),
         draft: draftProp,
         voice: "silent",
+        spokenReply:
+          `${suggestedEarly.chatBlocks.join("\n\n")}\n\n` +
+          `Isso é proposta — ainda não apliquei no rascunho. ` +
+          `Aceita a recomendada (${brlCent(suggestedEarly.amount)}), prefere outra faixa, ou manda o R$ que quer?`,
       };
     }
     const bias = seasonalBiasForPeriod(form.startsOn!, form.endsOn!);
@@ -1681,17 +1746,33 @@ export async function discussGoal(
   if (asksSuggestion || lockedTarget != null) {
     assembly = { ...assembly, valueDiscussed: true };
   }
-  // Pediu nova sugestão com lock antigo: recalcula.
+  // Nova sugestão: só atualiza proposedTarget — não sobrescreve form.target.
+  let proposedTarget: number | null = prev?.proposedTarget ?? null;
   if (asksSuggestion && lockedTarget == null && form.storeId && form.startsOn) {
     const suggested = await suggestGoalTarget(ctx, form.storeId, {
       from: form.startsOn,
       to: form.endsOn!,
     });
     if (suggested) {
-      form = { ...form, target: suggested.amount };
       proposal = suggested;
-      userLockedTarget = false;
+      proposedTarget = suggested.amount;
+      // Não toca form.target nem userLockedTarget.
     }
+  }
+  // Aceite explícito da proposta → aplica no rascunho (nunca por "sim" se já há outro target).
+  if (lockedTarget == null && proposedTarget != null) {
+    const canBareAccept = form.target == null && !userLockedTarget;
+    if (
+      looksLikeAcceptProposal(lastUser) ||
+      (canBareAccept && looksLikeAcceptProposalBare(lastUser, true))
+    ) {
+      form = { ...form, target: proposedTarget };
+      userLockedTarget = true;
+      assembly = { ...assembly, valueDiscussed: true };
+    }
+  }
+  if (lockedTarget != null) {
+    proposedTarget = lockedTarget;
   }
 
   // Copia: prioriza a fala do Gestor (não o histórico da IA).
@@ -1879,20 +1960,22 @@ export async function discussGoal(
     asksSuggestion &&
     form.storeId;
 
-  if (wantsValueHelp && !userLockedTarget) {
+  if (wantsValueHelp) {
     const suggested = await suggestGoalTarget(ctx, form.storeId, period);
     if (suggested != null) {
-      form = { ...form, target: suggested.amount };
       suggestionBlocks = suggested.chatBlocks;
       assembly = { ...assembly, valueDiscussed: true };
       proposal = suggested;
+      proposedTarget = suggested.amount;
+      // P0: não escreve form.target.
     }
   }
-  // Alvo falado pelo Gestor ("270 mil") sempre ganha da sugestão automática.
-  if (lockedTarget != null) {
+  // Alvo falado pelo Gestor ("270 mil") — não aplica se for só simulação de níveis.
+  if (lockedTarget != null && !looksLikeSimulateLevelsAtAmount(lastUser)) {
     form = { ...form, target: lockedTarget };
     assembly = { ...assembly, valueDiscussed: true };
     userLockedTarget = true;
+    proposedTarget = lockedTarget;
   }
 
   form = ensureGoalName(form);
@@ -2004,6 +2087,7 @@ export async function discussGoal(
     }
   }
 
+  // confirmedMount = config ok para OFERTAR save — não autoriza DB.
   if (
     basicsReady &&
     !skipAssemblyParse &&
@@ -2012,7 +2096,18 @@ export async function discussGoal(
     assembly.confirmedSpread &&
     assembly.confirmedTiers &&
     !assembly.confirmedMount &&
-    looksLikeConfirmMount(lastUser)
+    looksLikeConfirmMount(lastUser) &&
+    !looksLikeRequestSave(lastUser)
+  ) {
+    assembly = { ...assembly, confirmedMount: true };
+  }
+  if (
+    basicsReady &&
+    assembly.path != null &&
+    assembly.confirmedGroups &&
+    assembly.confirmedSpread &&
+    assembly.confirmedTiers &&
+    looksLikeRequestSave(lastUser)
   ) {
     assembly = { ...assembly, confirmedMount: true };
   }
@@ -2030,7 +2125,7 @@ export async function discussGoal(
     configSnapshotBlocks = buildGoalConfigSnapshot(form, form.target).chatBlocks;
   }
 
-  const draftOut: GoalDraft = {
+  let draftOut: GoalDraft = {
     form,
     pendingConfigCopy,
     assembly,
@@ -2039,8 +2134,47 @@ export async function discussGoal(
     lastAppliedTurnId: turnId,
     userLockedTarget,
     proposal,
+    proposedTarget,
+    pendingCommit: prev?.pendingCommit ?? null,
+    lastSave: prev?.lastSave ?? null,
     copyIntent,
   };
+
+  // Qualquer mudança de fingerprint invalida confirmação pendente.
+  if (draftOut.pendingCommit && !pendingCommitStillValid(draftOut)) {
+    draftOut = clearPendingCommit(draftOut);
+  }
+
+  let shouldCommit = false;
+  const hadAwaitingCommit = prev?.pendingCommit?.awaitingConfirm === true;
+
+  // 1) Pediu salvar → apresenta resumo e aguarda SIM (não grava neste turno).
+  if (
+    looksLikeRequestSave(lastUser) &&
+    goalConfigReadyForSaveOffer(draftOut) &&
+    !looksLikeAskGroupWeightAdvice(lastUser)
+  ) {
+    const pending = createPendingCommit(draftOut, storeName);
+    draftOut = { ...draftOut, pendingCommit: pending, assembly: { ...assembly, confirmedMount: true } };
+  } else if (
+    // 2) SIM só se JÁ havia pending.awaitingConfirm no turno anterior.
+    hadAwaitingCommit &&
+    draftOut.pendingCommit &&
+    looksLikeConfirmPendingSave(lastUser) &&
+    pendingCommitStillValid(draftOut) &&
+    !looksLikeAskGroupWeightAdvice(lastUser) &&
+    !looksLikeRequestSave(lastUser)
+  ) {
+    draftOut = {
+      ...draftOut,
+      pendingCommit: {
+        ...draftOut.pendingCommit,
+        awaitingConfirm: false,
+        authorized: true,
+      },
+    };
+    shouldCommit = goalCanPersist(draftOut);
+  }
   logGoalCopy("turn_state", {
     turnId,
     copyStatus,
@@ -2056,9 +2190,11 @@ export async function discussGoal(
   if (suggestionBlocks.length > 0) {
     extras.push(`sugestao_calculada:\n${suggestionBlocks.join("\n")}`);
   }
-  if (proposal && !userLockedTarget) {
+  if (proposal && proposedTarget != null) {
     extras.push(
       `proposta_meta:\n${proposal.chatBlocks.join("\n")}`,
+      `proposedTarget: ${brlCent(proposedTarget)} (NAO e form.target ate aceite)`,
+      `alvo_aplicado: ${form.target != null ? brlCent(form.target) : "null"}`,
       `cenarios: ${proposal.scenarios.map((s) => `${s.label}=${brlCent(s.amount)}`).join(" · ")}`,
       `confianca: ${proposal.confidence}`,
     );
@@ -2066,7 +2202,13 @@ export async function discussGoal(
   if (userLockedTarget && form.target != null) {
     extras.push(
       `alvo_travado_pelo_gestor: ${brlCent(form.target)}`,
-      "instrucao_fala: O Gestor definiu este R$. Nao substitua pela proposta automatica.",
+      "instrucao_fala: O Gestor definiu/aceitou este R$ no rascunho. Nao substitua pela proposta.",
+    );
+  }
+  if (draftOut.pendingCommit?.awaitingConfirm) {
+    extras.push(
+      `pending_commit: version=${draftOut.pendingCommit.versionId} target=${brlCent(draftOut.pendingCommit.target)}`,
+      "instrucao_fala: Ja apresentou o resumo. Espere SIM para gravar. Nao chame commit_draft ainda.",
     );
   }
   if (copiedLadder && sourceWin) {
@@ -2109,7 +2251,29 @@ export async function discussGoal(
 
   let spokenReply: string | null = null;
   const copyJustApplied = Boolean(sourceWin && (copiedLadder || copyStatus === "failed"));
-  if (looksLikeAskGroupWeightAdvice(lastUser)) {
+  if (looksLikeValueInconsistency(lastUser)) {
+    spokenReply = speakValueInconsistency(draftOut);
+  } else if (looksLikeSimulateLevelsAtAmount(lastUser)) {
+    const simAmount = parseGoalTarget(lastUser) ?? proposedTarget;
+    if (simAmount != null) {
+      spokenReply = speakSimulateLevels(draftOut, simAmount);
+    }
+  } else if (shouldCommit) {
+    spokenReply = null; // Provider grava e fala o resultado real
+  } else if (draftOut.pendingCommit?.awaitingConfirm && looksLikeRequestSave(lastUser)) {
+    spokenReply = draftOut.pendingCommit.summary;
+  } else if (
+    asksSuggestion &&
+    proposedTarget != null &&
+    suggestionBlocks.length + (proposal?.chatBlocks.length ?? 0) > 0
+  ) {
+    const blocks = suggestionBlocks.length ? suggestionBlocks : proposal!.chatBlocks;
+    spokenReply =
+      `${blocks.join("\n\n")}\n\n` +
+      `Proposta: ${brlCent(proposedTarget)} — ainda não está no rascunho` +
+      (form.target != null ? ` (aplicado continua ${brlCent(form.target)})` : "") +
+      `. Aceita a recomendada ou manda outro R$?`;
+  } else if (looksLikeAskGroupWeightAdvice(lastUser)) {
     spokenReply = speakGoalWeightAdvice(draftOut, weightAdviceForSpeak);
   } else if (copyJustApplied && (copyStatus === "ok" || copyStatus === "failed")) {
     spokenReply = speakGoalDraftConfig(draftOut, {
@@ -2117,6 +2281,16 @@ export async function discussGoal(
     });
   } else if (looksLikeInspectGoalDraft(lastUser)) {
     spokenReply = speakGoalDraftConfig(draftOut, { facet: goalInspectFacet(lastUser) });
+  } else if (
+    userLockedTarget &&
+    form.target != null &&
+    proposedTarget != null &&
+    form.target === proposedTarget &&
+    (looksLikeAcceptProposal(lastUser) || looksLikeAcceptProposalBare(lastUser, true))
+  ) {
+    spokenReply =
+      `Apliquei ${brlCent(form.target)} no rascunho.\n\n` +
+      buildGoalConfigSnapshot(form, form.target).chatBlocks.join("\n\n");
   }
 
   return {
@@ -2125,6 +2299,7 @@ export async function discussGoal(
     voice: "silent",
     spokenReply,
     copyJustApplied,
+    shouldCommit,
   };
 }
 

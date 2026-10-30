@@ -1,0 +1,228 @@
+/**
+ * Contrato P0: proposta ≠ rascunho aplicado ≠ autorização de gravação.
+ * Mutação financeira e commit só por operações determinísticas.
+ */
+import { brlCent, monthYearTitle } from "@/lib/format";
+import { buildGoalConfigSnapshot, simulateLevelAtStoreTarget } from "./goalConfigIntel";
+import type { GoalDraft, GoalDraftForm } from "./goalDraft";
+
+export type GoalPendingCommit = {
+  versionId: string;
+  fingerprint: string;
+  target: number;
+  summary: string;
+  /** Pediu gravação; ainda falta o "sim" desta versão. */
+  awaitingConfirm: boolean;
+  /** Gestor confirmou esta versão — único sinal que autoriza saveGoal. */
+  authorized: boolean;
+  presentedAt: string;
+};
+
+export type GoalLastSave = {
+  id: string;
+  target: number;
+  name: string;
+  at: string;
+};
+
+function norm(s: string): string {
+  return s
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "");
+}
+
+/** Impressão digital do que será gravado — muda → invalida confirmação. */
+export function goalDraftFingerprint(form: GoalDraftForm): string {
+  return JSON.stringify({
+    storeId: form.storeId,
+    startsOn: form.startsOn,
+    endsOn: form.endsOn,
+    target: form.target,
+    tierMode: form.tierMode,
+    spreadUnidentified: form.spreadUnidentified,
+    managerOn: form.managerOn,
+    tiers: form.tiers.map((t) => ({
+      name: t.name,
+      minAttainmentPct: t.minAttainmentPct,
+      commissionPct: t.commissionPct,
+      bonus: t.bonus,
+      managerPct: t.managerPct ?? null,
+      managerBonus: t.managerBonus ?? null,
+    })),
+    groups: form.groups.map((g) => ({ shiftId: g.shiftId, name: g.name, pct: g.pct })),
+  });
+}
+
+export function newCommitVersionId(): string {
+  return `v-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+/** Resumo apresentado ao Gestor antes do SIM de gravação. */
+export function buildCommitSummary(draft: GoalDraft, storeName: string): string {
+  const form = draft.form;
+  const dest = form.startsOn ? monthYearTitle(form.startsOn) : "?";
+  const alvo = form.target != null ? brlCent(form.target) : "?";
+  const snap = buildGoalConfigSnapshot(form, form.target);
+  const groups =
+    snap.groups.length > 0
+      ? snap.groups.map((g) => `${g.name} ${g.pct}%`).join(" / ")
+      : "sem grupos";
+  const levels = snap.levels
+    .map((l) => `${l.name} ${l.minAttainmentPct}%/${l.commissionPct}%`)
+    .join(" · ");
+  return (
+    `Vou gravar o rascunho abaixo. Confira com atenção:\n\n` +
+    `· Filial: ${storeName || form.storeId}\n` +
+    `· Período: ${dest}\n` +
+    `· Valor: ${alvo}\n` +
+    `· Grupos: ${groups}\n` +
+    `· Níveis: ${levels}\n\n` +
+    `Responda SIM para autorizar gravar exatamente este rascunho. ` +
+    `Se mudar qualquer coisa depois, peço confirmação de novo.`
+  );
+}
+
+export function createPendingCommit(draft: GoalDraft, storeName: string): GoalPendingCommit {
+  const fingerprint = goalDraftFingerprint(draft.form);
+  return {
+    versionId: newCommitVersionId(),
+    fingerprint,
+    target: draft.form.target!,
+    summary: buildCommitSummary(draft, storeName),
+    awaitingConfirm: true,
+    authorized: false,
+    presentedAt: new Date().toISOString(),
+  };
+}
+
+/** Qualquer mutação do form invalida autorização pendente. */
+export function clearPendingCommit(draft: GoalDraft): GoalDraft {
+  if (!draft.pendingCommit) return draft;
+  return { ...draft, pendingCommit: null };
+}
+
+export function pendingCommitStillValid(draft: GoalDraft): boolean {
+  const p = draft.pendingCommit;
+  if (!p || draft.form.target == null) return false;
+  return p.fingerprint === goalDraftFingerprint(draft.form);
+}
+
+export function looksLikeAcceptProposal(text: string): boolean {
+  const p = norm(text).trim();
+  if (/nao|não|outra|diferente|muda o valor|troca o valor/.test(p) && !/nao precisa/.test(p)) {
+    if (/^(nao|não)\b/.test(p)) return false;
+  }
+  return (
+    /aceito (a |o )?(proposta|recomend|valor|meta)|vamos (de |com )?(a )?recomend|fica a recomend|pode (ser|ficar) (a |o )?(recomend|proposta)|fechado (nessa|nessa faixa|no valor)|quero (a |o )?recomend|aplica (a |o )?recomend|usa (a |o )?recomend|vamos com (essa|esse|a recomend|o valor)/.test(
+      p,
+    ) ||
+    (/^(sim|pode|ok|fechado|isso)(\b|,|$)/.test(p) &&
+      false) /* bare sim NÃO aceita proposta — só com pendingCommit ou pedido explícito */
+  );
+}
+
+/** Aceite curto só conta se havia proposta pendente e a pergunta do JARVIS era sobre valor. */
+export function looksLikeAcceptProposalBare(text: string, hasProposed: boolean): boolean {
+  if (!hasProposed) return false;
+  const p = norm(text).trim();
+  return (
+    looksLikeAcceptProposal(text) ||
+    /^(sim|pode|ok|fechado|isso|essa|esse|pode ser)(\b|,|$)/.test(p)
+  );
+}
+
+export function looksLikeRequestSave(text: string): boolean {
+  const p = norm(text).trim();
+  return (
+    /salva(r)? (o )?rascunho|grava(r)? (o )?rascunho|pode (salvar|gravar)|autorizo|pode montar|monta (o )?rascunho|cria (a )?meta|vamos (criar|montar|gravar|salvar)|ok pode/.test(
+      p,
+    ) || /^(salva|grava|autorizo)(\b|,|$)/.test(p)
+  );
+}
+
+export function looksLikeConfirmPendingSave(text: string): boolean {
+  const p = norm(text).trim();
+  if (/nao|não|espera|ainda nao|ainda não|cancela/.test(p)) return false;
+  return /^(sim|pode|ok|confirma|confirmo|autorizo|fechado)(\b|,|$)/.test(p);
+}
+
+/** Simular níveis com outro R$ — sem mutar o rascunho. */
+export function looksLikeSimulateLevelsAtAmount(text: string): boolean {
+  const p = norm(text).trim();
+  return (
+    /como (ficaria|ficariam|fica|ficam).{0,40}(nivel|niveis|escada)/.test(p) ||
+    /(nivel|niveis|escada).{0,40}(com|a|se ).{0,20}(r\$|mil)/.test(p) ||
+    /simula.{0,20}(nivel|niveis|escada|meta)/.test(p)
+  );
+}
+
+export function looksLikeValueInconsistency(text: string): boolean {
+  const p = norm(text).trim();
+  return (
+    /(suger|falou|disse|anunci|recomend).{0,48}(mas|e )?(salv|grav|esta|está|ficou|meta).{0,24}(r\$|\d)/.test(
+      p,
+    ) ||
+    /(salv|grav).{0,24}(diferente|errado|outra)|diverg|inconsist|nao (foi|eh|é) (o|esse) valor|voce falou.{0,40}mas/.test(
+      p,
+    )
+  );
+}
+
+export function speakValueInconsistency(draft: GoalDraft): string {
+  const applied = draft.form.target != null ? brlCent(draft.form.target) : "nenhum valor aplicado";
+  const proposed =
+    draft.proposedTarget != null
+      ? brlCent(draft.proposedTarget)
+      : draft.proposal?.scenarios.find((s) => s.kind === "recommended")?.amount != null
+        ? brlCent(draft.proposal.scenarios.find((s) => s.kind === "recommended")!.amount)
+        : null;
+  const saved = draft.lastSave
+    ? `${brlCent(draft.lastSave.target)} (rascunho id ${draft.lastSave.id.slice(0, 8)}…)`
+    : null;
+
+  const lines = [
+    `Estado real agora:`,
+    `· Valor aplicado no rascunho: ${applied}`,
+    proposed != null ? `· Última proposta do motor (ainda não é o rascunho): ${proposed}` : null,
+    saved ? `· Último valor gravado nesta conversa: ${saved}` : `· Ainda não gravei rascunho nesta conversa.`,
+    ``,
+    proposed != null && draft.form.target != null && proposed !== applied
+      ? `A proposta ${proposed} só entra no rascunho se você aceitar explicitamente (ex.: “aceito a recomendada”). Enquanto isso, gravação usaria ${applied}.`
+      : `Se quiser trocar o valor aplicado, diga o R$ ou aceite a proposta.`,
+  ];
+  return lines.filter((l) => l != null).join("\n");
+}
+
+export function speakSimulateLevels(draft: GoalDraft, amount: number): string {
+  const form = draft.form;
+  const lines = form.tiers.map((t) => {
+    const sim = simulateLevelAtStoreTarget(amount, t);
+    const b = t.bonus > 0 ? ` · bônus ${brlCent(t.bonus)}` : "";
+    return `· ${t.name}: limiar ${brlCent(sim.threshold)} · comissão ilustrativa ${brlCent(sim.commissionAtThreshold)}${b}`;
+  });
+  const applied = form.target != null ? brlCent(form.target) : "sem valor aplicado";
+  return (
+    `Simulação com ${brlCent(amount)} (não alterei o rascunho; aplicado continua ${applied}):\n\n` +
+    lines.join("\n")
+  );
+}
+
+export function applyProposedTarget(draft: GoalDraft, amount: number): GoalDraft {
+  return {
+    ...draft,
+    form: { ...draft.form, target: amount },
+    proposedTarget: amount,
+    userLockedTarget: true,
+    pendingCommit: null,
+  };
+}
+
+export function looksLikeAskValueSuggestionP0(text: string): boolean {
+  const p = norm(text);
+  return (
+    /suger|propor|recomend|ideia de (meta|valor)|quanto (seria|fica|voce|vc)|me (da|dá) (um |uma )?(valor|ideia|numero|número)|pode (suger|calcular|propor|recomend)|basead|historico|histórico|nao sei|não sei|sem ideia|voce sugere|você sugere|valor vc sugere|valor voce sugere|da pra melhorar|da para melhorar|qual valor/.test(
+      p,
+    )
+  );
+}

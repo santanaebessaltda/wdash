@@ -11,6 +11,7 @@ import {
 import { useLocation, useNavigate } from "react-router-dom";
 import { validateChallengeForm } from "@/data/wedash/challengeForm";
 import { isOwner } from "@/layout/nav-wedash";
+import { brlCent } from "@/lib/format";
 import { useSession } from "@/session/SessionProvider";
 import { commitChallenge } from "./challengeCommit";
 import {
@@ -27,7 +28,7 @@ import {
   discussGoal,
   formatGoalFactsForModel,
   goalAssemblyPendingSteps,
-  goalCanCommit,
+  goalCanPersist,
   loadGoalDraftSession,
   looksLikeGoalConversation,
   looksLikeLeakedGoalFacts,
@@ -40,6 +41,7 @@ import {
   validateGoalDraft,
   type GoalDraft,
 } from "./goalDraft";
+import { looksLikeValueInconsistency } from "./goalContract";
 import {
   blobToBase64,
   jarvisLlmTurn,
@@ -505,33 +507,44 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
         return silent ? "Não tem proposta de meta aberta pra gravar." : undefined;
       }
       const draft = goalDraftRef.current;
-      if (!goalCanCommit(draft)) {
+      if (!goalCanPersist(draft)) {
         const missing = missingGoalLabels(validateGoalDraft(draft.form));
-        const msg = missing.length
-          ? `Ainda não da pra gravar a meta. Falta: ${missing.join(", ")}. Pergunte isso ao Gestor.`
-          : "Ainda não fechou pra gravar. Me completa no chat o que falta.";
+        const msg = !draft.pendingCommit?.authorized
+          ? "Ainda não autorizei a gravação desta versão. Peça para salvar o rascunho e confirme com SIM no resumo."
+          : missing.length
+            ? `Ainda não dá pra gravar a meta. Falta: ${missing.join(", ")}.`
+            : "A configuração mudou depois do resumo — peço confirmação de novo.";
         if (silent) return msg;
         speakAnswer(msg);
         return;
       }
+      const targetSaved = draft.form.target!;
       setCommitBusy(true);
       setMode("thinking");
-      // Meta no chat grava como rascunho — Gestor revisa/publica em Performance > Metas.
       const res = await commitGoal(session.tenantId, draft.form, { published: false });
       setCommitBusy(false);
       if (!res.ok) {
+        syncGoalDraft({
+          ...draft,
+          pendingCommit: draft.pendingCommit
+            ? { ...draft.pendingCommit, authorized: false, awaitingConfirm: true }
+            : null,
+        });
         if (silent) return res.reason;
         speakAnswer(res.reason);
         return;
       }
       setGoalDraft(null);
       syncGoalDraft(null);
+      clearGoalDraftSession();
       setCreatedItem({ kind: "goal", id: res.id, name: res.name, asDraft: true });
       const periodLabel =
         draft.form.startsOn && draft.form.endsOn
           ? ` (${draft.form.startsOn.slice(8, 10)}/${draft.form.startsOn.slice(5, 7)} a ${draft.form.endsOn.slice(8, 10)}/${draft.form.endsOn.slice(5, 7)})`
           : "";
-      const msg = `Pronto. Salvei como rascunho “${res.name}”${periodLabel}, igual o botão Salvar rascunho em Metas. Abre o link, revisa/edita e publica quando quiser.`;
+      const msg =
+        `Pronto. Salvei o rascunho “${res.name}”${periodLabel} com valor ${brlCent(targetSaved)} ` +
+        `(id ${res.id.slice(0, 8)}…). Abre o link, revisa e publica quando quiser.`;
       if (silent) return msg;
       speakAnswer(msg);
     },
@@ -623,6 +636,7 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
 
       let goalTurnApplied = false;
       let goalSpokenReply: string | null = null;
+      let goalShouldCommit = false;
       const turnId = `t-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
       const llmSession = (): JarvisLlmSession => {
         const draft = goalDraftRef.current;
@@ -710,15 +724,7 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
             return (await authorizeSchedule({ silent: true })) ?? "Não consegui gravar a escala.";
           }
           if (goalDraftRef.current || t === "goal") {
-            const historyBlob = [...messagesRef.current, { from: "user" as const, text: q }]
-              .slice(-16)
-              .map((m) => `${m.from}: ${m.text}`)
-              .join("\n");
-            const { draft } = await discussGoal(historyBlob || q, ctx, goalDraftRef.current, {
-              turnId: `${turnId}-commit`,
-            });
-            syncGoalDraft(draft);
-            setGoalDraft(null);
+            // P0: commit NÃO reexecuta discussGoal — só valida pendingCommit + form.
             setChallengeDraft(null);
             challengeDraftRef.current = null;
             setScheduleDraft(null);
@@ -772,20 +778,31 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
           const beforePath = before?.assembly?.path ?? null;
           const beforePending = before ? goalAssemblyPendingSteps(before).join("|") : "";
           const historyBlob = recentMsgs.map((m) => `${m.from}: ${m.text}`).join("\n");
-          const { draft, skipped, spokenReply } = await discussGoal(historyBlob, ctx, before, {
-            turnId,
-          });
+          const { draft, skipped, spokenReply, shouldCommit } = await discussGoal(
+            historyBlob,
+            ctx,
+            before,
+            { turnId },
+          );
           if (gen !== replyGen.current) return;
           syncGoalDraft(draft);
           const afterPending = goalAssemblyPendingSteps(draft).join("|");
           goalTurnApplied =
             !skipped &&
             ((draft.assembly?.path ?? null) !== beforePath || afterPending !== beforePending);
-          // Só fala determinística quando discussGoal pediu (cópia deste turno / inspeção / pesos).
           if (!skipped && spokenReply) goalSpokenReply = spokenReply;
+          if (!skipped && shouldCommit) goalShouldCommit = true;
         }
 
-        // Intenção resolvida no motor (cópia / "como ficou" / pesos) — não deixa o LLM reabrir a cópia.
+        // Commit autorizado neste turno — fala = resultado real de saveGoal.
+        if (goalShouldCommit) {
+          const msg = await authorizeGoal({ silent: true });
+          if (gen !== replyGen.current) return;
+          finish(msg || "Não consegui gravar a meta.");
+          return;
+        }
+
+        // Intenção resolvida no motor — não deixa o LLM reabrir a cópia / inventar R$.
         if (goalSpokenReply) {
           finish(goalSpokenReply);
           return;
@@ -814,8 +831,13 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
 
         let answer = llm.content.trim();
         const draftNow = goalDraftRef.current;
-        if (
+        // Correção de valor / inconsistência: nunca vira checklist de grupos.
+        if (draftNow && looksLikeValueInconsistency(q)) {
+          const { speakValueInconsistency } = await import("./goalContract");
+          answer = speakValueInconsistency(draftNow);
+        } else if (
           draftNow &&
+          !looksLikeValueInconsistency(q) &&
           (looksLikeStallingGoalReply(answer) || looksLikeLostGoalReply(answer, draftNow))
         ) {
           answer = naturalGoalAskFromDraft(draftNow);
