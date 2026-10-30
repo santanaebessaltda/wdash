@@ -797,6 +797,102 @@ describe("P0 proposta 244600 vs 257000", () => {
     expect(spokenReply).not.toMatch(/recomendo R\$ 260|vamos de 260|subir (pra|para) 260/i);
   });
 
+  it("pode seguir com config pronta cria pending e fala resumo (nao grava)", async () => {
+    const prev = {
+      form: {
+        ...emptyGoalForm("a"),
+        name: "Novembro 2026",
+        startsOn: "2026-11-01",
+        endsOn: "2026-11-30",
+        target: 244_600,
+        groups: [
+          { shiftId: "m", name: "Turno 1", pct: 45 },
+          { shiftId: "t", name: "Turno 2", pct: 55 },
+        ],
+        tiers: [
+          { name: "Meta", minAttainmentPct: 50, commissionPct: 1.5, bonus: 50 },
+          { name: "Desafio", minAttainmentPct: 110, commissionPct: 3, bonus: 50 },
+        ],
+      },
+      assembly: {
+        ...emptyGoalAssembly(),
+        periodConfirmed: true,
+        valueDiscussed: true,
+        path: "copy" as const,
+        confirmedGroups: true,
+        confirmedSpread: true,
+        confirmedTiers: true,
+      },
+      userLockedTarget: true,
+      copyStatus: "ok" as const,
+      pendingCommit: null,
+    };
+    const { draft, spokenReply, shouldCommit } = await discussGoal("pode seguir", ctx, prev);
+    expect(draft.pendingCommit?.awaitingConfirm).toBe(true);
+    expect(draft.pendingCommit?.authorized).toBe(false);
+    expect(shouldCommit).toBeFalsy();
+    expect(spokenReply).toMatch(/SIM|gravar/i);
+    expect(spokenReply).toMatch(/244/);
+  });
+
+  it("SIM sem pending (LLM pediu sozinho) autoriza gravação se config pronta", async () => {
+    const prev = {
+      form: {
+        ...emptyGoalForm("a"),
+        name: "Novembro 2026",
+        startsOn: "2026-11-01",
+        endsOn: "2026-11-30",
+        target: 244_600,
+        groups: [{ shiftId: "m", name: "T1", pct: 100 }],
+        tiers: [
+          { name: "Meta", minAttainmentPct: 50, commissionPct: 1.5, bonus: 50 },
+          { name: "Desafio", minAttainmentPct: 110, commissionPct: 3, bonus: 50 },
+        ],
+      },
+      assembly: {
+        ...emptyGoalAssembly(),
+        periodConfirmed: true,
+        valueDiscussed: true,
+        path: "copy" as const,
+        confirmedGroups: true,
+        confirmedSpread: true,
+        confirmedTiers: true,
+        confirmedMount: true,
+      },
+      userLockedTarget: true,
+      copyStatus: "ok" as const,
+      pendingCommit: null,
+    };
+    const { draft, shouldCommit, spokenReply } = await discussGoal("SIM", ctx, prev);
+    expect(draft.pendingCommit?.authorized).toBe(true);
+    expect(shouldCommit).toBe(true);
+    expect(spokenReply).toBeNull();
+  });
+
+  it("vamos seguir a mesma faixa aceita proposta", async () => {
+    const prev = {
+      form: {
+        ...emptyGoalForm("a"),
+        name: "Novembro 2026",
+        startsOn: "2026-11-01",
+        endsOn: "2026-11-30",
+        target: null as number | null,
+      },
+      assembly: {
+        ...emptyGoalAssembly(),
+        periodConfirmed: true,
+        valueDiscussed: true,
+        path: null as "copy" | "fresh" | null,
+      },
+      proposedTarget: 244_600,
+      userLockedTarget: false,
+      pendingCommit: null,
+    };
+    const { draft, spokenReply } = await discussGoal("Vamos seguir a mesma faixa", ctx, prev);
+    expect(draft.form.target).toBe(244_600);
+    expect(spokenReply).toMatch(/Apliquei|244/i);
+  });
+
   it("pedir salvar cria pendingCommit sem shouldCommit", async () => {
     const prev = {
       form: {

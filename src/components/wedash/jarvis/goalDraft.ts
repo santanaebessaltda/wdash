@@ -29,6 +29,7 @@ import {
   looksLikeAcceptPendingProposal,
   looksLikeAskValueSuggestionP0,
   looksLikeConfirmPendingSave,
+  looksLikeProceedToSaveOffer,
   looksLikeRequestSave,
   looksLikeSimulateLevelsAtAmount,
   looksLikeValueInconsistency,
@@ -442,6 +443,7 @@ export function looksLikeConfirmMount(text: string): boolean {
   const p = norm(text).trim();
   if (looksLikeDeclineConfigCopy(text) && !/monta/.test(p)) return false;
   return (
+    looksLikeProceedToSaveOffer(text) ||
     /^(sim|pode|ok|monta|cria|autorizo|fechado)(\b|,|$)/.test(p) ||
     /pode montar|monta (o )?rascunho|cria (a )?meta|autorizo|vamos (criar|montar)|salva(r)? (o )?rascunho|ok pode/.test(p)
   );
@@ -2246,24 +2248,18 @@ export async function discussGoal(
   }
 
   let shouldCommit = false;
+  let justPresentedCommit = false;
   const hadAwaitingCommit = prev?.pendingCommit?.awaitingConfirm === true;
+  const saveReady =
+    goalConfigReadyForSaveOffer(draftOut) && !looksLikeAskGroupWeightAdvice(lastUser);
 
-  // 1) Pediu salvar → apresenta resumo e aguarda SIM (não grava neste turno).
   if (
-    looksLikeRequestSave(lastUser) &&
-    goalConfigReadyForSaveOffer(draftOut) &&
-    !looksLikeAskGroupWeightAdvice(lastUser)
-  ) {
-    const pending = createPendingCommit(draftOut, storeName);
-    draftOut = { ...draftOut, pendingCommit: pending, assembly: { ...assembly, confirmedMount: true } };
-  } else if (
-    // 2) SIM só se JÁ havia pending.awaitingConfirm no turno anterior.
+    // 1) SIM com pending aguardando → autoriza gravação (P0).
     hadAwaitingCommit &&
     draftOut.pendingCommit &&
     looksLikeConfirmPendingSave(lastUser) &&
     pendingCommitStillValid(draftOut) &&
-    !looksLikeAskGroupWeightAdvice(lastUser) &&
-    !looksLikeRequestSave(lastUser)
+    !looksLikeAskGroupWeightAdvice(lastUser)
   ) {
     draftOut = {
       ...draftOut,
@@ -2272,8 +2268,44 @@ export async function discussGoal(
         awaitingConfirm: false,
         authorized: true,
       },
+      assembly: { ...assembly, confirmedMount: true },
     };
     shouldCommit = goalCanPersist(draftOut);
+  } else if (
+    // 2) SIM sem pending (LLM pediu confirmação sozinho) + config já “pronta pra gravar”
+    // no turno anterior → autoriza. Não confundir com aceite de proposta de valor.
+    !hadAwaitingCommit &&
+    !draftOut.pendingCommit &&
+    !justAcceptedProposal &&
+    prev?.assembly?.confirmedMount === true &&
+    saveReady &&
+    looksLikeConfirmPendingSave(lastUser) &&
+    form.target != null
+  ) {
+    const pending = createPendingCommit(draftOut, storeName);
+    draftOut = {
+      ...draftOut,
+      pendingCommit: {
+        ...pending,
+        awaitingConfirm: false,
+        authorized: true,
+      },
+      assembly: { ...assembly, confirmedMount: true },
+    };
+    shouldCommit = goalCanPersist(draftOut);
+  } else if (
+    // 3) Pediu salvar / “pode seguir” → apresenta resumo e AGUARDA SIM (não grava neste turno).
+    saveReady &&
+    (looksLikeRequestSave(lastUser) || looksLikeProceedToSaveOffer(lastUser)) &&
+    !looksLikeConfirmPendingSave(lastUser) // “sim” solto cai no ramo 1/2
+  ) {
+    const pending = createPendingCommit(draftOut, storeName);
+    draftOut = {
+      ...draftOut,
+      pendingCommit: pending,
+      assembly: { ...assembly, confirmedMount: true },
+    };
+    justPresentedCommit = true;
   }
   logGoalCopy("turn_state", {
     turnId,
@@ -2386,8 +2418,13 @@ export async function discussGoal(
     }
   } else if (shouldCommit) {
     spokenReply = null; // Provider grava e fala o resultado real
-  } else if (draftOut.pendingCommit?.awaitingConfirm && looksLikeRequestSave(lastUser)) {
-    spokenReply = draftOut.pendingCommit.summary;
+  } else if (
+    justPresentedCommit ||
+    (draftOut.pendingCommit?.awaitingConfirm &&
+      (looksLikeRequestSave(lastUser) || looksLikeProceedToSaveOffer(lastUser)))
+  ) {
+    // Sempre o resumo determinístico — LLM não inventa “Confirma com SIM” sem pending.
+    spokenReply = draftOut.pendingCommit?.summary ?? null;
   } else if (
     asksSuggestion &&
     proposedTarget != null &&

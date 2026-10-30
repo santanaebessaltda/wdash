@@ -9,6 +9,7 @@ import {
   looksLikeAskValueSuggestionP0,
   looksLikeConfirmPendingSave,
   looksLikeNaturalAffirmation,
+  looksLikeProceedToSaveOffer,
   looksLikeRequestSave,
   looksLikeSimulateLevelsAtAmount,
   looksLikeValueInconsistency,
@@ -143,6 +144,9 @@ describe("P0 pendingCommit", () => {
   it("confirmacao de pesos nao e request save", () => {
     expect(looksLikeRequestSave("Vamos deixar 45 e 55% mesmo")).toBe(false);
     expect(looksLikeConfirmPendingSave("Sim")).toBe(true);
+    expect(looksLikeConfirmPendingSave("SIM")).toBe(true);
+    expect(looksLikeConfirmPendingSave("pode seguir")).toBe(false);
+    expect(looksLikeProceedToSaveOffer("pode seguir")).toBe(true);
     expect(looksLikeRequestSave("pode salvar o rascunho")).toBe(true);
   });
 });

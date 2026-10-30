@@ -125,6 +125,24 @@ export function looksLikeRequestSave(text: string): boolean {
   );
 }
 
+/**
+ * Gestor quer avançar para o resumo de gravação (sem necessariamente dizer “salvar”).
+ * Ex.: “pode seguir”, “vamos seguir”, “fechado”, “próximo”.
+ */
+export function looksLikeProceedToSaveOffer(text: string): boolean {
+  const p = norm(text).trim();
+  if (/nao|não|espera|cancela|ainda nao|ainda não/.test(p)) return false;
+  if (looksLikeRequestSave(text)) return true;
+  return (
+    /^(pode seguir|vamos seguir|seguir|segue|fechado|bora|proximo|próximo|pode ir|vamos)([!.?…]*)$/.test(
+      p,
+    ) ||
+    /pode seguir|vamos seguir|segue (ai|aí|com isso)|pode (ir|avancar|avançar)|vamos (pro|para o) (resumo|rascunho)/.test(
+      p,
+    )
+  );
+}
+
 /** Afirmação natural curta (contexto decide se é aceite de proposta ou de gravação). */
 export function looksLikeNaturalAffirmation(text: string): boolean {
   const p = norm(text).trim();
@@ -154,7 +172,7 @@ export function looksLikeAcceptProposal(text: string): boolean {
     return false;
   }
   if (looksLikeNaturalAffirmation(text)) return true;
-  return /aceito (a |o )?(proposta|recomend|valor|meta)|vamos (de |com )?(a )?recomend|fica a recomend|pode (ser|ficar) (a |o )?(recomend|proposta)|fechado (nessa|nessa faixa|no valor)|quero (a |o )?recomend|aplica (a |o )?recomend|usa (a |o )?recomend|vamos com (essa|esse|a recomend|o valor)|aplica esse valor|quero esse valor|fica (nesse|com )?(esse )?valor|aplica (esse |o )?valor/.test(
+  return /aceito (a |o )?(proposta|recomend|valor|meta)|vamos (de |com )?(a )?recomend|fica a recomend|pode (ser|ficar) (a |o )?(recomend|proposta)|fechado (nessa|nessa faixa|no valor)|quero (a |o )?recomend|aplica (a |o )?recomend|usa (a |o )?recomend|vamos com (essa|esse|a recomend|o valor)|aplica esse valor|quero esse valor|fica (nesse|com )?(esse )?valor|aplica (esse |o )?valor|mesma faixa|seguir a (mesma )?faixa|seguir a recomend|vamos (na|com a) (mesma )?faixa|topa a recomend/.test(
     p,
   );
 }
@@ -182,7 +200,8 @@ export function looksLikeAcceptProposalBare(text: string, hasProposed: boolean):
 export function looksLikeConfirmPendingSave(text: string): boolean {
   const p = norm(text).trim();
   if (/nao|não|espera|ainda nao|ainda não|cancela/.test(p)) return false;
-  return /^(sim|pode|ok|confirma|confirmo|autorizo|fechado)(\b|,|$)/.test(p);
+  // Só afirmação curta. “pode salvar” / “pode seguir” NÃO entram aqui.
+  return /^(sim|ok|fechado|autorizo|confirma|confirmo|pode)([!.?…]*)$/.test(p);
 }
 
 /** Simular níveis com outro R$ — sem mutar o rascunho. */

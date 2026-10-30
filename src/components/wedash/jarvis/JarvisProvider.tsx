@@ -510,7 +510,7 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
       if (!goalCanPersist(draft)) {
         const missing = missingGoalLabels(validateGoalDraft(draft.form));
         const msg = !draft.pendingCommit?.authorized
-          ? "Ainda não autorizei a gravação desta versão. Peça para salvar o rascunho e confirme com SIM no resumo."
+          ? "Ainda falta autorizar esta versão. Diz “pode seguir” ou “salvar o rascunho” pra eu mostrar o resumo; aí responde SIM."
           : missing.length
             ? `Ainda não dá pra gravar a meta. Falta: ${missing.join(", ")}.`
             : "A configuração mudou depois do resumo — peço confirmação de novo.";
