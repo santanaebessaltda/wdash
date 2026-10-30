@@ -4,6 +4,7 @@ import {
   emptyGoalForm,
   ensureGoalName,
   goalDraftReady,
+  looksLikeAcceptConfigCopy,
   mergeGoalUtterance,
   parseConfigSourceMonth,
   parseGoalPeriod,
@@ -45,6 +46,17 @@ describe("parseGoalTarget", () => {
     expect(parseGoalTarget("meta de R$ 180.000")).toBe(180000);
     expect(parseGoalTarget("meta de 180 mil")).toBe(180000);
   });
+
+  it("270 mil ganha de R$ 244.600 no historico", () => {
+    const blob = [
+      "user: Preciso fazer a meta de novembro",
+      "jarvis: Sugeri R$ 244.600,00 com base no mes passado",
+      "user: Vamos chegar em 270 mil de Meta, quanto ficaria a desafio?",
+      "jarvis: Meta 270 mil e desafio 297 mil. Posso criar?",
+      "user: ok pode criar essa meta",
+    ].join("\n");
+    expect(parseGoalTarget(blob)).toBe(270000);
+  });
 });
 
 describe("mergeGoalUtterance", () => {
@@ -78,6 +90,18 @@ describe("parseConfigSourceMonth", () => {
       from: "2026-10-01",
       to: "2026-10-31",
     });
+  });
+
+  it("não copia por 'pode seguir' sem pedido de config", () => {
+    expect(parseConfigSourceMonth("pode seguir a conversa", "2026-10-29", "2026-11-01")).toBeNull();
+  });
+});
+
+describe("looksLikeAcceptConfigCopy", () => {
+  it("aceita sim curto e recusa não", () => {
+    expect(looksLikeAcceptConfigCopy("sim")).toBe(true);
+    expect(looksLikeAcceptConfigCopy("pode copiar")).toBe(true);
+    expect(looksLikeAcceptConfigCopy("não")).toBe(false);
   });
 });
 

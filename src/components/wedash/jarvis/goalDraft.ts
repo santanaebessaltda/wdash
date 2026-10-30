@@ -22,7 +22,21 @@ export type GoalDraftForm = {
   managerOn: boolean;
 };
 
-export type GoalDraft = { form: GoalDraftForm };
+export type GoalDraft = {
+  form: GoalDraftForm;
+  /** Janela oferecida (“quer copiar a config do mês X?”); “sim” usa isso. */
+  pendingConfigCopy?: { from: string; to: string } | null;
+};
+
+/** Aceite curto depois da oferta de copiar config do mês anterior. */
+export function looksLikeAcceptConfigCopy(text: string): boolean {
+  const p = norm(text).trim();
+  if (/nao|não|deixa|sem copia|sem configurar|agora nao|agora não/.test(p)) return false;
+  return (
+    /^(sim|pode|quero|copia|ok)(\b|,|$)/.test(p) ||
+    /pode copiar|quero (que )?copie|copia (a |a )?config|sim,? (pode|copia|quero)|copia sim|copia isso|copia dela/.test(p)
+  );
+}
 
 /** Mesmos cortes do editor (`DEFAULT_TIERS` em GoalEditorPage). */
 export function defaultGoalTiers(): Tier[] {
@@ -151,21 +165,50 @@ export function parseGoalPeriod(text: string, today: string): { startsOn: string
 }
 
 export function parseGoalTarget(text: string): number | null {
-  const m =
-    text.match(/meta\s+(?:de\s+)?r\$\s*([\d.]+(?:,\d{1,2})?)/i) ??
-    text.match(/r\$\s*([\d.]+(?:,\d{1,2})?)/i) ??
-    text.match(/([\d.]+(?:,\d{1,2})?)\s*(?:mil\b)/i) ??
-    text.match(/(?:alvo|faturamento|meta)\s+(?:de\s+)?([\d.]+(?:,\d{1,2})?)\s*reais?/i);
-  if (!m) return null;
-  let raw = m[1]!;
-  // "R$ 180 mil" e "180 mil" → milhão de reais em linguagem falada.
-  const mil = new RegExp(`${m[1]!.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*mil\\b`, "i").test(text);
-  if (raw.includes(",")) raw = raw.replace(/\./g, "").replace(",", ".");
-  else raw = raw.replace(/\./g, "");
-  let n = Number(raw);
-  if (!Number.isFinite(n) || n <= 0) return null;
-  if (mil) n *= 1000;
-  return Math.round(n);
+  type Hit = { value: number; score: number };
+  const hits: Hit[] = [];
+
+  const push = (raw: string, mil: boolean, score: number, index: number) => {
+    let r = raw;
+    if (r.includes(",")) r = r.replace(/\./g, "").replace(",", ".");
+    else r = r.replace(/\./g, "");
+    let n = Number(r);
+    if (!Number.isFinite(n) || n <= 0) return;
+    if (mil) n *= 1000;
+    hits.push({ value: Math.round(n), score: score + index / 100_000 });
+  };
+
+  const patterns: { re: RegExp; score: number; milAlways?: boolean }[] = [
+    { re: /chegar\s+em\s+(?:r\$\s*)?([\d.]+(?:,\d{1,2})?)\s*mil\b/gi, score: 60, milAlways: true },
+    { re: /([\d.]+(?:,\d{1,2})?)\s*mil\s+de\s+meta\b/gi, score: 55, milAlways: true },
+    { re: /meta\s+(?:de\s+)?(?:r\$\s*)?([\d.]+(?:,\d{1,2})?)\s*mil\b/gi, score: 50, milAlways: true },
+    { re: /(?:alvo|meta)\s+(?:de\s+)?r\$\s*([\d.]+(?:,\d{1,2})?)/gi, score: 35 },
+    { re: /r\$\s*([\d.]+(?:,\d{1,2})?)/gi, score: 15 },
+    { re: /([\d.]+(?:,\d{1,2})?)\s*mil\b/gi, score: 25, milAlways: true },
+  ];
+
+  // Preferir falas do usuario quando o texto e um historico "user: … / jarvis: …".
+  const chunks = text.includes("user:")
+    ? text.split(/\n(?=user:|jarvis:)/i).map((c) => {
+        const user = /^user:/i.test(c.trim());
+        return { c, boost: user ? 40 : 0 };
+      })
+    : [{ c: text, boost: 0 }];
+
+  for (const { c, boost } of chunks) {
+    for (const { re, score, milAlways } of patterns) {
+      re.lastIndex = 0;
+      let m: RegExpExecArray | null;
+      while ((m = re.exec(c)) != null) {
+        const mil = milAlways === true || new RegExp(`${m[1]!.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*mil\\b`, "i").test(c);
+        push(m[1]!, mil, score + boost, m.index);
+      }
+    }
+  }
+
+  if (hits.length === 0) return null;
+  hits.sort((a, b) => b.score - a.score);
+  return hits[0]!.value;
 }
 
 export type GoalFormErrors = {
@@ -235,30 +278,41 @@ export function applyChallengeTierPct(tiers: Tier[], pct: number): Tier[] {
  * Mês de onde copiar escada/modo (“mesma configuração de outubro”).
  * Diferente do período da meta nova.
  */
-export function parseConfigSourceMonth(text: string, today: string): { from: string; to: string } | null {
+export function parseConfigSourceMonth(
+  text: string,
+  today: string,
+  targetStartsOn?: string | null,
+): { from: string; to: string } | null {
   const p = norm(text);
-  const wantsCopy = /configura|igual|copiar|seguir|mesma|mesmo|basead|como (em|no|na)|escada (de|do|da)/.test(p);
+  // Nao copiar por "pode seguir" / "seguir a conversa" — so pedido explicito de config/escada.
+  const wantsCopy =
+    /mesma configura|mesma escada|mesmo modo|copiar (a |o )?(configura|escada|meta)|copia (a |o )?(configura|escada|meta)|quero copiar|pode copiar|sim,? copia|copia (sim|isso|dela|de)|igual (a |ao |a meta |ao mes )?de |configura[cç][aã]o de |escada de /.test(
+      p,
+    ) || /\bcopia\b/.test(p) && /configura|escada|grupo|bonus|bônus|nivel|outubro|mes passado/.test(p);
   if (!wantsCopy) return null;
 
   if (/mes passado/.test(p)) {
-    const from = shiftMonthStart(today, -1);
+    const base = targetStartsOn || today;
+    const from = shiftMonthStart(base, -1);
     return { from, to: endOfMonth(from) };
   }
 
   for (const [name, month] of Object.entries(MONTH_NAMES)) {
     if (
       !new RegExp(
-        `(configura|igual|copiar|seguir|mesma|mesmo|escada|nivel|de).{0,48}${name}|${name}.{0,24}(configura|escada|nivel)`,
+        `(configura|igual|copiar|copia|seguir|mesma|mesmo|escada|nivel|de).{0,48}${name}|${name}.{0,24}(configura|escada|nivel)`,
       ).test(p)
     ) {
       continue;
     }
-    const y = Number(today.slice(0, 4));
+    const y = Number((targetStartsOn || today).slice(0, 4));
     const from = `${y}-${pad(month)}-01`;
     return { from, to: endOfMonth(from) };
   }
 
-  const from = shiftMonthStart(today, -1);
+  // "copia a configuração" sem mes → periodo anterior ao alvo.
+  const base = targetStartsOn || today;
+  const from = shiftMonthStart(base, -1);
   return { from, to: endOfMonth(from) };
 }
 
@@ -296,6 +350,36 @@ export function pickGoalTargetStore(
     if (/\b(pra|para|aqui|nessa|neste|montar|criar)\b/.test(around)) return s;
   }
   return others[0]!;
+}
+
+/** Meta publicada no periodo anterior (pra oferecer copia de config). */
+export async function findPriorGoalForStore(
+  ctx: JarvisContext,
+  storeId: string,
+  targetStartsOn: string,
+): Promise<{ from: string; to: string; name: string; tiers: number; groups: number } | null> {
+  if (!storeId) return null;
+  const from = shiftMonthStart(targetStartsOn, -1);
+  const to = endOfMonth(from);
+  try {
+    const goals = await fetchGoals({
+      tenantId: ctx.tenantId,
+      storeIds: [storeId],
+      from,
+      to,
+    });
+    const src = goals.find((g) => g.storeId === storeId) ?? goals[0];
+    if (!src) return null;
+    return {
+      from: src.startsOn,
+      to: src.endsOn,
+      name: src.name,
+      tiers: src.tiers.length,
+      groups: src.groups.length,
+    };
+  } catch {
+    return null;
+  }
 }
 
 /** Copia modo/escada/rateio/gerência da meta publicada do mês de referência. */
@@ -499,34 +583,48 @@ export async function discussGoal(
     form = { ...form, target: null };
   }
 
-  const sourceWin = parseConfigSourceMonth(question, ctx.today);
-  let copiedLadder = false;
-  if (sourceWin) {
-    const before = JSON.stringify(form.tiers);
-    const pool = ctx.network.length > 0 ? ctx.network : ctx.stores;
-    const matched = matchStoresInText(question, pool);
-    const source = pickConfigSourceStore(question, matched);
-    form = await copyGoalLadderFromPeriod(form, ctx, sourceWin, source?.id);
-    copiedLadder = JSON.stringify(form.tiers) !== before;
-    if (looksLikeGoalLadderTalk(question) && /10\s*%|por cento a mais|nivel desafio|meta desafio/.test(norm(question))) {
-      form = { ...form, tiers: applyChallengeTierPct(form.tiers, 110) };
-    }
-  }
-
   if (!form.startsOn) {
     const startsOn = shiftMonthStart(ctx.today, 1);
     form = ensureGoalName({ ...form, startsOn, endsOn: endOfMonth(startsOn) });
   }
 
+  // Copia de config so se o Gestor pediu (ou aceitou a oferta); senao oferecemos a do mes anterior.
+  const qn = norm(question);
+  const isConfirm = /autorizo|cria a meta|pode criar|ok pode|vamos criar|salva(r)? (o )?rascunho/.test(qn);
+  let sourceWin = parseConfigSourceMonth(question, ctx.today, form.startsOn);
+  if (
+    !sourceWin &&
+    prev?.pendingConfigCopy &&
+    looksLikeAcceptConfigCopy(question) &&
+    !isConfirm
+  ) {
+    sourceWin = prev.pendingConfigCopy;
+  }
+  let copiedLadder = false;
+  if (sourceWin) {
+    const before = JSON.stringify({ tiers: form.tiers, groups: form.groups, tierMode: form.tierMode });
+    const pool = ctx.network.length > 0 ? ctx.network : ctx.stores;
+    const matched = matchStoresInText(question, pool);
+    const source = pickConfigSourceStore(question, matched);
+    form = await copyGoalLadderFromPeriod(form, ctx, sourceWin, source?.id);
+    copiedLadder =
+      JSON.stringify({ tiers: form.tiers, groups: form.groups, tierMode: form.tierMode }) !== before;
+    if (looksLikeGoalLadderTalk(question) && /10\s*%|por cento a mais|nivel desafio|meta desafio/.test(qn)) {
+      form = { ...form, tiers: applyChallengeTierPct(form.tiers, 110) };
+    }
+  }
+
   const period =
     form.startsOn && form.endsOn ? { from: form.startsOn, to: form.endsOn } : null;
   const bias = period ? seasonalBiasForPeriod(period.from, period.to) : null;
-  const qn = norm(question);
+  const lockedTarget = parseGoalTarget(question);
   const wantsValueHelp =
-    form.target == null ||
-    /suger|propor|basead|historico|historico|mes passado|melhorar|subir|aumentar|quanto (seria|fica)|valor da meta|da pra melhorar|da para melhorar/.test(
-      qn,
-    );
+    !isConfirm &&
+    lockedTarget == null &&
+    (form.target == null ||
+      /suger|propor|basead|historico|mes passado|melhorar|subir|aumentar|quanto (seria|fica)|valor da meta|da pra melhorar|da para melhorar/.test(
+        qn,
+      ));
 
   let suggestionNote: string | null = null;
   if (wantsValueHelp && form.storeId) {
@@ -536,6 +634,23 @@ export async function discussGoal(
       suggestionNote = `Sugeri ${brlCent(suggested.amount)} (${suggested.rationale}). ${suggested.seasonalSummary}`;
     }
   }
+  // Alvo falado pelo Gestor ("270 mil") sempre ganha da sugestao automatica / R$ antigo no historico.
+  if (lockedTarget != null) {
+    form = { ...form, target: lockedTarget };
+  }
+
+  let pendingConfigCopy: GoalDraft["pendingConfigCopy"] = null;
+  let configOffer: string | null = null;
+  if (!copiedLadder && form.storeId && form.startsOn && !isConfirm) {
+    const prior = await findPriorGoalForStore(ctx, form.storeId, form.startsOn);
+    if (prior) {
+      pendingConfigCopy = { from: prior.from, to: prior.to };
+      configOffer =
+        `Tem meta em ${monthYearTitle(prior.from)} nessa filial (${prior.tiers} niveis` +
+        (prior.groups > 0 ? `, ${prior.groups} grupos` : "") +
+        `). Quer que eu copie a configuração (escada, bônus opcional e distribuição por grupo)?`;
+    }
+  }
 
   const storeName =
     ctx.network.find((s) => s.id === form.storeId)?.tradeName ??
@@ -543,12 +658,15 @@ export async function discussGoal(
     "";
   let reply = formatGoalProposal(form, storeName);
   if (copiedLadder) {
-    reply = `Mantive a escada/modo da meta de ${monthYearTitle(sourceWin!.from)} e so ajustei o que voce pediu. ${reply}`;
+    reply = `Copiei escada, bônus e grupos da meta de ${monthYearTitle(sourceWin!.from)}. ${reply}`;
   }
   if (suggestionNote) {
     reply = `${suggestionNote} ${reply}`;
-  } else if (bias && bias.events.length > 0 && !/autorizo|cria a meta|vamos criar/.test(qn)) {
+  } else if (bias && bias.events.length > 0 && !isConfirm) {
     reply = `${bias.summary} ${reply}`;
   }
-  return { reply, draft: { form } };
+  if (configOffer) {
+    reply = `${reply} ${configOffer}`;
+  }
+  return { reply, draft: { form, pendingConfigCopy } };
 }
