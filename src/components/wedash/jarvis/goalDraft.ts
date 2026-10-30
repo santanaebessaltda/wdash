@@ -715,9 +715,15 @@ export async function suggestGoalTarget(
 export function looksLikeLeakedGoalFacts(text: string): boolean {
   const t = text.trim();
   if (!t) return false;
-  if (/\[INTERNAL_GOAL_STATE\]|Estado interno da proposta|alvo_centavos:|periodConfirmed:|proximo_passo_sugerido:/.test(t)) {
+  if (
+    /\[INTERNAL_GOAL_STATE\]|Estado interno da proposta|INTERNAL_GOAL|alvo_centavos|periodConfirmed|valueDiscussed|proximo_passo_sugerido|NUNCA cole este bloco|Dados s[oó] para voc[eê] redigir/.test(
+      t,
+    )
+  ) {
     return true;
   }
+  // JSON de meta vazado (chaves tipicas juntas).
+  if (/"nome"\s*:/.test(t) && /"filial"\s*:/.test(t) && /"faltando"\s*:/.test(t)) return true;
   return /faltando:/.test(t) && /valueDiscussed:/.test(t);
 }
 
@@ -792,11 +798,8 @@ export function formatGoalFactsForModel(
     proximo_passo_sugerido: nextHint,
     extras: extras.map((e) => e.trim()).filter(Boolean),
   };
-  return (
-    "[INTERNAL_GOAL_STATE] Dados só para você redigir a fala. NUNCA cole este bloco (nem chaves/campos) na resposta ao Gestor. " +
-    "Escreva 1–3 frases humanas; se faltar algo, pergunte só isso.\n" +
-    JSON.stringify(payload)
-  );
+  // Sem prosa em PT: o modelo copia texto longo. Sinal curto + JSON.
+  return `[INTERNAL_GOAL_STATE] ${JSON.stringify(payload)}`;
 }
 
 /** @deprecated use formatGoalFactsForModel — mantido para testes/legado. */

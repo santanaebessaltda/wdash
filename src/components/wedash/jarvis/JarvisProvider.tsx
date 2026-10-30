@@ -574,11 +574,11 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
         challengeDraftRef.current = null;
         setScheduleDraft(null);
         scheduleDraftRef.current = null;
-        const { reply: answer, draft } = await discussGoal(q, ctx, goalDraftRef.current);
+        const { draft } = await discussGoal(q, ctx, goalDraftRef.current);
         goalDraftRef.current = draft;
         setGoalDraft(null);
         setCreatedItem(null);
-        finish(answer);
+        finish(naturalGoalAskFromDraft(draft));
         return;
       }
 
@@ -623,6 +623,15 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
 
       const finish = (answer: string) => {
         if (gen !== replyGen.current) return;
+        // Ultima barreira: nunca mostrar estado interno / JSON da tool no chat.
+        if (looksLikeLeakedGoalFacts(answer)) {
+          speakAnswer(
+            goalDraftRef.current
+              ? naturalGoalAskFromDraft(goalDraftRef.current)
+              : "Me fala mais um detalhe pra gente fechar a meta.",
+          );
+          return;
+        }
         speakAnswer(answer);
       };
 

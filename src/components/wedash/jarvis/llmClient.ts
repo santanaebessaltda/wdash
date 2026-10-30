@@ -1,5 +1,6 @@
 import { getSupabase } from "@/lib/supabase";
 import type { JarvisContext } from "./context";
+import { looksLikeLeakedGoalFacts } from "./goalDraft";
 import { compactSeasonalContext } from "./seasonalBrief";
 import { runJarvisTool, type JarvisToolName } from "./llmTools";
 
@@ -114,7 +115,9 @@ export async function jarvisLlmTurn(
     }
 
     if (payload.type === "message" && payload.content) {
-      return { ok: true, content: payload.content, sideEffects };
+      // Se o modelo colou o tool result, devolve vazio — o Provider usa fala humana do draft.
+      const content = looksLikeLeakedGoalFacts(payload.content) ? "" : payload.content;
+      return { ok: true, content, sideEffects };
     }
 
     if (payload.type === "tool_calls" && payload.assistant?.tool_calls?.length) {

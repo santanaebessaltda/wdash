@@ -207,6 +207,11 @@ describe("leaked goal facts", () => {
   it("detecta vazamento do estado interno", () => {
     expect(looksLikeLeakedGoalFacts("Estado interno da proposta de META...")).toBe(true);
     expect(looksLikeLeakedGoalFacts("[INTERNAL_GOAL_STATE] {\"faltando\":[]}")).toBe(true);
+    expect(
+      looksLikeLeakedGoalFacts(
+        'Dados só para você redigir a fala. NUNCA cole este bloco\n{"nome":"Nova meta","filial":"X","faltando":["valor"]}',
+      ),
+    ).toBe(true);
     expect(looksLikeLeakedGoalFacts("Vamos lá!! Qual mês você quer fechar?")).toBe(false);
   });
 
