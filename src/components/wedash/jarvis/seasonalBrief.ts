@@ -182,13 +182,28 @@ export function eventsInPeriod(from: string, to: string): SeasonalEvent[] {
     });
 }
 
+export type SeasonalBiasLine = {
+  name: string;
+  kind: "commercial" | "national";
+  date: string;
+  /** Contribuição no fator (ex.: +0.12, −0.01). */
+  delta: number;
+};
+
 export type SeasonalBias = {
   /** Multiplicador no alvo (1 = neutro). */
   factor: number;
   events: SeasonalEvent[];
+  /** Linhas com contribuição (comerciais primeiro, por |delta|). */
+  lines: SeasonalBiasLine[];
   /** Uma linha pra falar com o Gestor. */
   summary: string;
 };
+
+function deltaForEvent(e: SeasonalEvent): number {
+  if (e.kind === "commercial") return COMMERCIAL_DELTA[e.name] ?? 0;
+  return -0.01;
+}
 
 /**
  * Quanto o periodo puxa a meta pra cima/baixo por sazonal + feriado.
@@ -196,31 +211,193 @@ export type SeasonalBias = {
  */
 export function seasonalBiasForPeriod(from: string, to: string): SeasonalBias {
   const events = eventsInPeriod(from, to);
-  let delta = 0;
-  const bits: string[] = [];
-  for (const e of events) {
-    if (e.kind === "commercial") {
-      const d = COMMERCIAL_DELTA[e.name] ?? 0;
-      if (d !== 0) {
-        delta += d;
-        bits.push(`${e.name} (${d > 0 ? "+" : ""}${Math.round(d * 100)}%)`);
-      } else {
-        bits.push(`${e.name} em ${fmt(e.date)}`);
-      }
-    } else {
-      delta -= 0.01;
-      bits.push(`feriado ${e.name} (${fmt(e.date)})`);
-    }
-  }
+  const lines: SeasonalBiasLine[] = events.map((e) => ({
+    name: e.name,
+    kind: e.kind,
+    date: e.date,
+    delta: deltaForEvent(e),
+  }));
+  let delta = lines.reduce((s, l) => s + l.delta, 0);
   delta = Math.max(-0.25, Math.min(0.25, delta));
   const factor = Math.round((1 + delta) * 1000) / 1000;
+
+  // Comerciais com peso primeiro (Black Friday não some atrás de feriados por data).
+  const ordered = [...lines].sort((a, b) => {
+    if (a.kind !== b.kind) return a.kind === "commercial" ? -1 : 1;
+    return Math.abs(b.delta) - Math.abs(a.delta);
+  });
+  const bits = ordered.map((l) => {
+    const pct = Math.round(l.delta * 100);
+    if (l.kind === "national") return `feriado ${l.name} (${pct}%)`;
+    if (l.delta === 0) return `${l.name} em ${fmt(l.date)}`;
+    return `${l.name} (${pct > 0 ? "+" : ""}${pct}%)`;
+  });
   const summary =
     bits.length === 0
       ? "Sem data sazonal forte no periodo."
       : `No periodo: ${bits.slice(0, 6).join("; ")}${bits.length > 6 ? "…" : ""}. Ajuste tipico no alvo: ${
           delta === 0 ? "neutro" : `${delta > 0 ? "+" : ""}${Math.round(delta * 100)}%`
         }.`;
-  return { factor, events, summary };
+  return { factor, events, lines: ordered, summary };
+}
+
+/** Texto curto do ajuste: destaca comerciais (ex. Black Friday) e feriados à parte. */
+export function speakSeasonalBiasBreakdown(bias: SeasonalBias): string {
+  if (bias.lines.length === 0) return "Sem data sazonal forte no período.";
+  const commercial = bias.lines.filter((l) => l.kind === "commercial" && l.delta !== 0);
+  const holidays = bias.lines.filter((l) => l.kind === "national");
+  const pct = Math.round((bias.factor - 1) * 100);
+  const parts: string[] = [];
+  if (commercial.length) {
+    parts.push(
+      "Comercial: " +
+        commercial
+          .map((l) => {
+            const p = Math.round(l.delta * 100);
+            return `${l.name} ${p > 0 ? "+" : ""}${p}%`;
+          })
+          .join("; "),
+    );
+  }
+  if (holidays.length) {
+    parts.push(
+      "Feriados (−1% cada): " + holidays.map((l) => l.name).join(", "),
+    );
+  }
+  parts.push(
+    pct === 0
+      ? "Ajuste líquido no alvo: neutro."
+      : `Ajuste líquido no alvo: ${pct > 0 ? "+" : ""}${pct}%.`,
+  );
+  return parts.join(". ");
+}
+
+/** Aliases de fala → nome canônico do calendário (comercial ou feriado). */
+const SEASONAL_MENTION_ALIASES: { re: RegExp; name: string }[] = [
+  { re: /black\s*friday|blackfriday/, name: "Black Friday" },
+  { re: /\bnatal\b/, name: "Natal" },
+  { re: /\bcarnaval\b/, name: "Carnaval" },
+  { re: /dia das maes|dia das mães/, name: "Dia das Mães" },
+  { re: /dia dos namorados/, name: "Dia dos Namorados" },
+  { re: /dia dos pais/, name: "Dia dos Pais" },
+  { re: /dia do professor/, name: "Dia do Professor" },
+  { re: /\bpascoa\b|\bpáscoa\b/, name: "Páscoa" },
+  { re: /\bfinados\b/, name: "Finados" },
+  { re: /proclamacao da republica|proclamação da república/, name: "Proclamação da República" },
+  { re: /consciencia negra|consciência negra/, name: "Consciência Negra" },
+  { re: /nossa senhora/, name: "Nossa Senhora Aparecida" },
+];
+
+function normPt(text: string): string {
+  return text
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "");
+}
+
+/** Qual data sazonal o Gestor citou (qualquer uma do calendário, não só BF). */
+export function detectSeasonalEventMention(
+  text: string,
+  bias?: SeasonalBias | null,
+): string | null {
+  const p = normPt(text);
+  for (const { re, name } of SEASONAL_MENTION_ALIASES) {
+    if (re.test(p)) return name;
+  }
+  // Nomes que estão no bias do período (cobre datas novas sem alias fixo).
+  if (bias) {
+    for (const line of bias.lines) {
+      const n = normPt(line.name);
+      if (n.length >= 4 && p.includes(n)) return line.name;
+    }
+  }
+  return null;
+}
+
+export function looksLikeAskSeasonalInclusion(text: string, bias?: SeasonalBias | null): boolean {
+  const p = normPt(text);
+  if (detectSeasonalEventMention(text, bias) != null) return true;
+  return (
+    /sazonal|ajuste sazonal|calendario|calendário|feriado/.test(p) &&
+    /(ja|já)\s+(esta|está|entrou|inclu|embut)|entrou no|inclu|embut|conta(r|ndo)? (com|a)|foi (consider|inclu|embut)|esse ajuste|esse fator/.test(
+      p,
+    )
+  );
+}
+
+/** @deprecated use looksLikeAskSeasonalInclusion */
+export function looksLikeAskBlackFridayOrSeasonalInclusion(text: string): boolean {
+  return looksLikeAskSeasonalInclusion(text);
+}
+
+/**
+ * Responde se um evento sazonal (Natal, Black Friday, feriado…) já entrou no cálculo —
+ * sem sugerir novo R$ nem misturar limiar de nível com meta-base.
+ */
+export function speakSeasonalInclusionAnswer(opts: {
+  bias: SeasonalBias;
+  eventName?: string | null;
+  proposedAmount: number | null;
+  appliedTarget: number | null;
+  /** Se a conversa tratou R$ como limiar de nível (ex. 110%). */
+  tierThresholdAmount?: number | null;
+  tierPct?: number | null;
+  tierBase?: number | null;
+}): string {
+  const breakdown = speakSeasonalBiasBreakdown(opts.bias);
+  const focus = opts.eventName?.trim() || null;
+  const line = focus
+    ? opts.bias.lines.find((l) => l.name.toLowerCase() === focus.toLowerCase())
+    : null;
+  const included = line != null && line.delta !== 0;
+  const focusPct = line ? Math.round(line.delta * 100) : 0;
+
+  let head: string;
+  if (focus) {
+    head = included
+      ? `Sim — ${focus} já entrou no ajuste sazonal da proposta` +
+        (focusPct !== 0 ? ` (${focusPct > 0 ? "+" : ""}${focusPct}% no fator)` : "") +
+        "."
+      : opts.bias.lines.some((l) => l.name.toLowerCase() === focus.toLowerCase())
+        ? `${focus} está no calendário do período, mas com peso neutro neste modelo.`
+        : `${focus} não aparece no calendário deste período da meta.`;
+  } else {
+    head = "O ajuste sazonal da proposta já está detalhado abaixo — não mudo o valor só por causa do calendário.";
+  }
+
+  const parts = [head, breakdown];
+
+  if (opts.proposedAmount != null) {
+    parts.push(
+      `A recomendada ${brlLike(opts.proposedAmount)} já embute esse ajuste — não somo de novo em cima.`,
+    );
+  }
+  if (opts.appliedTarget != null && opts.appliedTarget !== opts.proposedAmount) {
+    parts.push(`No rascunho, o valor aplicado continua ${brlLike(opts.appliedTarget)}.`);
+  }
+
+  if (
+    opts.tierThresholdAmount != null &&
+    opts.tierPct != null &&
+    opts.tierBase != null
+  ) {
+    parts.push(
+      `Sobre os R$ ${brlLike(opts.tierThresholdAmount).replace(/^R\$\s*/, "")}: se esse for o patamar de ${opts.tierPct}%, ` +
+        `a meta-base fica ${brlLike(opts.tierBase)} — a análise comercial (histórico + sazonal) se refere à base, não ao limiar do nível.`,
+    );
+  } else {
+    parts.push("Não vou sugerir outro valor só porque você perguntou do calendário.");
+  }
+
+  return parts.join("\n\n");
+}
+
+function brlLike(n: number): string {
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+    maximumFractionDigits: 0,
+  }).format(n);
 }
 
 /** Resumo curto das proximas datas (contexto da sessao LLM). */

@@ -738,6 +738,65 @@ describe("P0 proposta 244600 vs 257000", () => {
     expect(spokenReply).toMatch(/não alterei|nao alterei|aplicado continua/i);
   });
 
+  it("pergunta sazonal (Black Friday) explica inclusao e nao empurra 260k", async () => {
+    const prev = {
+      form: {
+        ...emptyGoalForm("a"),
+        name: "Novembro 2026",
+        startsOn: "2026-11-01",
+        endsOn: "2026-11-30",
+        target: 244_600,
+        tiers: [
+          { name: "Meta", minAttainmentPct: 50, commissionPct: 1.5, bonus: 50 },
+          { name: "Super", minAttainmentPct: 75, commissionPct: 2, bonus: 50 },
+          { name: "Hiper", minAttainmentPct: 100, commissionPct: 2.5, bonus: 50 },
+          { name: "Meta desafio", minAttainmentPct: 110, commissionPct: 3, bonus: 50 },
+        ],
+      },
+      assembly: {
+        ...emptyGoalAssembly(),
+        periodConfirmed: true,
+        valueDiscussed: true,
+        path: "copy" as const,
+        confirmedGroups: true,
+        confirmedSpread: true,
+        confirmedTiers: true,
+      },
+      userLockedTarget: true,
+      proposedTarget: 244_600,
+      proposal: {
+        amount: 244_600,
+        scenarios: [],
+        evidence: [],
+        caveats: [],
+        confidence: "medium" as const,
+        rationale: "teste",
+        seasonalSummary: "",
+        chatBlocks: [],
+      },
+      tierRevenueHint: {
+        amountAtLevel: 260_000,
+        attainmentPct: 110,
+        proposedBase: 236_364,
+        tierName: "Meta desafio",
+      },
+      copyStatus: "ok" as const,
+    };
+    const { draft, spokenReply } = await discussGoal(
+      "E a Black Friday, já entrou no ajuste?",
+      ctx,
+      prev,
+    );
+    expect(draft.form.target).toBe(244_600);
+    expect(spokenReply).toMatch(/já entrou|ja entrou/i);
+    expect(spokenReply).toMatch(/Black Friday/);
+    expect(spokenReply).toMatch(/\+12%/);
+    expect(spokenReply).toMatch(/não somo|nao somo/i);
+    expect(spokenReply).toMatch(/110%/);
+    expect(spokenReply).toMatch(/236/);
+    expect(spokenReply).not.toMatch(/recomendo R\$ 260|vamos de 260|subir (pra|para) 260/i);
+  });
+
   it("pedir salvar cria pendingCommit sem shouldCommit", async () => {
     const prev = {
       form: {

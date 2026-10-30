@@ -5,7 +5,14 @@ import { fetchSalesDayAggs } from "@/data/wedash/salesRepo";
 import { brlCent, monthYearTitle } from "@/lib/format";
 import { matchStoresInText, type JarvisContext, type JarvisStoreRef } from "./context";
 import { looksLikeGoalLadderTalk } from "./respond";
-import { seasonalBiasForPeriod } from "./seasonalBrief";
+import {
+  detectSeasonalEventMention,
+  looksLikeAskSeasonalInclusion,
+  seasonalBiasForPeriod,
+  speakSeasonalBiasBreakdown,
+  speakSeasonalInclusionAnswer,
+} from "./seasonalBrief";
+import type { TierRevenueProposal } from "./goalOpIntent";
 import {
   applyConfigPatternToForm,
   buildGoalConfigSnapshot,
@@ -99,6 +106,14 @@ export type GoalDraft = {
   proposal?: GoalIntelligenceResult | null;
   /** R$ recomendado pelo motor — distinto de form.target até aceite. */
   proposedTarget?: number | null;
+  /**
+   * Se o Gestor falou R$ como limiar de nível (ex. 260 mil @ 110%),
+   * guarda para análises comerciais não tratarem o limiar como meta-base.
+   */
+  tierRevenueHint?: Pick<
+    TierRevenueProposal,
+    "amountAtLevel" | "attainmentPct" | "proposedBase" | "tierName"
+  > | null;
   /** Confirmação de gravação vinculada à fingerprint do rascunho. */
   pendingCommit?: GoalPendingCommit | null;
   /** Último save bem-sucedido nesta sessão de montagem. */
@@ -1170,13 +1185,10 @@ export async function suggestGoalTarget(
       bias.factor === 1
         ? "sem ajuste sazonal forte"
         : `ajuste sazonal ${sazonalPct > 0 ? "+" : ""}${sazonalPct}%`;
-    if (bias.events.length > 0) {
+    if (bias.lines.length > 0) {
       evidence.push({
         kind: bias.factor === 1 ? "observed" : "estimate",
-        label: `Calendário: ${bias.events
-          .slice(0, 3)
-          .map((e) => e.name)
-          .join(", ")} (${sazonalBit})`,
+        label: `Calendário: ${speakSeasonalBiasBreakdown(bias)}`,
       });
     }
 
@@ -1231,15 +1243,11 @@ export async function suggestGoalTarget(
               : ` — a recomendada fica ~${Math.abs(deltaPct)}% abaixo.`),
       );
     }
-    if (bias.events.length > 0) {
-      const names = bias.events
-        .slice(0, 3)
-        .map((e) => e.name)
-        .join(", ");
+    if (bias.lines.length > 0) {
       chatBlocks.push(
         sazonalPct !== 0
-          ? `Já embuti ${sazonalBit} (${names}).`
-          : `No calendário: ${names}.`,
+          ? `Já embuti ${sazonalBit}. ${speakSeasonalBiasBreakdown(bias)}`
+          : `No calendário: ${speakSeasonalBiasBreakdown(bias)}`,
       );
     }
     if (caveats.length) {
@@ -1784,12 +1792,7 @@ export async function discussGoal(
       "";
     return {
       reply: formatGoalFactsForModel(draftVal, storeVal, [
-        bias.events.length
-          ? `sazonal_do_mes: ${bias.events
-              .slice(0, 3)
-              .map((e) => e.name)
-              .join(", ")}`
-          : "",
+        bias.lines.length ? `sazonal_do_mes: ${speakSeasonalBiasBreakdown(bias)}` : "",
         "instrucao_fala: Sem base pra calcular ainda. Peca so o dado que falta (filial/periodo), nunca 'qual valor voce quer'.",
       ]),
       draft: draftVal,
@@ -1814,8 +1817,20 @@ export async function discussGoal(
     }
   }
   // Proposta vinda de faturamento-em-nível (P1) — sem aplicar.
+  let tierRevenueHint = prev?.tierRevenueHint ?? null;
   if (opPlan.proposedTarget != null && opPlan.blockDirectTargetLock) {
     proposedTarget = opPlan.proposedTarget;
+    if (opPlan.tierProposal) {
+      tierRevenueHint = {
+        amountAtLevel: opPlan.tierProposal.amountAtLevel,
+        attainmentPct: opPlan.tierProposal.attainmentPct,
+        proposedBase: opPlan.tierProposal.proposedBase,
+        tierName: opPlan.tierProposal.tierName,
+      };
+    }
+  }
+  if (lockedTarget != null && opIntent.amountRole === "store_base") {
+    tierRevenueHint = null;
   }
 
   // Aceite contextual da proposta (pode ser / fechado / vamos nessa / sim) —
@@ -2219,6 +2234,7 @@ export async function discussGoal(
     userLockedTarget,
     proposal,
     proposedTarget,
+    tierRevenueHint,
     pendingCommit: prev?.pendingCommit ?? null,
     lastSave: prev?.lastSave ?? null,
     copyIntent,
@@ -2338,6 +2354,28 @@ export async function discussGoal(
   if (opPlan.spokenReply) {
     // P1: resposta ao ponto (nível / origem / ambiguidade) antes do fluxo de montagem.
     spokenReply = scrubTechnicalSpeech(opPlan.spokenReply);
+  } else if (
+    form.startsOn &&
+    form.endsOn &&
+    looksLikeAskSeasonalInclusion(
+      lastUser,
+      seasonalBiasForPeriod(form.startsOn, form.endsOn),
+    )
+  ) {
+    // Qualquer data sazonal (Natal, BF, feriado…): explicar o cálculo — não empurrar outro R$.
+    const biasNow = seasonalBiasForPeriod(form.startsOn, form.endsOn);
+    const hint = draftOut.tierRevenueHint;
+    spokenReply = scrubTechnicalSpeech(
+      speakSeasonalInclusionAnswer({
+        bias: biasNow,
+        eventName: detectSeasonalEventMention(lastUser, biasNow),
+        proposedAmount: draftOut.proposal?.amount ?? draftOut.proposedTarget ?? null,
+        appliedTarget: form.target,
+        tierThresholdAmount: hint?.amountAtLevel ?? null,
+        tierPct: hint?.attainmentPct ?? null,
+        tierBase: hint?.proposedBase ?? null,
+      }),
+    );
   } else if (looksLikeValueInconsistency(lastUser)) {
     spokenReply = speakValueInconsistency(draftOut);
   } else if (looksLikeSimulateLevelsAtAmount(lastUser) || opIntent.notes === "simulate_levels") {
