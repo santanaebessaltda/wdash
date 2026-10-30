@@ -39,6 +39,7 @@ import {
   type JarvisLlmSession,
   type LlmChatMessage,
 } from "./llmClient";
+import { clearJarvisMemory, formatMemoryForModel, loadJarvisMemory } from "./memoryRepo";
 import { commitSchedule } from "./scheduleCommit";
 import {
   discussSchedule,
@@ -125,6 +126,8 @@ type JarvisApi = {
   cancelDictate: () => void;
   reply: (q: string) => void;
   clearChat: () => void;
+  /** Apaga só a memória de longo prazo (não o thread). */
+  clearMemory: () => void;
   authorizeChallenge: () => void;
   authorizeGoal: () => void;
   authorizeSchedule: () => void;
@@ -178,6 +181,7 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
   const dictateAudioCtxRef = useRef<AudioContext | null>(null);
   const messagesRef = useRef<JarvisMessage[]>(messages);
   messagesRef.current = messages;
+  const memoryTextRef = useRef<string>("Nenhuma memória de longo prazo ainda.");
 
   challengeDraftRef.current = challengeDraft;
   // Meta no chat e so-texto: state fica null (sem card), mas o rascunho vive no ref.
@@ -629,6 +633,7 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
           goalNextStep,
           challengeDraftSummary: c ? `${c.name || "sem nome"} · modo ${c.mode} · métrica ${c.metric}` : null,
           scheduleDraftSummary: s ? `${s.monthStart || "?"} · loja ${s.storeId || "?"}` : null,
+          longTermMemory: memoryTextRef.current,
         };
       };
 
@@ -724,11 +729,19 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
       });
 
       void (async () => {
+        const facts = await loadJarvisMemory(ctx.tenantId, ctx.membershipId);
+        if (gen !== replyGen.current) return;
+        memoryTextRef.current = formatMemoryForModel(facts);
+
         // Só prompt + tools. Sem script local de conversa.
         const llm = await jarvisLlmTurn(history, ctx, q, llmSession, llmHooks());
         if (gen !== replyGen.current) return;
 
         applyPeriodHint();
+
+        const refreshed = await loadJarvisMemory(ctx.tenantId, ctx.membershipId);
+        if (gen !== replyGen.current) return;
+        memoryTextRef.current = formatMemoryForModel(refreshed);
 
         if (!llm.ok) {
           const reason = llm.reason || "erro";
@@ -757,7 +770,7 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
   );
 
   const clearChat = useCallback(() => {
-    // Invalida turnos em voo (bolhas / draft) antes de limpar o estado.
+    // Invalida turnos em voo. Não apaga memória de longo prazo (clearMemory).
     replyGen.current += 1;
     cancelDictate();
     setMessages([]);
@@ -775,6 +788,19 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
     setCreatedItem(null);
     setCommitBusy(false);
   }, [cancelDictate]);
+
+  const clearMemory = useCallback(() => {
+    if (!session) return;
+    void (async () => {
+      const res = await clearJarvisMemory(session.tenantId, session.membershipId);
+      memoryTextRef.current = "Nenhuma memória de longo prazo ainda.";
+      if (!res.ok) {
+        setMicHint(`Não consegui esquecer: ${res.reason}`);
+        return;
+      }
+      speakAnswer("Beleza. Esqueci o que tinha guardado de você. O chat continua aí.");
+    })();
+  }, [session, speakAnswer]);
 
   useEffect(() => {
     return () => {
@@ -804,6 +830,7 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
       cancelDictate,
       reply,
       clearChat,
+      clearMemory,
       authorizeChallenge: () => void authorizeChallenge(),
       authorizeGoal: () => void authorizeGoal(),
       authorizeSchedule: () => void authorizeSchedule(),
@@ -833,6 +860,7 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
       cancelDictate,
       challengeDraft,
       clearChat,
+      clearMemory,
       commitBusy,
       createdItem,
       dictateBusy,

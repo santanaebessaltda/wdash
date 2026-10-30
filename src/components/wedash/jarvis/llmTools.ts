@@ -1,5 +1,10 @@
 import type { JarvisContext } from "./context";
 import { loadGoalBrief } from "./goalBrief";
+import {
+  forgetJarvisFact,
+  formatMemoryForModel,
+  rememberJarvisFact,
+} from "./memoryRepo";
 import { loadSalesBrief } from "./salesBrief";
 import { loadSeasonalBrief } from "./seasonalBrief";
 import { loadStockStalledBrief } from "./stockStalled";
@@ -14,7 +19,9 @@ export type JarvisToolName =
   | "draft_goal"
   | "draft_schedule"
   | "commit_draft"
-  | "discard_draft";
+  | "discard_draft"
+  | "remember_fact"
+  | "forget_fact";
 
 export async function runJarvisTool(
   name: JarvisToolName,
@@ -24,6 +31,7 @@ export async function runJarvisTool(
 ): Promise<{ content: string; sideEffect?: LlmSideEffect }> {
   const question = String(args.question ?? args.request ?? fallbackQuestion);
   const target = String(args.target ?? "goal");
+  const fact = String(args.fact ?? args.match ?? "").trim();
 
   switch (name) {
     case "analyze_sales":
@@ -38,6 +46,22 @@ export async function runJarvisTool(
           loadSeasonalBrief(ctx.today) +
           " Use isso ao sugerir meta/desafio do periodo — nao espere o Gestor citar Black Friday ou feriado.",
       };
+    case "remember_fact": {
+      if (!fact) return { content: "Nada para lembrar (fato vazio)." };
+      const res = await rememberJarvisFact(ctx.tenantId, ctx.membershipId, fact);
+      if (!res.ok) return { content: `Não consegui gravar a memória: ${res.reason}` };
+      return {
+        content: `Memória gravada. Lista atual:\n${formatMemoryForModel(res.facts)}`,
+      };
+    }
+    case "forget_fact": {
+      if (!fact) return { content: "Diga o trecho ou id do fato a esquecer." };
+      const res = await forgetJarvisFact(ctx.tenantId, ctx.membershipId, fact);
+      if (!res.ok) return { content: `Não consegui esquecer: ${res.reason}` };
+      return {
+        content: `Atualizei a memória.\n${formatMemoryForModel(res.facts)}`,
+      };
+    }
     case "draft_challenge":
       return {
         content: "Rascunho de desafio será montado no app; o Gestor precisa autorizar para gravar.",

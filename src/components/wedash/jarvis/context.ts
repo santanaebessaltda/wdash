@@ -12,6 +12,8 @@ export type JarvisStoreRef = {
 
 export type JarvisContext = {
   tenantId: string;
+  /** Membership do Gestor — memória de longo prazo do JARVIS. */
+  membershipId: string;
   /** Vazio = todas as lojas da sessão. */
   storeIds: string[];
   /** Escopo da Topbar (ou rede se vazio). */
@@ -43,6 +45,7 @@ export function jarvisContextFromSession(session: Session, scopeStoreIds: string
   const stores = picked.length > 0 ? picked : network;
   return {
     tenantId: session.tenantId,
+    membershipId: session.membershipId,
     storeIds: stores.map((s) => s.id),
     stores,
     network,

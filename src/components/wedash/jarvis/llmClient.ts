@@ -36,6 +36,8 @@ export type JarvisLlmSession = {
   goalNextStep?: string | null;
   challengeDraftSummary?: string | null;
   scheduleDraftSummary?: string | null;
+  /** Memória de longo prazo (não some com Apagar conversa). */
+  longTermMemory?: string | null;
 };
 
 /** Hooks para aplicar rascunho no app e devolver texto denso à tool (a IA fala depois). */
@@ -56,10 +58,13 @@ function contextNote(ctx: JarvisContext, session?: JarvisLlmSession | null): str
     `Hoje: ${ctx.today}. Filiais no escopo: ${stores}. Tenant: ${ctx.tenantId}.`,
     `Gestor (chame pelo primeiro nome): ${ctx.managerFirstName || "Gestor"}.`,
     `Sazonal/feriados a considerar sozinho (meta/desafio): ${compactSeasonalContext(ctx.today, 2)}.`,
-    "Interprete a intenção pelo sentido + histórico. O app não classifica palavra-chave.",
-    "Você escreve TODA a fala. Tools só executam. Nunca use travessão (—).",
-    "Voce redige toda a fala. Cumprimento = zero tools. Gravar = commit_draft; descartar = discard_draft.",
+    "Voce redige toda a fala. Tools so executam. Cumprimento = zero tools. Nunca use travessao (—).",
+    "Agente: pode chamar varias tools no mesmo raciocinio (vendas, meta, sazonal) antes de propor. Baseie meta/desafio em numeros da tool.",
+    "Memoria de longo prazo: use remember_fact para preferencias/decisoes duraveis; Apagar conversa NAO apaga isso.",
   ];
+  if (session?.longTermMemory) {
+    lines.push(`Memoria deste Gestor:\n${session.longTermMemory}`);
+  }
   if (session?.goalDraftSummary) {
     lines.push(
       `META em discussao: ${session.goalDraftSummary}. Continue SEMPRE com draft_goal; gravar = commit_draft target=goal.`,
@@ -102,7 +107,7 @@ export async function jarvisLlmTurn(
   const resolveSession = () => (typeof session === "function" ? session() : session);
   const messages: LlmChatMessage[] = [...history, { role: "user", content: userText }];
   const sideEffects: LlmSideEffect[] = [];
-  const maxRounds = 4;
+  const maxRounds = 6;
 
   for (let round = 0; round < maxRounds; round++) {
     const { data, error } = await sb.functions.invoke("jarvis-ai", {

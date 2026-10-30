@@ -28,6 +28,7 @@ import {
 
 const ctx = {
   tenantId: "t",
+  membershipId: "m1",
   storeIds: ["a"],
   stores: [{ id: "a", name: "CAMPO GRANDE", tradeName: "Shopping Campo Grande", code: "00010" }],
   network: [{ id: "a", name: "CAMPO GRANDE", tradeName: "Shopping Campo Grande", code: "00010" }],

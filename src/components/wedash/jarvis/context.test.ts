@@ -47,6 +47,7 @@ describe("resolveStoresInQuestion", () => {
   it("acha SB na rede mesmo com Topbar so na CENTRO", () => {
     const ctx: JarvisContext = {
       tenantId: "t",
+      membershipId: "m1",
       storeIds: ["centro"],
       stores: [centro],
       network: [sb, centro],
@@ -61,6 +62,7 @@ describe("resolveStoresInQuestion", () => {
   it("sem nome no texto usa o escopo da Topbar", () => {
     const ctx: JarvisContext = {
       tenantId: "t",
+      membershipId: "m1",
       storeIds: ["centro"],
       stores: [centro],
       network: [sb, centro],
