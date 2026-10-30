@@ -23,7 +23,9 @@ export type LlmTurnResult =
 export type LlmSideEffect =
   | { kind: "draft_challenge"; request: string }
   | { kind: "draft_goal"; request: string }
-  | { kind: "draft_schedule"; request: string };
+  | { kind: "draft_schedule"; request: string }
+  | { kind: "commit_draft"; target: string }
+  | { kind: "discard_draft"; target: string };
 
 /** Estado do app que a IA precisa para continuar o fio (sem keyword routing). */
 export type JarvisLlmSession = {
@@ -38,6 +40,8 @@ export type JarvisLlmHooks = {
   onDraftGoal?: (request: string) => Promise<string>;
   onDraftChallenge?: (request: string) => Promise<string>;
   onDraftSchedule?: (request: string) => Promise<string>;
+  onCommitDraft?: (target: string) => Promise<string>;
+  onDiscardDraft?: (target: string) => Promise<string>;
 };
 
 function contextNote(ctx: JarvisContext, session?: JarvisLlmSession | null): string {
@@ -49,24 +53,24 @@ function contextNote(ctx: JarvisContext, session?: JarvisLlmSession | null): str
     `Hoje: ${ctx.today}. Filiais no escopo: ${stores}. Tenant: ${ctx.tenantId}.`,
     `Gestor (chame pelo primeiro nome): ${ctx.managerFirstName || "Gestor"}.`,
     `Sazonal/feriados a considerar sozinho (meta/desafio): ${compactSeasonalContext(ctx.today, 2)}.`,
-    "Interprete a intenção pelo histórico + mensagem atual. Não roteie por palavra isolada.",
-    "Você escreve TODA a fala ao Gestor. Tools só trazem dado/estado. Nunca use travessão (—).",
-    "Cumprimento/small talk: responda humano pelo nome; sem tool e sem relatório. Sem cardápio de menu.",
-    "Ao montar meta ou desafio, ja leve sazonal/feriado na sugestao de valor quando couber (1 frase).",
+    "Interprete a intenção pelo sentido + histórico. O app não classifica palavra-chave.",
+    "Você escreve TODA a fala. Tools só executam. Nunca use travessão (—).",
+    "Small talk: humano, pelo nome; zero tool; sem relatório inventado.",
+    "Gravar rascunho/card = commit_draft. Descartar = discard_draft. Pedido de abrir outra tela = responda no chat, sem navegar.",
   ];
   if (session?.goalDraftSummary) {
     lines.push(
-      `Proposta de META em discussao (so texto, sem card): ${session.goalDraftSummary}. Continuacao = draft_goal. Resposta curta do Gestor (isso/mes/valor) CONTINUA a meta — nao pergunte de novo se e meta ou desafio. Confirmacao (cria a meta/autorizo) grava rascunho. Nao invente que ja gravou.`,
+      `META em discussao (texto): ${session.goalDraftSummary}. Continue com draft_goal; gravar = commit_draft target=goal.`,
     );
     if (session.goalDraftMissing) {
-      lines.push(`Ainda faltando na meta: ${session.goalDraftMissing}. Pergunte isso de forma natural.`);
+      lines.push(`Ainda faltando na meta: ${session.goalDraftMissing}.`);
     }
   }
   if (session?.challengeDraftSummary) {
-    lines.push(`Rascunho de DESAFIO (produto/disputa) aberto: ${session.challengeDraftSummary}.`);
+    lines.push(`DESAFIO aberto (card): ${session.challengeDraftSummary}. Gravar = commit_draft target=challenge.`);
   }
   if (session?.scheduleDraftSummary) {
-    lines.push(`Rascunho de ESCALA aberto: ${session.scheduleDraftSummary}.`);
+    lines.push(`ESCALA aberta (card): ${session.scheduleDraftSummary}. Gravar = commit_draft target=schedule.`);
   }
   if (!session?.goalDraftSummary && !session?.challengeDraftSummary && !session?.scheduleDraftSummary) {
     lines.push("Nenhum rascunho aberto no app agora.");
@@ -155,6 +159,24 @@ export async function jarvisLlmTurn(
               call,
               name,
               ran: { content, sideEffect: { kind: "draft_schedule" as const, request: question } },
+            };
+          }
+          if (name === "commit_draft" && hooks?.onCommitDraft) {
+            const target = String(args.target ?? "goal");
+            const content = await hooks.onCommitDraft(target);
+            return {
+              call,
+              name,
+              ran: { content, sideEffect: { kind: "commit_draft" as const, target } },
+            };
+          }
+          if (name === "discard_draft" && hooks?.onDiscardDraft) {
+            const target = String(args.target ?? "all");
+            const content = await hooks.onDiscardDraft(target);
+            return {
+              call,
+              name,
+              ran: { content, sideEffect: { kind: "discard_draft" as const, target } },
             };
           }
           const ran = await runJarvisTool(name, args, ctx, userText);

@@ -12,7 +12,9 @@ export type JarvisToolName =
   | "analyze_seasonal"
   | "draft_challenge"
   | "draft_goal"
-  | "draft_schedule";
+  | "draft_schedule"
+  | "commit_draft"
+  | "discard_draft";
 
 export async function runJarvisTool(
   name: JarvisToolName,
@@ -21,6 +23,7 @@ export async function runJarvisTool(
   fallbackQuestion: string,
 ): Promise<{ content: string; sideEffect?: LlmSideEffect }> {
   const question = String(args.question ?? args.request ?? fallbackQuestion);
+  const target = String(args.target ?? "goal");
 
   switch (name) {
     case "analyze_sales":
@@ -43,13 +46,23 @@ export async function runJarvisTool(
     case "draft_goal":
       return {
         content:
-          "Proposta de meta atualizada no app (so texto, sem card). Use o estado interno se o hook nao tiver devolvido fatos. So grava rascunho se o Gestor confirmar cria/autorizo. Fale naturalmente o proximo passo.",
+          "Proposta de meta atualizada no app (so texto, sem card). Use o estado interno se o hook nao tiver devolvido fatos. Para GRAVAR use commit_draft. Fale naturalmente o proximo passo.",
         sideEffect: { kind: "draft_goal", request: question },
       };
     case "draft_schedule":
       return {
         content: "Rascunho de escala será montado no app; o Gestor precisa autorizar para gravar.",
         sideEffect: { kind: "draft_schedule", request: question },
+      };
+    case "commit_draft":
+      return {
+        content: "Hook do app deve gravar o rascunho; se este texto aparecer, o hook falhou.",
+        sideEffect: { kind: "commit_draft", target },
+      };
+    case "discard_draft":
+      return {
+        content: "Hook do app deve descartar o rascunho; se este texto aparecer, o hook falhou.",
+        sideEffect: { kind: "discard_draft", target },
       };
     default:
       return { content: "Tool desconhecida." };

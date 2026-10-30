@@ -41,11 +41,6 @@ import {
   type JarvisLlmSession,
   type LlmChatMessage,
 } from "./llmClient";
-import {
-  classifyIntent,
-  looksLikeLeaveChatRequest,
-  STAY_IN_CHAT_REPLY,
-} from "./respond";
 import { commitSchedule } from "./scheduleCommit";
 import {
   discussSchedule,
@@ -451,158 +446,157 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
       });
   }, [dictateBusy, dictating, draftText]);
 
-  const authorizeChallenge = useCallback(async () => {
-    if (!session || !challengeDraftRef.current || commitBusy) return;
-    const draft = challengeDraftRef.current;
-    if (!challengeDraftReady(draft.form)) {
-      speakAnswer(`Ainda falta ${missingChallengeLabels(validateChallengeForm(draft.form)).join(", ")}.`);
-      return;
-    }
-    setCommitBusy(true);
-    setMode("thinking");
-    const res = await commitChallenge(session.tenantId, draft.form);
-    setCommitBusy(false);
-    if (!res.ok) {
-      speakAnswer(res.reason);
-      return;
-    }
-    setChallengeDraft(null);
-    challengeDraftRef.current = null;
-    setCreatedItem({ kind: "challenge", id: res.id, name: res.name });
-    speakAnswer(`Fechado. Desafio “${res.name}” criado. Tem o link aí embaixo.`);
-  }, [commitBusy, session, speakAnswer]);
+  /** Grava desafio. silent=true → só retorna texto (tool commit_draft); false → fala no chat (botão Autorizar). */
+  const authorizeChallenge = useCallback(
+    async (opts?: { silent?: boolean }): Promise<string | void> => {
+      const silent = opts?.silent === true;
+      if (!session || !challengeDraftRef.current || commitBusy) {
+        return silent ? "Não tem rascunho de desafio aberto pra gravar." : undefined;
+      }
+      const draft = challengeDraftRef.current;
+      if (!challengeDraftReady(draft.form)) {
+        const msg = `Ainda falta ${missingChallengeLabels(validateChallengeForm(draft.form)).join(", ")}.`;
+        if (silent) return msg;
+        speakAnswer(msg);
+        return;
+      }
+      setCommitBusy(true);
+      setMode("thinking");
+      const res = await commitChallenge(session.tenantId, draft.form);
+      setCommitBusy(false);
+      if (!res.ok) {
+        if (silent) return res.reason;
+        speakAnswer(res.reason);
+        return;
+      }
+      setChallengeDraft(null);
+      challengeDraftRef.current = null;
+      setCreatedItem({ kind: "challenge", id: res.id, name: res.name });
+      const msg = `Fechado. Desafio “${res.name}” criado. Tem o link aí embaixo.`;
+      if (silent) return msg;
+      speakAnswer(msg);
+    },
+    [commitBusy, session, speakAnswer],
+  );
 
-  const authorizeGoal = useCallback(async () => {
-    if (!session || !goalDraftRef.current || commitBusy) return;
-    const draft = goalDraftRef.current;
-    if (!goalCanCommit(draft)) {
-      // Sem falas fixas: o Gestor completa no chat e o Gemini pergunta.
-      speakAnswer("Ainda não fechou pra gravar. Me completa no chat o que falta.");
-      return;
-    }
-    setCommitBusy(true);
-    setMode("thinking");
-    // Meta no chat grava como rascunho — Gestor revisa/publica em Performance > Metas.
-    const res = await commitGoal(session.tenantId, draft.form, { published: false });
-    setCommitBusy(false);
-    if (!res.ok) {
-      speakAnswer(res.reason);
-      return;
-    }
-    setGoalDraft(null);
-    goalDraftRef.current = null;
-    setCreatedItem({ kind: "goal", id: res.id, name: res.name, asDraft: true });
-    const periodLabel =
-      draft.form.startsOn && draft.form.endsOn
-        ? ` (${draft.form.startsOn.slice(8, 10)}/${draft.form.startsOn.slice(5, 7)} a ${draft.form.endsOn.slice(8, 10)}/${draft.form.endsOn.slice(5, 7)})`
-        : "";
-    speakAnswer(
-      `Pronto. Salvei como rascunho “${res.name}”${periodLabel}, igual o botão Salvar rascunho em Metas. Abre o link, revisa/edita e publica quando quiser.`,
-    );
-  }, [commitBusy, session, speakAnswer]);
+  const authorizeGoal = useCallback(
+    async (opts?: { silent?: boolean }): Promise<string | void> => {
+      const silent = opts?.silent === true;
+      if (!session || !goalDraftRef.current || commitBusy) {
+        return silent ? "Não tem proposta de meta aberta pra gravar." : undefined;
+      }
+      const draft = goalDraftRef.current;
+      if (!goalCanCommit(draft)) {
+        const missing = missingGoalLabels(validateGoalDraft(draft.form));
+        const msg = missing.length
+          ? `Ainda não da pra gravar a meta. Falta: ${missing.join(", ")}. Pergunte isso ao Gestor.`
+          : "Ainda não fechou pra gravar. Me completa no chat o que falta.";
+        if (silent) return msg;
+        speakAnswer(msg);
+        return;
+      }
+      setCommitBusy(true);
+      setMode("thinking");
+      // Meta no chat grava como rascunho — Gestor revisa/publica em Performance > Metas.
+      const res = await commitGoal(session.tenantId, draft.form, { published: false });
+      setCommitBusy(false);
+      if (!res.ok) {
+        if (silent) return res.reason;
+        speakAnswer(res.reason);
+        return;
+      }
+      setGoalDraft(null);
+      goalDraftRef.current = null;
+      setCreatedItem({ kind: "goal", id: res.id, name: res.name, asDraft: true });
+      const periodLabel =
+        draft.form.startsOn && draft.form.endsOn
+          ? ` (${draft.form.startsOn.slice(8, 10)}/${draft.form.startsOn.slice(5, 7)} a ${draft.form.endsOn.slice(8, 10)}/${draft.form.endsOn.slice(5, 7)})`
+          : "";
+      const msg = `Pronto. Salvei como rascunho “${res.name}”${periodLabel}, igual o botão Salvar rascunho em Metas. Abre o link, revisa/edita e publica quando quiser.`;
+      if (silent) return msg;
+      speakAnswer(msg);
+    },
+    [commitBusy, session, speakAnswer],
+  );
 
-  const authorizeSchedule = useCallback(async () => {
-    if (!session || !scheduleDraftRef.current || commitBusy) return;
-    const draft = scheduleDraftRef.current;
-    if (!scheduleDraftReady(draft.form)) {
-      speakAnswer(`Ainda falta ${missingScheduleLabels(validateScheduleDraft(draft.form)).join(", ")}.`);
-      return;
-    }
-    setCommitBusy(true);
-    setMode("thinking");
-    const res = await commitSchedule(session.tenantId, draft.form);
-    setCommitBusy(false);
-    if (!res.ok) {
-      speakAnswer(res.reason);
-      return;
-    }
-    setScheduleDraft(null);
-    scheduleDraftRef.current = null;
-    const monthNames = [
-      "janeiro",
-      "fevereiro",
-      "março",
-      "abril",
-      "maio",
-      "junho",
-      "julho",
-      "agosto",
-      "setembro",
-      "outubro",
-      "novembro",
-      "dezembro",
-    ];
-    const label = `${monthNames[Number(res.monthStart.slice(5, 7)) - 1]} de ${res.monthStart.slice(0, 4)}`;
-    setCreatedItem({ kind: "schedule", name: label });
-    const keepNote =
-      res.keptManualDays > 0
-        ? ` Mantive ${res.keptManualDays} dia${res.keptManualDays === 1 ? "" : "s"} que você tinha ajustado na mão.`
-        : "";
-    speakAnswer(
-      `Pronto. Escala de ${label} gerada pra ${res.people} pessoa${res.people === 1 ? "" : "s"}.${keepNote}`,
-    );
-  }, [commitBusy, session, speakAnswer]);
+  const authorizeSchedule = useCallback(
+    async (opts?: { silent?: boolean }): Promise<string | void> => {
+      const silent = opts?.silent === true;
+      if (!session || !scheduleDraftRef.current || commitBusy) {
+        return silent ? "Não tem rascunho de escala aberto pra gravar." : undefined;
+      }
+      const draft = scheduleDraftRef.current;
+      if (!scheduleDraftReady(draft.form)) {
+        const msg = `Ainda falta ${missingScheduleLabels(validateScheduleDraft(draft.form)).join(", ")}.`;
+        if (silent) return msg;
+        speakAnswer(msg);
+        return;
+      }
+      setCommitBusy(true);
+      setMode("thinking");
+      const res = await commitSchedule(session.tenantId, draft.form);
+      setCommitBusy(false);
+      if (!res.ok) {
+        if (silent) return res.reason;
+        speakAnswer(res.reason);
+        return;
+      }
+      setScheduleDraft(null);
+      scheduleDraftRef.current = null;
+      const monthNames = [
+        "janeiro",
+        "fevereiro",
+        "março",
+        "abril",
+        "maio",
+        "junho",
+        "julho",
+        "agosto",
+        "setembro",
+        "outubro",
+        "novembro",
+        "dezembro",
+      ];
+      const label = `${monthNames[Number(res.monthStart.slice(5, 7)) - 1]} de ${res.monthStart.slice(0, 4)}`;
+      setCreatedItem({ kind: "schedule", name: label });
+      const keepNote =
+        res.keptManualDays > 0
+          ? ` Mantive ${res.keptManualDays} dia${res.keptManualDays === 1 ? "" : "s"} que você tinha ajustado na mão.`
+          : "";
+      const msg = `Pronto. Escala de ${label} gerada pra ${res.people} pessoa${res.people === 1 ? "" : "s"}.${keepNote}`;
+      if (silent) return msg;
+      speakAnswer(msg);
+    },
+    [commitBusy, session, speakAnswer],
+  );
 
+  /** Fallback sem Gemini: continua rascunho aberto ou resposta local; sem classifyIntent. */
   const replyLocal = useCallback(
     async (q: string, ctx: ReturnType<typeof jarvisContextFromSession>, finish: (a: string) => void) => {
-      const intent = classifyIntent(q);
-
-      if (intent === "stay_in_chat" || looksLikeLeaveChatRequest(q)) {
-        finish(STAY_IN_CHAT_REPLY);
-        return;
-      }
-
-      if (
-        intent === "challenge" ||
-        (challengeDraftRef.current && intent === "unknown" && !goalDraftRef.current && !scheduleDraftRef.current)
-      ) {
-        setGoalDraft(null);
-        goalDraftRef.current = null;
-        setScheduleDraft(null);
-        scheduleDraftRef.current = null;
-        const { reply: answer, draft } = await discussChallenge(q, ctx, challengeDraftRef.current);
-        setChallengeDraft(draft);
-        challengeDraftRef.current = draft;
-        setCreatedItem(null);
-        finish(answer);
-        return;
-      }
-
-      if (
-        intent === "goal" ||
-        (goalDraftRef.current && intent === "unknown" && !challengeDraftRef.current && !scheduleDraftRef.current)
-      ) {
-        setChallengeDraft(null);
-        challengeDraftRef.current = null;
-        setScheduleDraft(null);
-        scheduleDraftRef.current = null;
+      if (goalDraftRef.current) {
         const { draft } = await discussGoal(q, ctx, goalDraftRef.current);
         goalDraftRef.current = draft;
         setGoalDraft(null);
-        setCreatedItem(null);
         finish(naturalGoalAskFromDraft(draft));
         return;
       }
-
-      if (
-        intent === "schedule" ||
-        (scheduleDraftRef.current && intent === "unknown" && !challengeDraftRef.current && !goalDraftRef.current)
-      ) {
-        setChallengeDraft(null);
-        challengeDraftRef.current = null;
-        setGoalDraft(null);
-        goalDraftRef.current = null;
-        const { reply: answer, draft } = await discussSchedule(q, ctx, scheduleDraftRef.current);
-        setScheduleDraft(draft);
-        scheduleDraftRef.current = draft;
-        setCreatedItem(null);
+      if (challengeDraftRef.current) {
+        const { reply: answer, draft } = await discussChallenge(q, ctx, challengeDraftRef.current);
+        setChallengeDraft(draft);
+        challengeDraftRef.current = draft;
         finish(answer);
         return;
       }
-
+      if (scheduleDraftRef.current) {
+        const { reply: answer, draft } = await discussSchedule(q, ctx, scheduleDraftRef.current);
+        setScheduleDraft(draft);
+        scheduleDraftRef.current = draft;
+        finish(answer);
+        return;
+      }
       finish(await jarvisAnswer(q, ctx));
     },
-    [session],
+    [],
   );
 
   const reply = useCallback(
@@ -615,13 +609,6 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
       setMode("thinking");
       setMicHint(null);
       const ctx = jarvisContextFromSession(session, readTopbarStoreIds());
-      const n = q
-        .toLowerCase()
-        .normalize("NFD")
-        .replace(/\p{M}/gu, "");
-      const discardChallenge = /descart|cancela(r)? (o )?desafio|esquece (o )?desafio|nao quero (esse|o) desafio/.test(n);
-      const discardGoal = /descart|cancela(r)? (a )?meta|esquece (a )?meta|nao quero (essa|a) meta/.test(n);
-      const discardSchedule = /descart|cancela(r)? (a )?escala|esquece (a )?escala|nao quero (essa|a) escala/.test(n);
 
       const finish = (answer: string) => {
         if (gen !== replyGen.current) return;
@@ -636,97 +623,6 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
         }
         speakAnswer(answer);
       };
-
-      if (discardChallenge && challengeDraftRef.current) {
-        setChallengeDraft(null);
-        challengeDraftRef.current = null;
-        finish("Beleza, descartei o rascunho do desafio. Quando quiser a gente começa outro.");
-        return;
-      }
-      if (discardGoal && goalDraftRef.current) {
-        setGoalDraft(null);
-        goalDraftRef.current = null;
-        finish("Beleza, descartei a meta. Quando quiser montamos outra.");
-        return;
-      }
-      if (discardSchedule && scheduleDraftRef.current) {
-        setScheduleDraft(null);
-        scheduleDraftRef.current = null;
-        finish("Beleza, descartei a escala. É só pedir de novo.");
-        return;
-      }
-
-      const intent = classifyIntent(q);
-      if (intent === "authorize") {
-        if (challengeDraftRef.current) {
-          void authorizeChallenge();
-          return;
-        }
-        if (scheduleDraftRef.current && !goalDraftRef.current && !/\bmeta\b/.test(n)) {
-          void authorizeSchedule();
-          return;
-        }
-        // Meta: remonta pelo historico; se pronto grava, senao o Gemini pergunta o que falta.
-        if (goalDraftRef.current || /\bmeta\b/.test(n) || /vamos criar|cria(r)? |monta(r)? /.test(n)) {
-          void (async () => {
-            if (gen !== replyGen.current) return;
-            const historyBlob = [...messagesRef.current, { from: "user", text: q }]
-              .slice(-16)
-              .map((m) => `${m.from}: ${m.text}`)
-              .join("\n");
-            const { draft } = await discussGoal(historyBlob || q, ctx, goalDraftRef.current);
-            if (gen !== replyGen.current) return;
-            goalDraftRef.current = draft;
-            setGoalDraft(null);
-            setChallengeDraft(null);
-            challengeDraftRef.current = null;
-            setScheduleDraft(null);
-            scheduleDraftRef.current = null;
-            setCreatedItem(null);
-            if (goalCanCommit(draft)) {
-              await authorizeGoal();
-              return;
-            }
-            const history: LlmChatMessage[] = messagesRef.current
-              .slice(-12)
-              .map((m) => ({
-                role: m.from === "user" ? "user" : "assistant",
-                content: m.text,
-              }));
-            const g = draft.form;
-            const missing = missingGoalLabels(validateGoalDraft(g));
-            const llm = await jarvisLlmTurn(
-              history,
-              ctx,
-              q,
-              {
-                goalDraftSummary: `${g.name || "sem nome"} · alvo ${g.target ?? "?"} · ${g.startsOn ?? "?"} a ${g.endsOn ?? "?"}`,
-                goalDraftMissing: missing.length ? missing.join(", ") : null,
-              },
-            );
-            if (gen !== replyGen.current) return;
-            const raw = llm.ok ? llm.content.trim() : "";
-            finish(
-              raw && !looksLikeLeakedGoalFacts(raw)
-                ? raw
-                : naturalGoalAskFromDraft(draft),
-            );
-          })();
-          return;
-        }
-        if (scheduleDraftRef.current) {
-          void authorizeSchedule();
-          return;
-        }
-        finish("Não tenho rascunho pendente. Manda um desafio, uma meta ou a escala que a gente monta.");
-        return;
-      }
-
-      // Só atalho de produto: “abre tela / rola”. Conversa (oi, meta, vendas…) = IA + prompt.
-      if (intent === "stay_in_chat" || looksLikeLeaveChatRequest(q)) {
-        finish(STAY_IN_CHAT_REPLY);
-        return;
-      }
 
       const applyPeriodHint = () => {
         syncScopePeriodFromQuestion(q, location.pathname, location.search, navigate);
@@ -761,7 +657,7 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
           challengeDraftRef.current = null;
           setScheduleDraft(null);
           scheduleDraftRef.current = null;
-          const { draft, reply } = await discussGoal(request || q, ctx, goalDraftRef.current);
+          const { draft, reply: toolReply } = await discussGoal(request || q, ctx, goalDraftRef.current);
           goalDraftRef.current = draft;
           setGoalDraft(null);
           setCreatedItem(null);
@@ -769,7 +665,7 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
             ctx.network.find((s) => s.id === draft.form.storeId)?.tradeName ??
             ctx.stores.find((s) => s.id === draft.form.storeId)?.tradeName ??
             "";
-          return reply || formatGoalFactsForModel(draft, storeName);
+          return toolReply || formatGoalFactsForModel(draft, storeName);
         },
         onDraftChallenge: async (request) => {
           setGoalDraft(null);
@@ -780,7 +676,7 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
           setChallengeDraft(draft);
           challengeDraftRef.current = draft;
           setCreatedItem(null);
-          return "Rascunho de desafio atualizado no app (card Autorizar). Fale naturalmente; gravar so com Autorizar.";
+          return "Rascunho de desafio atualizado no app (card Autorizar). Fale naturalmente; pra gravar use commit_draft ou o botão Autorizar.";
         },
         onDraftSchedule: async (request) => {
           setChallengeDraft(null);
@@ -791,12 +687,64 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
           setScheduleDraft(draft);
           scheduleDraftRef.current = draft;
           setCreatedItem(null);
-          return "Rascunho de escala atualizado no app (card Autorizar). Fale naturalmente; gravar so com Autorizar.";
+          return "Rascunho de escala atualizado no app (card Autorizar). Fale naturalmente; pra gravar use commit_draft ou o botão Autorizar.";
+        },
+        onCommitDraft: async (target) => {
+          const t = target.trim().toLowerCase();
+          if (t === "challenge") {
+            return (await authorizeChallenge({ silent: true })) ?? "Não consegui gravar o desafio.";
+          }
+          if (t === "schedule") {
+            return (await authorizeSchedule({ silent: true })) ?? "Não consegui gravar a escala.";
+          }
+          // Meta: remonta pelo histórico curto pra pegar último “ok” antes de gravar.
+          if (goalDraftRef.current || t === "goal") {
+            const historyBlob = [...messagesRef.current, { from: "user" as const, text: q }]
+              .slice(-16)
+              .map((m) => `${m.from}: ${m.text}`)
+              .join("\n");
+            const { draft } = await discussGoal(historyBlob || q, ctx, goalDraftRef.current);
+            goalDraftRef.current = draft;
+            setGoalDraft(null);
+            setChallengeDraft(null);
+            challengeDraftRef.current = null;
+            setScheduleDraft(null);
+            scheduleDraftRef.current = null;
+            return (await authorizeGoal({ silent: true })) ?? "Não consegui gravar a meta.";
+          }
+          return "Não tem rascunho aberto pra gravar. Monte meta, desafio ou escala antes.";
+        },
+        onDiscardDraft: async (target) => {
+          const t = target.trim().toLowerCase();
+          const cleared: string[] = [];
+          if (t === "all" || t === "goal") {
+            if (goalDraftRef.current) {
+              setGoalDraft(null);
+              goalDraftRef.current = null;
+              cleared.push("meta");
+            }
+          }
+          if (t === "all" || t === "challenge") {
+            if (challengeDraftRef.current) {
+              setChallengeDraft(null);
+              challengeDraftRef.current = null;
+              cleared.push("desafio");
+            }
+          }
+          if (t === "all" || t === "schedule") {
+            if (scheduleDraftRef.current) {
+              setScheduleDraft(null);
+              scheduleDraftRef.current = null;
+              cleared.push("escala");
+            }
+          }
+          if (!cleared.length) return "Não tinha rascunho aberto pra descartar.";
+          return `Descartei: ${cleared.join(", ")}. Pode falar de novo o que quer montar.`;
         },
       });
 
       void (async () => {
-        // LLM-first: a IA interpreta (prompt) e escolhe tools; app nao roteia cumprimento/mes por keyword.
+        // 100% LLM: prompt + tools. App nao roteia por keyword (autorizar/descartar/cumprimento).
         const llm = await jarvisLlmTurn(history, ctx, q, llmSession(), llmHooks());
         if (gen !== replyGen.current) return;
 
@@ -811,7 +759,6 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
 
         applyPeriodHint();
 
-        // Hooks ja aplicaram rascunhos; nunca mostre estado interno da tool no chat.
         const raw = llm.content.trim();
         if (raw && !looksLikeLeakedGoalFacts(raw)) {
           finish(raw);

@@ -47,51 +47,52 @@ type ToolCall = {
   function: { name: string; arguments: string };
 };
 
-const SYSTEM_PROMPT = `Você é o JARVIS no WDash (franquias WEPINK/WPINK). Chat só texto (ditado vira texto). Você SEMPRE escreve a resposta ao Gestor; as tools só trazem dado ou atualizam rascunho. Nunca diga que é um formulário, checklist ou chatbot de script.
+const SYSTEM_PROMPT = `Você é o JARVIS no WDash (franquias WEPINK/WPINK). Chat só texto (ditado vira texto).
 
-Papel: colega / sócio sênior. Discute, pergunta, rebate, sugere. Uma ideia por vez. Interprete a intenção pelo sentido (oi, hi, opa, e aí, tudo bem, etc.) — o app não classifica cumprimento por lista de palavras; use bom senso.
+Papel: sócio sênior — discute, pergunta, rebate, sugere. Uma ideia por vez. Você SEMPRE escreve a fala ao Gestor; tools só buscam dado ou mudam estado no app. Nunca diga que é formulário, checklist ou bot de script.
 
-Tom: português do Brasil, informal, humano (1 a 3 frases curtas). Números das tools com centavos (R$ 330.000,00). Separe ideias com linha em branco (\\n\\n). Nunca use travessão (—). Prefira ponto, vírgula ou pergunta direta.
+O app NÃO classifica mensagem por palavra-chave. Interprete intenção pelo sentido + histórico + rascunho no contexto. Cumprimento (oi, opa, e aí…), small talk, “abre tela”, “cancela”, “cria a meta”, “autorizo” — tudo é você quem decide o que fazer (falar e/ou chamar tool).
 
-Quando usar tool:
-- Só se o Gestor pediu dado da base, análise, ou montar/ajustar meta, desafio ou escala.
-- Cumprimento / small talk: responda humano (pode usar o primeiro nome do contexto), pergunte o que precisa. ZERO tools. Não invente relatório de vendas.
+Tom: português do Brasil, informal, humano (1–3 frases curtas). Números das tools com centavos (R$ 330.000,00). Separe ideias com linha em branco (\\n\\n). Nunca use travessão (—). Prefira ponto, vírgula ou pergunta direta.
 
-Continuidade: se já estão montando META e a resposta é curta (confirma mês, valor, “isso”), continue com draft_goal. Não pergunte de novo se é meta/desafio/escala.
+Como decidir em cada turno:
+1) O que o Gestor quer AGORA (histórico + rascunhos no contexto)?
+2) Só conversa social? → fale e pare. ZERO tools. Não invente relatório.
+3) Continuidade: resposta curta (“isso”, mês, valor) no fio de meta → draft_goal. Não pergunte de novo se é meta/desafio/escala.
+4) Falta um dado na meta (mês, valor, filial…)? → pergunte SÓ isso; use draft_goal se precisar atualizar estado. Não despeje feriados/histórico.
+5) Precisa de número da base? → analyze_*.
+6) Montar/ajustar proposta? → draft_* e depois FALE. Não vire menu.
+7) Gestor pediu gravar / autorizar / “cria a meta” / confirmação clara de salvar → commit_draft (target certo). NÃO use só draft_goal para gravar.
+8) Gestor pediu descartar / cancelar / esquecer o rascunho → discard_draft.
+9) “Abre Visão geral / rola a página”: responde no chat; sem navegação e sem tool.
+10) Sazonal/feriado: no máximo 1 frase quando couber (analyze_seasonal se for montar valor).
 
-Como pensar:
-1) O que o Gestor quer AGORA (histórico + rascunho no contexto)?
-2) É só conversa social? → fale e pare. Sem tool.
-3) Falta mês, valor ou filial na meta? → pergunte SÓ isso (draft_goal se precisar atualizar estado). Não despeje histórico/feriados.
-4) Precisa de número da base? → analyze_*.
-5) Precisa montar/ajustar proposta? → draft_* e depois FALE naturalmente. Não vire menu.
-6) Follow-up curto continua o fio.
-7) Sazonal/feriado: no máximo 1 frase quando couber.
+Domínio das tools:
+- analyze_sales → vendas/ticket/P.A. (meta cadastrada ≠ faturamento).
+- analyze_goal → valor-alvo da meta já cadastrada.
+- analyze_stock → estoque parado.
+- analyze_seasonal → calendário sazonal.
+- draft_goal → discutir/ajustar META (escada, modo, valor, período, nível desafio/+10%, copiar). META = só texto no chat, sem card.
+- draft_challenge → DESAFIO de produto/disputa (card Autorizar). Nível/escada da meta NÃO é desafio de produto.
+- draft_schedule → escala (card Autorizar).
+- commit_draft → grava o rascunho aberto (meta = Salvar rascunho em Metas, não publica; desafio/escala = cria de verdade).
+- discard_draft → apaga o rascunho aberto.
 
-Domínio:
-- META: valor, escada, modo, grupos, nível desafio/+10%, copiar config → analyze_goal e/ou draft_goal.
-- DESAFIO (produto/disputa): draft_challenge (+ analyze_stock se fizer sentido).
-- Rascunho de META aberto + "desafio" no sentido de nível/escada → draft_goal.
-- Vendas/ticket/P.A. → analyze_sales (meta ≠ faturamento).
-- Escala → draft_schedule.
-- "Abre Visão geral / rola a página": resolve no chat; sem navegação.
-
-Regras:
-- META = só texto no chat. Confirmação curta ("cria a meta" / Autorizo) = Salvar rascunho (não publica). Nunca diga que já gravou/publicou se ainda está discutindo.
-- Valor falado pelo Gestor (ex.: 270 mil) prevalece. Só sugira número se ele pedir. Use a sugestão da tool quando vier.
-- Não copie escada/bônus/grupos sozinho; se a tool indicar meta anterior, pergunte se quer copiar.
-- Sem copiar: pergunte grupos, rateio sem vendedor identificado, confirme níveis; peça "pode montar" antes de gravar.
-- Desafio/escala: card + Autorizar. Nunca diga que gravou sozinho.
+Regras de negócio:
+- Nunca diga que já gravou/publicou se ainda está só discutindo. Só diga que salvou depois de commit_draft com sucesso no retorno da tool.
+- Valor falado pelo Gestor (ex.: 270 mil) prevalece. Só sugira número se ele pedir; use a sugestão da tool quando vier.
+- Não copie escada/bônus/grupos sozinho; se a tool indicar meta anterior, pergunte se quer copiar. Sem copiar: grupos, rateio, níveis; peça ok antes de commit.
+- Desafio/escala: card + Autorizar (ou commit_draft no chat). Não diga que gravou sozinho.
 - Não invente número. Use EXATAMENTE a filial que a tool nomeou.
 - No request de draft_*, descreva o pedido + o já combinado no histórico.
-- Depois de draft_goal, leia o retorno da tool (pode vir como [INTERNAL_GOAL_STATE] JSON) e FALE como humano. PROIBIDO colar o bloco interno, listar campos (alvo_centavos, periodConfirmed, faltando, etc.) ou dizer "estado interno". Ex.: se falta mês → "Vamos lá!! Qual mês você quer fechar?". Se falta valor → pergunte o valor. Uma pergunta, pare.`;
+- Depois de draft_goal, leia o retorno (pode vir [INTERNAL_GOAL_STATE] JSON) e FALE como humano. PROIBIDO colar o bloco, listar campos técnicos (alvo_centavos, periodConfirmed, faltando…) ou dizer “estado interno”. Uma pergunta, pare.`;
 
 const TOOLS = [
   {
     type: "function",
     function: {
       name: "analyze_sales",
-      description: "Consulta vendas/faturamento/ticket/P.A. na base do WDash (período e filial do contexto ou do pedido). NÃO use para perguntar o valor da meta cadastrada.",
+      description: "Consulta vendas/faturamento/ticket/P.A. na base do WDash. NÃO use para perguntar o valor da meta cadastrada.",
       parameters: {
         type: "object",
         properties: {
@@ -106,7 +107,7 @@ const TOOLS = [
     function: {
       name: "analyze_goal",
       description:
-        "Lê a meta de faturamento cadastrada (valor-alvo) no período/filial. Use quando perguntarem quanto é a meta, qual a meta do mês, se tem meta. Opcionalmente inclui realizado vs meta.",
+        "Lê a meta de faturamento cadastrada (valor-alvo) no período/filial. Use quando perguntarem quanto é a meta, qual a meta do mês, se tem meta.",
       parameters: {
         type: "object",
         properties: {
@@ -135,7 +136,7 @@ const TOOLS = [
     function: {
       name: "analyze_seasonal",
       description:
-        "Datas sazonais e feriados (Black Friday, Natal, Dia das Maes, feriados nacionais…). Use ao montar/sugerir meta ou desafio do periodo — nao espere o Gestor lembrar.",
+        "Datas sazonais e feriados. Use ao montar/sugerir meta ou desafio do periodo.",
       parameters: { type: "object", properties: {} },
     },
   },
@@ -144,7 +145,7 @@ const TOOLS = [
     function: {
       name: "draft_challenge",
       description:
-        "Cria ou ajusta o rascunho de DESAFIO de produto/disputa (Performance > Desafios). NÃO use para nível/escada da meta (nível desafio, +10%, config de outubro) — isso é draft_goal. Descreva o pedido completo em request.",
+        "Cria ou ajusta o rascunho de DESAFIO de produto/disputa. NÃO use para nível/escada da meta — isso é draft_goal. Ainda não grava.",
       parameters: {
         type: "object",
         properties: {
@@ -159,7 +160,7 @@ const TOOLS = [
     function: {
       name: "draft_goal",
       description:
-        "Cria ou ajusta a META (escada, modo, valor, período, nível desafio/+10%, copiar config). Em confirmação (criar/autorizar) o app grava RASCUNHO em Metas. Descreva o pedido completo em request.",
+        "Cria ou ajusta a discussão da META (escada, modo, valor, período…). Ainda NÃO grava. Para gravar use commit_draft target=goal.",
       parameters: {
         type: "object",
         properties: {
@@ -174,13 +175,49 @@ const TOOLS = [
     function: {
       name: "draft_schedule",
       description:
-        "Cria ou ajusta o rascunho de escala (ainda não grava). Use também para editar o rascunho atual: descreva em request o pedido completo. O app mostra o card Autorizar.",
+        "Cria ou ajusta o rascunho de escala (ainda não grava). O app mostra o card Autorizar.",
       parameters: {
         type: "object",
         properties: {
           request: { type: "string" },
         },
         required: ["request"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "commit_draft",
+      description:
+        "Grava o rascunho aberto. target=goal → Salvar rascunho em Metas (não publica). target=challenge|schedule → cria de verdade. Use quando o Gestor autorizar/confirmar claramente.",
+      parameters: {
+        type: "object",
+        properties: {
+          target: {
+            type: "string",
+            description: "goal | challenge | schedule",
+          },
+        },
+        required: ["target"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "discard_draft",
+      description:
+        "Descarta o rascunho aberto. target=goal|challenge|schedule|all. Use quando o Gestor pedir cancelar/esquecer/descartar.",
+      parameters: {
+        type: "object",
+        properties: {
+          target: {
+            type: "string",
+            description: "goal | challenge | schedule | all",
+          },
+        },
+        required: ["target"],
       },
     },
   },
