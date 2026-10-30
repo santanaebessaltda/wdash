@@ -38,6 +38,10 @@ export type JarvisLlmSession = {
   goalAssemblyPath?: string | null;
   /** A fala deste turno já atualizou o rascunho (ex.: “sim” na cópia). */
   goalTurnApplied?: boolean | null;
+  /** JSON operacional completo do rascunho (níveis/grupos/origem) — fonte da verdade. */
+  goalOperationalState?: string | null;
+  /** ok | failed | null */
+  goalCopyStatus?: string | null;
   challengeDraftSummary?: string | null;
   scheduleDraftSummary?: string | null;
   /** Memória de longo prazo (não some com Apagar conversa). */
@@ -84,6 +88,12 @@ function contextNote(ctx: JarvisContext, session?: JarvisLlmSession | null): str
         `Caminho da meta ja definido: ${session.goalAssemblyPath}. NUNCA pergunte de novo se copia escada ou monta do zero.`,
       );
     }
+    if (session.goalCopyStatus) {
+      lines.push(`copyStatus=${session.goalCopyStatus}. Se ok, a escada JA esta no rascunho — nao busque meta publicada do mes de destino.`);
+    }
+    if (session.goalOperationalState) {
+      lines.push(`ESTADO_OPERACIONAL_META (fonte da verdade):\n${session.goalOperationalState}`);
+    }
     if (session.goalNextStep) {
       lines.push(`Proximo passo da meta (um por vez): ${session.goalNextStep}`);
     }
@@ -96,7 +106,7 @@ function contextNote(ctx: JarvisContext, session?: JarvisLlmSession | null): str
       lines.push(`Campos ainda incompletos: ${session.goalDraftMissing}.`);
     }
     lines.push(
-      "PROIBIDO: 'vou montar/preparar', 'um momento', 'qual valor voce esta pensando?'. Voce PROPÕE (proposta_meta / alvo). 1 insight que o dash nao grita. Nao despeje lista de meses. Se path ja e copy/fresh, nao repergunte copiar vs zero.",
+      "PROIBIDO: 'vou montar/preparar', 'um momento', 'qual valor voce esta pensando?'. Voce PROPÕE (proposta_meta / alvo). Ao perguntarem 'como ficou' / niveis, recite ESTADO_OPERACIONAL_META — nao desvie para sazonalidade. Se path ja e copy/fresh, nao repergunte copiar vs zero.",
     );
   }
   if (session?.challengeDraftSummary) {

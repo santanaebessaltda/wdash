@@ -8,9 +8,11 @@ import {
   goalDraftReady,
   looksLikeAcceptConfigCopy,
   looksLikeAskValueSuggestion,
+  looksLikeBareCopyAccept,
   looksLikeConfirmMount,
   looksLikeDeclineConfigCopy,
   looksLikeGoalConversation,
+  looksLikeInspectGoalDraft,
   looksLikeLeakedGoalFacts,
   looksLikeLadderCopyCorrection,
   looksLikeLostGoalReply,
@@ -19,6 +21,7 @@ import {
   persistGoalDraftSession,
   loadGoalDraftSession,
   clearGoalDraftSession,
+  formatGoalFactsForModel,
   mergeGoalUtterance,
   parseConfigSourceMonth,
   parseGoalPeriod,
@@ -27,6 +30,7 @@ import {
   parseSpreadUnidentifiedChoice,
   pickConfigSourceStore,
   pickGoalTargetStore,
+  speakGoalDraftConfig,
   validateGoalDraft,
   discussGoal,
   goalAssemblyPendingSteps,
@@ -534,5 +538,124 @@ describe("leaked goal facts", () => {
         },
       }),
     ).toBe(true);
+  });
+});
+
+describe("continuidade copia outubro → novembro", () => {
+  function octoberCopiedDraft() {
+    const form = emptyGoalForm("a");
+    form.name = "Novembro 2026";
+    form.startsOn = "2026-11-01";
+    form.endsOn = "2026-11-30";
+    form.target = 244_600;
+    form.tierMode = "GROUP";
+    form.managerOn = true;
+    form.groups = [
+      { shiftId: "m", name: "Turno 1", pct: 45 },
+      { shiftId: "t", name: "Turno 2", pct: 55 },
+    ];
+    form.tiers = [
+      { name: "Meta", minAttainmentPct: 50, commissionPct: 1.5, bonus: 50, managerPct: 0.5 },
+      { name: "Super meta", minAttainmentPct: 75, commissionPct: 2, bonus: 50 },
+      { name: "Hiper meta", minAttainmentPct: 100, commissionPct: 2.5, bonus: 50 },
+      { name: "Meta desafio", minAttainmentPct: 110, commissionPct: 3, bonus: 50 },
+    ];
+    return {
+      form,
+      pendingConfigCopy: null,
+      assembly: {
+        ...emptyGoalAssembly(),
+        periodConfirmed: true,
+        valueDiscussed: true,
+        path: "copy" as const,
+        confirmedGroups: true,
+        confirmedSpread: true,
+        confirmedTiers: true,
+        confirmedMount: false,
+      },
+      copyStatus: "ok" as const,
+      copiedFrom: {
+        goalId: "goal-oct",
+        storeId: "a",
+        from: "2026-10-01",
+        to: "2026-10-31",
+        name: "Outubro 2026",
+        tiers: 4,
+        groups: 2,
+      },
+      copyIntent: "exact" as const,
+      userLockedTarget: true,
+    };
+  }
+
+  it("detecta pergunta de inspecao", () => {
+    expect(looksLikeInspectGoalDraft("Como ficou?")).toBe(true);
+    expect(looksLikeInspectGoalDraft("Mostre os níveis")).toBe(true);
+    expect(looksLikeInspectGoalDraft("Pode copiar")).toBe(false);
+    expect(looksLikeBareCopyAccept("Sim")).toBe(true);
+  });
+
+  it("speakGoalDraftConfig mostra 4 niveis e 2 grupos do rascunho", () => {
+    const text = speakGoalDraftConfig(octoberCopiedDraft());
+    expect(text).toMatch(/outubro/i);
+    expect(text).toMatch(/novembro/i);
+    expect(text).toMatch(/244/);
+    expect(text).toMatch(/50%/);
+    expect(text).toMatch(/75%/);
+    expect(text).toMatch(/110%/);
+    expect(text).toMatch(/Turno 1 45%/);
+    expect(text).not.toMatch(/85%/);
+    expect(text).not.toMatch(/publicada em novembro/i);
+  });
+
+  it('"Como ficou?" preserva copia e expoe niveis no estado interno', async () => {
+    const prev = octoberCopiedDraft();
+    const { draft, reply } = await discussGoal("Como ficou?", ctx, prev);
+    expect(draft.copyStatus).toBe("ok");
+    expect(draft.form.tiers.map((t) => t.minAttainmentPct)).toEqual([50, 75, 100, 110]);
+    expect(draft.form.groups.map((g) => g.pct)).toEqual([45, 55]);
+    expect(draft.copiedFrom?.from).toBe("2026-10-01");
+    expect(draft.form.startsOn).toBe("2026-11-01");
+    expect(draft.form.target).toBe(244_600);
+    expect(reply).toMatch(/niveis_detalhe|config_no_rascunho|50/);
+    expect(reply).not.toMatch(/config_copia_falhou/);
+    const spoken = speakGoalDraftConfig(draft);
+    expect(spoken).toMatch(/50%/);
+  });
+
+  it('"Sim" apos copia ok nao zera a escada', async () => {
+    const prev = octoberCopiedDraft();
+    const { draft } = await discussGoal("Sim", ctx, prev);
+    expect(draft.copyStatus).toBe("ok");
+    expect(draft.form.tiers).toHaveLength(4);
+    expect(draft.form.tiers[0]?.minAttainmentPct).toBe(50);
+    expect(draft.copiedFrom?.goalId).toBe("goal-oct");
+  });
+
+  it("formatGoalFacts inclui origem e niveis — nao so resumo curto", () => {
+    const facts = formatGoalFactsForModel(octoberCopiedDraft(), "Campo Grande");
+    expect(facts).toMatch(/copiedFrom/);
+    expect(facts).toMatch(/niveis_detalhe/);
+    expect(facts).toMatch(/"atingimento":50/);
+    expect(facts).toMatch(/2026-10-01/);
+  });
+
+  it("persistencia guarda copiedFrom e niveis", () => {
+    clearGoalDraftSession();
+    persistGoalDraftSession(octoberCopiedDraft());
+    const loaded = loadGoalDraftSession();
+    expect(loaded?.copyStatus).toBe("ok");
+    expect(loaded?.copiedFrom?.from).toBe("2026-10-01");
+    expect(loaded?.form.tiers).toHaveLength(4);
+    clearGoalDraftSession();
+  });
+
+  it("turno seguinte ainda responde niveis sem buscar destino", async () => {
+    const afterCopy = octoberCopiedDraft();
+    const t2 = await discussGoal("Como ficou?", ctx, afterCopy, { turnId: "t2" });
+    const t3 = await discussGoal("Mostre os níveis", ctx, t2.draft, { turnId: "t3" });
+    expect(t3.draft.copyStatus).toBe("ok");
+    expect(t3.draft.form.tiers).toHaveLength(4);
+    expect(speakGoalDraftConfig(t3.draft)).toMatch(/Meta desafio 110%/);
   });
 });

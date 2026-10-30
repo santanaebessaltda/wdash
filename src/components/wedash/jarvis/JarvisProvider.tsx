@@ -23,19 +23,20 @@ import { jarvisContextFromSession } from "./context";
 import { splitJarvisReply, sleepMs, typingDelayMs } from "./chatBlocks";
 import { commitGoal } from "./goalCommit";
 import {
-  clearGoalDraftSession,
   discussGoal,
   formatGoalFactsForModel,
   goalAssemblyPendingSteps,
   goalCanCommit,
   loadGoalDraftSession,
   looksLikeGoalConversation,
+  looksLikeInspectGoalDraft,
   looksLikeLeakedGoalFacts,
   looksLikeLostGoalReply,
   looksLikeStallingGoalReply,
   missingGoalLabels,
   naturalGoalAskFromDraft,
   persistGoalDraftSession,
+  speakGoalDraftConfig,
   validateGoalDraft,
   type GoalDraft,
 } from "./goalDraft";
@@ -621,6 +622,7 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
         }));
 
       let goalTurnApplied = false;
+      let goalCopyTouched = false;
       const turnId = `t-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
       const llmSession = (): JarvisLlmSession => {
         const draft = goalDraftRef.current;
@@ -630,15 +632,26 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
         const s = scheduleDraftRef.current?.form;
         const missing = g ? missingGoalLabels(validateGoalDraft(g)) : [];
         const pending = draft ? goalAssemblyPendingSteps(draft) : [];
+        const storeName =
+          g?.storeId != null
+            ? (ctx.network.find((x) => x.id === g.storeId)?.tradeName ??
+              ctx.stores.find((x) => x.id === g.storeId)?.tradeName ??
+              "")
+            : "";
         return {
           goalDraftSummary: g
-            ? `${g.name || "sem nome"} · alvo ${g.target ?? "?"} · ${g.startsOn ?? "?"} a ${g.endsOn ?? "?"} · ${g.tiers.length} níveis · modo ${g.tierMode}`
+            ? `${g.name || "sem nome"} · alvo ${g.target ?? "?"} · ${g.startsOn ?? "?"} a ${g.endsOn ?? "?"} · ${g.tiers.length} níveis · ${g.groups.length} grupos · modo ${g.tierMode}` +
+              (draft?.copiedFrom
+                ? ` · origem ${draft.copiedFrom.from}`
+                : "")
             : null,
           goalDraftMissing: missing.length ? missing.join(", ") : null,
           goalPeriodConfirmed: a?.periodConfirmed ?? null,
           goalNextStep: pending.length ? pending.join(" → ") : null,
           goalAssemblyPath: a?.path ?? null,
           goalTurnApplied,
+          goalCopyStatus: draft?.copyStatus ?? null,
+          goalOperationalState: draft ? formatGoalFactsForModel(draft, storeName) : null,
           challengeDraftSummary: c ? `${c.name || "sem nome"} · modo ${c.mode} · métrica ${c.metric}` : null,
           scheduleDraftSummary: s ? `${s.monthStart || "?"} · loja ${s.storeId || "?"}` : null,
           longTermMemory: memoryTextRef.current,
@@ -757,6 +770,7 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
         if (onGoalThread) {
           const before = goalDraftRef.current;
           const beforePath = before?.assembly?.path ?? null;
+          const beforeCopy = before?.copyStatus ?? null;
           const beforePending = before ? goalAssemblyPendingSteps(before).join("|") : "";
           const historyBlob = recentMsgs.map((m) => `${m.from}: ${m.text}`).join("\n");
           const { draft, skipped } = await discussGoal(historyBlob, ctx, before, { turnId });
@@ -766,6 +780,22 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
           goalTurnApplied =
             !skipped &&
             ((draft.assembly?.path ?? null) !== beforePath || afterPending !== beforePending);
+          goalCopyTouched =
+            !skipped &&
+            draft.copyStatus != null &&
+            (draft.copyStatus !== beforeCopy || Boolean(draft.copiedFrom?.goalId));
+        }
+
+        // Cópia / inspeção: resposta determinística do estado — LLM não pode inventar nem buscar destino.
+        const draftForSpeak = goalDraftRef.current;
+        if (
+          draftForSpeak &&
+          (looksLikeInspectGoalDraft(q) ||
+            (goalCopyTouched &&
+              (draftForSpeak.copyStatus === "ok" || draftForSpeak.copyStatus === "failed")))
+        ) {
+          finish(speakGoalDraftConfig(draftForSpeak));
+          return;
         }
 
         // Só prompt + tools. Sem script local de conversa.
@@ -797,6 +827,15 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
         ) {
           answer = naturalGoalAskFromDraft(draftNow);
         }
+        // Rede de segurança: se o modelo inventou “não achei novembro” com cópia ok no estado.
+        if (
+          draftNow?.copyStatus === "ok" &&
+          /nao (encontrei|achei|localizei)|não (encontrei|achei|localizei)|meta publicada/.test(
+            answer.toLowerCase().normalize("NFD").replace(/\p{M}/gu, ""),
+          )
+        ) {
+          answer = speakGoalDraftConfig(draftNow);
+        }
         finish(answer);
       })();
     },
@@ -815,6 +854,7 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
 
   const clearChat = useCallback(() => {
     // Invalida turnos em voo. Memória de longo prazo fica (só tools remember/forget).
+    // Rascunho de meta = estado operacional separado: NÃO apaga com a conversa.
     replyGen.current += 1;
     cancelDictate();
     setMessages([]);
@@ -826,13 +866,12 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
     setChallengeDraft(null);
     challengeDraftRef.current = null;
     setGoalDraft(null);
-    syncGoalDraft(null);
-    clearGoalDraftSession();
+    // Mantém goalDraftRef + sessionStorage — só discard_draft / clearGoalDraftSession zera.
     setScheduleDraft(null);
     scheduleDraftRef.current = null;
     setCreatedItem(null);
     setCommitBusy(false);
-  }, [cancelDictate, syncGoalDraft]);
+  }, [cancelDictate]);
 
   useEffect(() => {
     return () => {
