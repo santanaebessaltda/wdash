@@ -24,6 +24,7 @@ import {
   pickGoalTargetStore,
   validateGoalDraft,
   discussGoal,
+  goalAssemblyPendingSteps,
 } from "./goalDraft";
 
 const ctx = {
@@ -268,5 +269,25 @@ describe("leaked goal facts", () => {
     const ask = naturalGoalAskFromDraft(draft).toLowerCase();
     expect(ask).toMatch(/valor/);
     expect(ask).not.toMatch(/m[eê]s/);
+  });
+
+  it("checklist depois do valor ainda pede config (nao so R$)", () => {
+    const draft = {
+      form: {
+        ...emptyGoalForm("a"),
+        startsOn: "2026-11-01",
+        endsOn: "2026-11-30",
+        target: 250_000,
+      },
+      pendingConfigCopy: null,
+      assembly: {
+        ...emptyGoalAssembly(),
+        periodConfirmed: true,
+        valueDiscussed: true,
+      },
+    };
+    const pending = goalAssemblyPendingSteps(draft);
+    expect(pending[0]).toMatch(/copiar|zero/i);
+    expect(pending.some((p) => /escada|desafio|grupos|rateio|rascunho/i.test(p))).toBe(true);
   });
 });

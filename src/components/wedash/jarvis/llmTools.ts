@@ -70,7 +70,7 @@ export async function runJarvisTool(
     case "draft_goal":
       return {
         content:
-          "Proposta de meta atualizada no app (so texto, sem card). Use o estado interno se o hook nao tiver devolvido fatos. Para GRAVAR use commit_draft. Fale naturalmente o proximo passo.",
+          "Estado da meta atualizado. Leia checklist_pendente / proximo_passo_sugerido e fale o PROXIMO passo (um). Nao diga que ja preparou tudo se ainda ha pendencias. Gravar = commit_draft.",
         sideEffect: { kind: "draft_goal", request: question },
       };
     case "draft_schedule":

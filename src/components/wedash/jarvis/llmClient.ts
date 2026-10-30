@@ -68,7 +68,7 @@ function contextNote(ctx: JarvisContext, session?: JarvisLlmSession | null): str
   }
   if (session?.goalDraftSummary) {
     lines.push(
-      `META em discussao: ${session.goalDraftSummary}. Continue SEMPRE com draft_goal; gravar = commit_draft target=goal.`,
+      `META em discussao: ${session.goalDraftSummary}. Continue SEMPRE com draft_goal neste fio (valor R$ nao encerra a meta). Gravar = commit_draft target=goal.`,
     );
     if (session.goalPeriodConfirmed) {
       lines.push("Mes ja confirmado. Nao pergunte o mes de novo.");
@@ -76,11 +76,14 @@ function contextNote(ctx: JarvisContext, session?: JarvisLlmSession | null): str
       lines.push("Mes ainda nao confirmado.");
     }
     if (session.goalNextStep) {
-      lines.push(`Proximo passo (estado do app): ${session.goalNextStep}`);
+      lines.push(`Proximo passo da meta (um por vez): ${session.goalNextStep}`);
     }
     if (session.goalDraftMissing) {
-      lines.push(`Ainda faltando: ${session.goalDraftMissing}.`);
+      lines.push(`Campos ainda incompletos: ${session.goalDraftMissing}.`);
     }
+    lines.push(
+      "Nao diga 'vou preparar' sem draft_goal. Avance checklist: periodo, filial, valor, copiar/zero, grupos, rateio, escada/desafio %, ok para rascunho.",
+    );
   }
   if (session?.challengeDraftSummary) {
     lines.push(`DESAFIO aberto (card): ${session.challengeDraftSummary}. Gravar = commit_draft target=challenge.`);

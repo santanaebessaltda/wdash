@@ -818,6 +818,7 @@ export function formatGoalFactsForModel(
       ? `${form.startsOn} a ${form.endsOn}`
       : "a definir";
   const missing = !goalDraftReady(form) ? missingGoalLabels(validateGoalDraft(form)) : [];
+  const pending = goalAssemblyPendingSteps(draft);
   const nextHint = nextAssemblyHint(form, a);
   const payload = {
     nome: form.name || "Nova meta",
@@ -839,7 +840,10 @@ export function formatGoalFactsForModel(
     confirmedMount: a.confirmedMount,
     pode_gravar_rascunho: goalCanCommit(draft),
     pendingConfigCopy: draft.pendingConfigCopy,
+    checklist_pendente: pending,
     proximo_passo_sugerido: nextHint,
+    instrucao:
+      "Avance UM item do checklist_pendente por turno (fale humano). Sempre chame draft_goal neste fio. Nunca diga 'vou preparar/montar' sem ter chamado draft_goal. commit_draft so se pode_gravar_rascunho.",
     extras: extras.map((e) => e.trim()).filter(Boolean),
   };
   // Sem prosa em PT: o modelo copia texto longo. Sinal curto + JSON.
@@ -854,26 +858,39 @@ export function formatGoalProposal(form: GoalDraftForm, storeName: string, assem
   );
 }
 
+/**
+ * O que ainda falta combinar na meta (além do R$). Ordem = fluxo natural no chat.
+ * A IA deve avançar um item por vez via draft_goal — nunca só “vou preparar”.
+ */
+export function goalAssemblyPendingSteps(draft: GoalDraft): string[] {
+  const form = draft.form;
+  const a = draft.assembly ?? emptyGoalAssembly();
+  const pending: string[] = [];
+  if (!a.periodConfirmed) pending.push("mês/período da meta");
+  if (!form.storeId) pending.push("filial");
+  if (!a.valueDiscussed || form.target == null) pending.push("valor-alvo (R$)");
+  if (a.periodConfirmed && form.storeId && a.valueDiscussed && form.target != null) {
+    if (a.path === null) pending.push("copiar escada/config da meta anterior ou montar do zero");
+    if (a.path === "fresh") {
+      if (!a.confirmedGroups) pending.push("divisão: grupos vs loja inteira");
+      if (!a.confirmedSpread) pending.push("venda sem vendedor identificado (rateio ou fora)");
+      if (!a.confirmedTiers) {
+        pending.push(`escada/níveis (inclui nível desafio %): ${formatTiersBrief(form.tiers)}`);
+      }
+    }
+    if (!a.confirmedMount) pending.push("confirmação para salvar o rascunho em Metas");
+  }
+  return pending;
+}
+
 function nextAssemblyHint(form: GoalDraftForm, assembly: GoalAssembly): string | null {
-  if (!assembly.periodConfirmed) {
-    return "perguntar pra qual mes montar a meta (sugira o mes tipado em form.startsOn). NUNCA diga 'quer fechar'";
-  }
-  if (!form.storeId) return "perguntar qual filial";
-  if (!assembly.valueDiscussed || form.target == null) {
-    return "perguntar valor da meta, ou se quer sugestao pelo historico. Nao pergunte o mes de novo";
-  }
-  if (!goalDraftReady(form)) {
-    const missing = missingGoalLabels(validateGoalDraft(form));
-    return `pedir: ${missing.join(", ")}`;
-  }
-  if (assembly.path === null) return "oferecer copiar config do mes anterior ou montar do zero";
-  if (assembly.path === "fresh") {
-    if (!assembly.confirmedGroups) return "perguntar divisao por grupos vs loja inteira";
-    if (!assembly.confirmedSpread) return "perguntar rateio de venda sem vendedor identificado";
-    if (!assembly.confirmedTiers) return `confirmar escada: ${formatTiersBrief(form.tiers)}`;
-  }
-  if (!assembly.confirmedMount) return "pedir confirmacao 'pode montar' antes de gravar rascunho";
-  return null;
+  const pending = goalAssemblyPendingSteps({
+    form,
+    pendingConfigCopy: null,
+    assembly,
+  });
+  if (!pending.length) return null;
+  return `perguntar/confirmar o proximo (um so): ${pending[0]}`;
 }
 
 /** silent = a IA fala; reply/facts so alimentam a tool. */

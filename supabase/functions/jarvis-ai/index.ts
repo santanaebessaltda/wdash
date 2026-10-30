@@ -61,11 +61,11 @@ Como decidir:
 1) O que o Gestor quer AGORA (histórico + rascunhos + memória)?
 2) Cumprimento/small talk? → humano pelo nome e PARE. ZERO tools.
 3) Pediu análise / meta / desafio com base em dados? → explore com analyze_* (pode várias no mesmo raciocínio), depois proponha. Não chute número.
-4) META / follow-up do fio → SEMPRE draft_goal. commit_draft só para gravar.
-5) Preferência durável (“sempre individual”, “filial X”, “não gosto de copiar escada”) → remember_fact.
-6) Cite cada R$ com o mês/ano da tool. Datas relativas (“ano passado”, “últimos meses”) = a partir de Hoje no contexto — não invente ano.
-7) Sazonal/mercado varejo: analyze_seasonal + bom senso; sem inventar notícia externa.
-8) “Abre tela” → só no chat.
+4) META: valor R$ é só uma peça. Montar junto = mês, filial, valor, escada/níveis (nível desafio %), modo, grupos, rateio sem vendedor, copiar config ou do zero, e só então salvar rascunho. Em TODO follow-up do fio → draft_goal. Leia checklist_pendente / proximo_passo_sugerido e avance UM passo. PROIBIDO dizer “vou preparar/montar” sem chamar draft_goal neste turno. commit_draft só com pode_gravar_rascunho.
+5) “Nível desafio +10%” da META = draft_goal (escada), NÃO draft_challenge (produto/disputa).
+6) Preferência durável → remember_fact.
+7) Cite cada R$ com mês/ano da tool. Datas relativas = a partir de Hoje — não invente ano.
+8) Sazonal: analyze_seasonal + bom senso. “Abre tela” → só no chat.
 
 Domínio das tools:
 - analyze_sales / analyze_goal / analyze_stock / analyze_seasonal
@@ -165,11 +165,14 @@ const TOOLS = [
     function: {
       name: "draft_goal",
       description:
-        "Cria ou ajusta a discussão da META (escada, modo, valor, período…). Ainda NÃO grava. Para gravar use commit_draft target=goal.",
+        "Atualiza a META em discussão (mês, filial, valor R$, escada/nível desafio %, modo, grupos, rateio, copiar config). Obrigatório em todo turno do fio de meta — inclusive quando o Gestor fecha valor ou pede 'preparar'. Ainda NÃO grava. Gravar = commit_draft target=goal.",
       parameters: {
         type: "object",
         properties: {
-          request: { type: "string" },
+          request: {
+            type: "string",
+            description: "Pedido + o já combinado (valor, % desafio, mês, filial…)",
+          },
         },
         required: ["request"],
       },

@@ -25,6 +25,7 @@ import { commitGoal } from "./goalCommit";
 import {
   discussGoal,
   formatGoalFactsForModel,
+  goalAssemblyPendingSteps,
   goalCanCommit,
   looksLikeLeakedGoalFacts,
   missingGoalLabels,
@@ -614,21 +615,14 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
         const c = challengeDraftRef.current?.form;
         const s = scheduleDraftRef.current?.form;
         const missing = g ? missingGoalLabels(validateGoalDraft(g)) : [];
-        let goalNextStep: string | null = null;
-        if (draft && a) {
-          if (!a.periodConfirmed) goalNextStep = "pedir o mês da meta";
-          else if (!g?.storeId) goalNextStep = "pedir a filial";
-          else if (!a.valueDiscussed || g.target == null) goalNextStep = "pedir ou sugerir o valor";
-          else if (a.path == null) goalNextStep = "perguntar se copia config anterior ou monta do zero";
-          else if (!a.confirmedMount) goalNextStep = "pedir confirmação para montar o rascunho";
-        }
+        const pending = draft ? goalAssemblyPendingSteps(draft) : [];
         return {
           goalDraftSummary: g
             ? `${g.name || "sem nome"} · alvo ${g.target ?? "?"} · ${g.startsOn ?? "?"} a ${g.endsOn ?? "?"} · ${g.tiers.length} níveis · modo ${g.tierMode}`
             : null,
           goalDraftMissing: missing.length ? missing.join(", ") : null,
           goalPeriodConfirmed: a?.periodConfirmed ?? null,
-          goalNextStep,
+          goalNextStep: pending.length ? pending.join(" → ") : null,
           challengeDraftSummary: c ? `${c.name || "sem nome"} · modo ${c.mode} · métrica ${c.metric}` : null,
           scheduleDraftSummary: s ? `${s.monthStart || "?"} · loja ${s.storeId || "?"}` : null,
           longTermMemory: memoryTextRef.current,
