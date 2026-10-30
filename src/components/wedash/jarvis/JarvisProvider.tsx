@@ -93,6 +93,10 @@ function loadChatHistory(): JarvisMessage[] {
 
 function persistChatHistory(messages: JarvisMessage[]) {
   try {
+    if (messages.length === 0) {
+      sessionStorage.removeItem(CHAT_HISTORY_KEY);
+      return;
+    }
     sessionStorage.setItem(CHAT_HISTORY_KEY, JSON.stringify(messages.slice(-CHAT_HISTORY_MAX)));
   } catch {
     /* quota / private mode */
@@ -210,7 +214,8 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
     }
     for (let i = 0; i < blocks.length; i++) {
       if (gen !== replyGen.current) return;
-      setMessages((m) => [...m, { from: "jarvis", text: blocks[i]! }]);
+      // Checa gen DENTRO do updater: Apagar conversa pode ter rodado entre o await e o setState.
+      setMessages((m) => (gen !== replyGen.current ? m : [...m, { from: "jarvis", text: blocks[i]! }]));
       if (i < blocks.length - 1) {
         setMode("thinking");
         await sleepMs(typingDelayMs(blocks[i + 1]!));
@@ -752,9 +757,11 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
   );
 
   const clearChat = useCallback(() => {
+    // Invalida turnos em voo (bolhas / draft) antes de limpar o estado.
     replyGen.current += 1;
     cancelDictate();
     setMessages([]);
+    messagesRef.current = [];
     persistChatHistory([]);
     setDraftText("");
     setMicHint(null);

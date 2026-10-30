@@ -82,8 +82,8 @@ export function JarvisFloat() {
                   {
                     label: "Apagar conversa",
                     danger: true,
-                    disabled: busy || empty,
-                    onClick: j.clearChat,
+                    disabled: empty,
+                    onClick: () => j.clearChat(),
                   },
                 ]}
                 trigger={
