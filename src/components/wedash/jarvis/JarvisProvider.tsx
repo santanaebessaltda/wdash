@@ -23,16 +23,19 @@ import { jarvisContextFromSession } from "./context";
 import { splitJarvisReply, sleepMs, typingDelayMs } from "./chatBlocks";
 import { commitGoal } from "./goalCommit";
 import {
+  clearGoalDraftSession,
   discussGoal,
   formatGoalFactsForModel,
   goalAssemblyPendingSteps,
   goalCanCommit,
+  loadGoalDraftSession,
   looksLikeGoalConversation,
   looksLikeLeakedGoalFacts,
   looksLikeLostGoalReply,
   looksLikeStallingGoalReply,
   missingGoalLabels,
   naturalGoalAskFromDraft,
+  persistGoalDraftSession,
   validateGoalDraft,
   type GoalDraft,
 } from "./goalDraft";
@@ -171,7 +174,7 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
 
   const endRef = useRef<HTMLDivElement>(null);
   const challengeDraftRef = useRef<ChallengeDraft | null>(null);
-  const goalDraftRef = useRef<GoalDraft | null>(null);
+  const goalDraftRef = useRef<GoalDraft | null>(loadGoalDraftSession());
   const scheduleDraftRef = useRef<ScheduleDraft | null>(null);
   const replyGen = useRef(0);
   const dictateBaseRef = useRef("");
@@ -195,6 +198,11 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     persistChatHistory(messages);
   }, [messages]);
+
+  const syncGoalDraft = useCallback((draft: GoalDraft | null) => {
+    goalDraftRef.current = draft;
+    persistGoalDraftSession(draft);
+  }, []);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -516,7 +524,7 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
         return;
       }
       setGoalDraft(null);
-      goalDraftRef.current = null;
+      syncGoalDraft(null);
       setCreatedItem({ kind: "goal", id: res.id, name: res.name, asDraft: true });
       const periodLabel =
         draft.form.startsOn && draft.form.endsOn
@@ -526,7 +534,7 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
       if (silent) return msg;
       speakAnswer(msg);
     },
-    [commitBusy, session, speakAnswer],
+    [commitBusy, session, speakAnswer, syncGoalDraft],
   );
 
   const authorizeSchedule = useCallback(
@@ -613,6 +621,7 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
         }));
 
       let goalTurnApplied = false;
+      const turnId = `t-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
       const llmSession = (): JarvisLlmSession => {
         const draft = goalDraftRef.current;
         const g = draft?.form;
@@ -643,9 +652,12 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
           setScheduleDraft(null);
           scheduleDraftRef.current = null;
           // Sempre o turno do Gestor: o arg da tool parafraseia e perde "copiar/outubro".
+          // turnId = mesma aplicação do eager (idempotente se já rodou).
           const utterance = q.trim() || request;
-          const { draft, reply: toolReply } = await discussGoal(utterance, ctx, goalDraftRef.current);
-          goalDraftRef.current = draft;
+          const { draft, reply: toolReply } = await discussGoal(utterance, ctx, goalDraftRef.current, {
+            turnId,
+          });
+          syncGoalDraft(draft);
           setGoalDraft(null);
           setCreatedItem(null);
           const storeName =
@@ -656,7 +668,7 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
         },
         onDraftChallenge: async (request) => {
           setGoalDraft(null);
-          goalDraftRef.current = null;
+          syncGoalDraft(null);
           setScheduleDraft(null);
           scheduleDraftRef.current = null;
           const { draft } = await discussChallenge(request || q, ctx, challengeDraftRef.current);
@@ -669,7 +681,7 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
           setChallengeDraft(null);
           challengeDraftRef.current = null;
           setGoalDraft(null);
-          goalDraftRef.current = null;
+          syncGoalDraft(null);
           const { draft } = await discussSchedule(request || q, ctx, scheduleDraftRef.current);
           setScheduleDraft(draft);
           scheduleDraftRef.current = draft;
@@ -689,8 +701,10 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
               .slice(-16)
               .map((m) => `${m.from}: ${m.text}`)
               .join("\n");
-            const { draft } = await discussGoal(historyBlob || q, ctx, goalDraftRef.current);
-            goalDraftRef.current = draft;
+            const { draft } = await discussGoal(historyBlob || q, ctx, goalDraftRef.current, {
+              turnId: `${turnId}-commit`,
+            });
+            syncGoalDraft(draft);
             setGoalDraft(null);
             setChallengeDraft(null);
             challengeDraftRef.current = null;
@@ -706,7 +720,7 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
           if (t === "all" || t === "goal") {
             if (goalDraftRef.current) {
               setGoalDraft(null);
-              goalDraftRef.current = null;
+              syncGoalDraft(null);
               cleared.push("meta");
             }
           }
@@ -745,12 +759,13 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
           const beforePath = before?.assembly?.path ?? null;
           const beforePending = before ? goalAssemblyPendingSteps(before).join("|") : "";
           const historyBlob = recentMsgs.map((m) => `${m.from}: ${m.text}`).join("\n");
-          const { draft } = await discussGoal(historyBlob, ctx, before);
+          const { draft, skipped } = await discussGoal(historyBlob, ctx, before, { turnId });
           if (gen !== replyGen.current) return;
-          goalDraftRef.current = draft;
+          syncGoalDraft(draft);
           const afterPending = goalAssemblyPendingSteps(draft).join("|");
           goalTurnApplied =
-            (draft.assembly?.path ?? null) !== beforePath || afterPending !== beforePending;
+            !skipped &&
+            ((draft.assembly?.path ?? null) !== beforePath || afterPending !== beforePending);
         }
 
         // Só prompt + tools. Sem script local de conversa.
@@ -794,6 +809,7 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
       navigate,
       session,
       speakAnswer,
+      syncGoalDraft,
     ],
   );
 
@@ -810,12 +826,13 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
     setChallengeDraft(null);
     challengeDraftRef.current = null;
     setGoalDraft(null);
-    goalDraftRef.current = null;
+    syncGoalDraft(null);
+    clearGoalDraftSession();
     setScheduleDraft(null);
     scheduleDraftRef.current = null;
     setCreatedItem(null);
     setCommitBusy(false);
-  }, [cancelDictate]);
+  }, [cancelDictate, syncGoalDraft]);
 
   useEffect(() => {
     return () => {
@@ -855,7 +872,7 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
       },
       discardGoal: () => {
         setGoalDraft(null);
-        goalDraftRef.current = null;
+        syncGoalDraft(null);
         speakAnswer("Beleza, descartei a meta.");
       },
       discardSchedule: () => {

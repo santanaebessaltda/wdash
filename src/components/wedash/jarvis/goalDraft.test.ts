@@ -16,6 +16,9 @@ import {
   looksLikeLostGoalReply,
   looksLikeStallingGoalReply,
   naturalGoalAskFromDraft,
+  persistGoalDraftSession,
+  loadGoalDraftSession,
+  clearGoalDraftSession,
   mergeGoalUtterance,
   parseConfigSourceMonth,
   parseGoalPeriod,
@@ -377,6 +380,159 @@ describe("leaked goal facts", () => {
   it("detecta correcao de escada/grupos copiados", () => {
     expect(
       looksLikeLadderCopyCorrection("Nas configurações de Outubro tem mais de 2 niveis, e tem divisão por grupo"),
+    ).toBe(true);
+  });
+
+  it("frase completa: novembro + copia outubro + desafio 10% + valor", async () => {
+    const { draft } = await discussGoal(
+      "Monte a meta de novembro copiando outubro, desafio 10% a mais, meta de 420 mil",
+      ctx,
+      null,
+    );
+    expect(draft.form.startsOn).toBe("2026-11-01");
+    expect(draft.form.target).toBe(420_000);
+    expect(draft.userLockedTarget).toBe(true);
+    expect(draft.assembly?.periodConfirmed).toBe(true);
+    // Sem meta no banco de teste a cópia falha, mas a intenção path=copy fica marcada.
+    expect(draft.assembly?.path).toBe("copy");
+    expect(draft.copyStatus === "failed" || draft.copyStatus === "ok").toBe(true);
+  });
+
+  it("Sim nao reaproveita R$ antigo do historico", async () => {
+    const prev = {
+      form: {
+        ...emptyGoalForm("a"),
+        name: "Novembro 2026",
+        startsOn: "2026-11-01",
+        endsOn: "2026-11-30",
+        target: 250_000,
+      },
+      pendingConfigCopy: { from: "2026-10-01", to: "2026-10-31" },
+      assembly: {
+        ...emptyGoalAssembly(),
+        periodConfirmed: true,
+        valueDiscussed: true,
+        path: null as const,
+      },
+      userLockedTarget: true,
+    };
+    const blob = ["user: meta de 250 mil", "jarvis: copiar outubro?", "user: Sim"].join("\n");
+    const { draft } = await discussGoal(blob, ctx, prev);
+    expect(draft.form.target).toBe(250_000);
+    expect(draft.assembly?.path).toBe("copy");
+  });
+
+  it("troca de mes zera alvo sem R$ novo", async () => {
+    const prev = {
+      form: {
+        ...emptyGoalForm("a"),
+        startsOn: "2026-10-01",
+        endsOn: "2026-10-31",
+        target: 200_000,
+      },
+      assembly: {
+        ...emptyGoalAssembly(),
+        periodConfirmed: true,
+        valueDiscussed: true,
+      },
+      userLockedTarget: true,
+    };
+    const { draft } = await discussGoal("Na verdade quero a meta de novembro", ctx, prev);
+    expect(draft.form.startsOn).toBe("2026-11-01");
+    expect(draft.form.target).toBeNull();
+    expect(draft.userLockedTarget).toBe(false);
+  });
+
+  it("substitui valor recomendado pelo falado pelo gestor", async () => {
+    const prev = {
+      form: {
+        ...emptyGoalForm("a"),
+        startsOn: "2026-11-01",
+        endsOn: "2026-11-30",
+        target: 300_000,
+      },
+      assembly: {
+        ...emptyGoalAssembly(),
+        periodConfirmed: true,
+        valueDiscussed: true,
+        path: "copy" as const,
+        confirmedGroups: true,
+        confirmedSpread: true,
+        confirmedTiers: true,
+      },
+      userLockedTarget: false,
+      copyStatus: "ok" as const,
+    };
+    const { draft } = await discussGoal("Vamos de 450 mil", ctx, prev);
+    expect(draft.form.target).toBe(450_000);
+    expect(draft.userLockedTarget).toBe(true);
+  });
+
+  it("turnId idempotente nao reaplica", async () => {
+    const first = await discussGoal("Meta de novembro, 250 mil", ctx, null, { turnId: "turn-1" });
+    expect(first.draft.lastAppliedTurnId).toBe("turn-1");
+    const second = await discussGoal("Meta de novembro, 250 mil", ctx, first.draft, { turnId: "turn-1" });
+    expect(second.skipped).toBe(true);
+    expect(second.draft.form.target).toBe(first.draft.form.target);
+  });
+
+  it("persiste e recupera rascunho na sessao", () => {
+    clearGoalDraftSession();
+    const draft = {
+      form: {
+        ...emptyGoalForm("a"),
+        startsOn: "2026-11-01",
+        endsOn: "2026-11-30",
+        target: 420_000,
+      },
+      assembly: { ...emptyGoalAssembly(), periodConfirmed: true, valueDiscussed: true },
+      lastAppliedTurnId: "x",
+    };
+    persistGoalDraftSession(draft);
+    const loaded = loadGoalDraftSession();
+    expect(loaded?.form.target).toBe(420_000);
+    expect(loaded?.lastAppliedTurnId).toBe("x");
+    clearGoalDraftSession();
+    expect(loadGoalDraftSession()).toBeNull();
+  });
+
+  it("goalCanCommit exige confirmacao de montagem", () => {
+    const form = {
+      ...emptyGoalForm("a"),
+      name: "Novembro 2026",
+      startsOn: "2026-11-01",
+      endsOn: "2026-11-30",
+      target: 420_000,
+    };
+    expect(
+      goalCanCommit({
+        form,
+        assembly: {
+          ...emptyGoalAssembly(),
+          periodConfirmed: true,
+          valueDiscussed: true,
+          path: "copy",
+          confirmedGroups: true,
+          confirmedSpread: true,
+          confirmedTiers: true,
+          confirmedMount: false,
+        },
+      }),
+    ).toBe(false);
+    expect(
+      goalCanCommit({
+        form,
+        assembly: {
+          ...emptyGoalAssembly(),
+          periodConfirmed: true,
+          valueDiscussed: true,
+          path: "copy",
+          confirmedGroups: true,
+          confirmedSpread: true,
+          confirmedTiers: true,
+          confirmedMount: true,
+        },
+      }),
     ).toBe(true);
   });
 });
