@@ -24,6 +24,10 @@ export type GoalDraftForm = {
 
 /** Checklist antes de gravar o rascunho em Metas — montagem guiada no chat. */
 export type GoalAssembly = {
+  /** Gestor confirmou o mês (não inferir sozinho e empurrar número). */
+  periodConfirmed: boolean;
+  /** Já falou valor ou pediu sugestão — aí sim sugerimos/fechamos alvo. */
+  valueDiscussed: boolean;
   /** copy = veio de meta anterior; fresh = montar do zero; null = ainda decidindo. */
   path: "copy" | "fresh" | null;
   confirmedGroups: boolean;
@@ -42,12 +46,22 @@ export type GoalDraft = {
 
 export function emptyGoalAssembly(): GoalAssembly {
   return {
+    periodConfirmed: false,
+    valueDiscussed: false,
     path: null,
     confirmedGroups: false,
     confirmedSpread: false,
     confirmedTiers: false,
     confirmedMount: false,
   };
+}
+
+/** Pediu sugestão de valor (não só “quero criar meta”). */
+export function looksLikeAskValueSuggestion(text: string): boolean {
+  const p = norm(text);
+  return /suger|propor|ideia de (meta|valor)|quanto (seria|fica|voce|vc)|me (da|dá) (um |uma )?(valor|ideia|numero|número)|pode (suger|calcular|propor)|basead|historico|histórico|nao sei|não sei|sem ideia|voce sugere|você sugere|valor vc sugere|valor voce sugere|da pra melhorar|da para melhorar/.test(
+    p,
+  );
 }
 
 /** Form válido + checklist de montagem confirmado. */
@@ -775,29 +789,87 @@ export async function discussGoal(
   const prevStarts = prev?.form.startsOn ?? null;
   let form = prev?.form ?? emptyGoalForm(ctx.stores.length === 1 ? ctx.stores[0]!.id : "");
   let assembly: GoalAssembly = { ...(prev?.assembly ?? emptyGoalAssembly()) };
-  form = mergeGoalUtterance(form, question, ctx);
-  // Periodo mudou (ex.: maio → novembro): nao reaproveitar valor do mes antigo.
-  if (prevStarts && form.startsOn && prevStarts !== form.startsOn && parseGoalTarget(question) == null) {
-    form = { ...form, target: null };
-    assembly = emptyGoalAssembly();
-  } else if (
-    form.target != null &&
-    /suger|melhorar|quanto (seria|fica)|valor vc sugere|valor voce sugere/.test(norm(question)) &&
-    parseGoalTarget(question) == null
-  ) {
-    form = { ...form, target: null };
-  }
-
-  if (!form.startsOn) {
-    const startsOn = shiftMonthStart(ctx.today, 1);
-    form = ensureGoalName({ ...form, startsOn, endsOn: endOfMonth(startsOn) });
-  }
-
   const lastUser = lastUserUtterance(question);
   const qn = norm(lastUser);
+  const periodSaidNow = parseGoalPeriod(lastUser, ctx.today) != null;
+  const lockedTarget = parseGoalTarget(question);
+  const asksSuggestion = looksLikeAskValueSuggestion(lastUser);
+
+  form = mergeGoalUtterance(form, question, ctx);
+
+  // Periodo mudou (ex.: maio → novembro): nao reaproveitar valor do mes antigo.
+  if (prevStarts && form.startsOn && prevStarts !== form.startsOn && lockedTarget == null) {
+    form = { ...form, target: null };
+    assembly = { ...emptyGoalAssembly(), periodConfirmed: periodSaidNow };
+  } else if (form.target != null && asksSuggestion && lockedTarget == null) {
+    form = { ...form, target: null };
+  }
+
+  if (periodSaidNow) assembly = { ...assembly, periodConfirmed: true };
+  // Aceite curto do mês sugerido (“esse”, “próximo”, “pode ser”).
+  if (
+    !assembly.periodConfirmed &&
+    form.startsOn &&
+    /^(esse|essa|isso|proximo|próximo|pode ser|fechado|ok|sim)(\b|,|$)/.test(qn)
+  ) {
+    assembly = { ...assembly, periodConfirmed: true };
+  }
+
+  // Nao inventar mês sozinho — pergunta antes de empurrar número.
+  // Guarda o próximo mês como proposta; “esse” / “ok” confirma sem o Gestor repetir.
+  if (!assembly.periodConfirmed) {
+    if (!form.startsOn) {
+      const tipStarts = shiftMonthStart(ctx.today, 1);
+      form = ensureGoalName({ ...form, startsOn: tipStarts, endsOn: endOfMonth(tipStarts), target: null });
+    }
+    if (!form.storeId && ctx.stores.length === 1) form = { ...form, storeId: ctx.stores[0]!.id };
+    const tipLabel = monthYearTitle(form.startsOn!);
+    return {
+      reply:
+        `Beleza — vamos montar a meta.\n\n` +
+        `De qual mês a gente tá falando? Posso seguir com ${tipLabel}, ou você fala outro.`,
+      draft: {
+        form: { ...form, target: null },
+        pendingConfigCopy: null,
+        assembly: { ...assembly, periodConfirmed: false, valueDiscussed: false },
+      },
+    };
+  }
+
+  form = ensureGoalName(form);
+  if (!form.storeId && ctx.stores.length === 1) form = { ...form, storeId: ctx.stores[0]!.id };
+  if (!form.storeId && (ctx.network.length > 1 || ctx.stores.length > 1)) {
+    return {
+      reply: `Ok, ${monthYearTitle(form.startsOn!)}.\n\nDe qual filial? Fala o nome da loja.`,
+      draft: { form, pendingConfigCopy: null, assembly },
+    };
+  }
+
   const isConfirm = /autorizo|cria a meta|pode criar|ok pode|vamos criar|salva(r)? (o )?rascunho|pode montar|monta (o )?rascunho/.test(
     qn,
   );
+
+  // Ainda sem valor: pergunta o que o Gestor tem em mente (nao despeja sugestão).
+  if (lockedTarget == null && !asksSuggestion && !assembly.valueDiscussed && form.target == null && !isConfirm) {
+    const bias = seasonalBiasForPeriod(form.startsOn!, form.endsOn!);
+    const teaser =
+      bias.events.length > 0
+        ? `\n\nNesse mês tem ${bias.events
+            .slice(0, 3)
+            .map((e) => e.name)
+            .join(", ")}${bias.events.length > 3 ? "…" : ""} — isso costuma mexer no alvo.`
+        : "";
+    return {
+      reply:
+        `Ok, ${monthYearTitle(form.startsOn!)}.${teaser}\n\n` +
+        `O que você tem em mente de valor? Pode falar um número, ou pedir pra eu sugerir com base no histórico.`,
+      draft: { form: { ...form, target: null }, pendingConfigCopy: null, assembly },
+    };
+  }
+
+  if (asksSuggestion || lockedTarget != null) {
+    assembly = { ...assembly, valueDiscussed: true };
+  }
 
   // Copia de config so se o Gestor pediu (ou aceitou a oferta).
   let sourceWin = parseConfigSourceMonth(question, ctx.today, form.startsOn);
@@ -818,6 +890,7 @@ export async function discussGoal(
       form = { ...form, tiers: applyChallengeTierPct(form.tiers, 110) };
     }
     assembly = {
+      ...assembly,
       path: "copy",
       confirmedGroups: true,
       confirmedSpread: true,
@@ -826,34 +899,38 @@ export async function discussGoal(
     };
     skipAssemblyParse = true;
   } else if (prev?.pendingConfigCopy && looksLikeDeclineConfigCopy(lastUser)) {
-    assembly = { ...emptyGoalAssembly(), path: "fresh" };
+    assembly = {
+      ...emptyGoalAssembly(),
+      periodConfirmed: true,
+      valueDiscussed: true,
+      path: "fresh",
+    };
     skipAssemblyParse = true;
   }
 
   const period =
     form.startsOn && form.endsOn ? { from: form.startsOn, to: form.endsOn } : null;
-  const bias = period ? seasonalBiasForPeriod(period.from, period.to) : null;
-  const lockedTarget = parseGoalTarget(question);
+
+  let suggestionBlocks: string[] = [];
   const wantsValueHelp =
     !isConfirm &&
     lockedTarget == null &&
     assembly.path == null &&
-    (form.target == null ||
-      /suger|propor|basead|historico|mes passado|melhorar|subir|aumentar|quanto (seria|fica)|valor da meta|da pra melhorar|da para melhorar/.test(
-        norm(question),
-      ));
+    asksSuggestion &&
+    form.storeId;
 
-  let suggestionBlocks: string[] = [];
-  if (wantsValueHelp && form.storeId) {
+  if (wantsValueHelp) {
     const suggested = await suggestGoalTarget(ctx, form.storeId, period);
     if (suggested != null) {
       form = { ...form, target: suggested.amount };
       suggestionBlocks = suggested.chatBlocks;
+      assembly = { ...assembly, valueDiscussed: true };
     }
   }
   // Alvo falado pelo Gestor ("270 mil") sempre ganha da sugestao automatica / R$ antigo no historico.
   if (lockedTarget != null) {
     form = { ...form, target: lockedTarget };
+    assembly = { ...assembly, valueDiscussed: true };
   }
 
   form = ensureGoalName(form);
@@ -861,7 +938,14 @@ export async function discussGoal(
 
   let pendingConfigCopy: GoalDraft["pendingConfigCopy"] = null;
   let configOffer: string | null = null;
-  if (basicsReady && assembly.path == null && !copiedLadder && form.storeId && form.startsOn) {
+  if (
+    basicsReady &&
+    assembly.valueDiscussed &&
+    assembly.path == null &&
+    !copiedLadder &&
+    form.storeId &&
+    form.startsOn
+  ) {
     const prior = await findPriorGoalForStore(ctx, form.storeId, form.startsOn);
     if (prior && !looksLikeDeclineConfigCopy(lastUser)) {
       pendingConfigCopy = { from: prior.from, to: prior.to };
@@ -873,7 +957,7 @@ export async function discussGoal(
       skipAssemblyParse = true;
     } else {
       assembly = { ...assembly, path: "fresh" };
-      skipAssemblyParse = true; // pergunta grupos neste turno; nao interpreta a fala atual
+      skipAssemblyParse = true;
     }
   }
 
@@ -919,22 +1003,26 @@ export async function discussGoal(
   const parts: string[] = [];
   if (suggestionBlocks.length > 0) {
     parts.push(...suggestionBlocks);
-  } else if (bias && bias.events.length > 0 && !isConfirm && assembly.path == null && lockedTarget == null) {
-    parts.push(bias.summary);
   }
   if (copiedLadder) {
     parts.push(`Copiei escada, bônus e grupos da meta de ${monthYearTitle(sourceWin!.from)}.`);
   }
-  // Resumo curto só quando não estamos no meio da oferta de valor (evita parede de texto).
-  if (suggestionBlocks.length === 0 || basicsReady) {
+  // Resumo só depois que valor entrou na conversa (evita parede de texto no começo).
+  if (assembly.valueDiscussed && suggestionBlocks.length === 0) {
+    parts.push(formatGoalProposal(form, storeName, assembly));
+  } else if (assembly.valueDiscussed && basicsReady && suggestionBlocks.length > 0 && configOffer) {
+    // sugestão já trouxe valor; configOffer vem em seguida
+  } else if (assembly.valueDiscussed && basicsReady && suggestionBlocks.length === 0) {
     parts.push(formatGoalProposal(form, storeName, assembly));
   }
   if (configOffer) {
     parts.push(configOffer);
-  } else {
+  } else if (assembly.valueDiscussed) {
     const nextQ = nextAssemblyQuestion(form, assembly);
     if (nextQ) parts.push(nextQ);
   }
-  const reply = parts.filter(Boolean).join("\n\n");
+  const reply =
+    parts.filter(Boolean).join("\n\n") ||
+    formatGoalProposal(form, storeName, assembly);
   return { reply, draft: { form, pendingConfigCopy, assembly } };
 }

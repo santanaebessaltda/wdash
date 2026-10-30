@@ -7,6 +7,7 @@ import {
   goalCanCommit,
   goalDraftReady,
   looksLikeAcceptConfigCopy,
+  looksLikeAskValueSuggestion,
   looksLikeConfirmMount,
   looksLikeDeclineConfigCopy,
   mergeGoalUtterance,
@@ -125,6 +126,8 @@ describe("goal assembly checklist", () => {
       goalCanCommit({
         form,
         assembly: {
+          periodConfirmed: true,
+          valueDiscussed: true,
           path: "fresh",
           confirmedGroups: true,
           confirmedSpread: true,
@@ -133,6 +136,11 @@ describe("goal assembly checklist", () => {
         },
       }),
     ).toBe(true);
+  });
+
+  it("looksLikeAskValueSuggestion distingue pedido de sugestão", () => {
+    expect(looksLikeAskValueSuggestion("Preciso criar a meta da minha filial")).toBe(false);
+    expect(looksLikeAskValueSuggestion("pode sugerir um valor")).toBe(true);
   });
 
   it("lê divisão por grupo e rateio", () => {
