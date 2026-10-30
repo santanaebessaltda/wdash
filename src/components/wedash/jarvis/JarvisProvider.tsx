@@ -24,6 +24,7 @@ import { jarvisContextFromSession } from "./context";
 import { commitGoal } from "./goalCommit";
 import {
   discussGoal,
+  goalCanCommit,
   goalDraftReady,
   missingGoalLabels,
   validateGoalDraft,
@@ -451,8 +452,19 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
   const authorizeGoal = useCallback(async () => {
     if (!session || !goalDraftRef.current || commitBusy) return;
     const draft = goalDraftRef.current;
-    if (!goalDraftReady(draft.form)) {
-      speakAnswer(`Ainda falta ${missingGoalLabels(validateGoalDraft(draft.form)).join(", ")}.`);
+    if (!goalCanCommit(draft)) {
+      if (!goalDraftReady(draft.form)) {
+        speakAnswer(`Ainda falta ${missingGoalLabels(validateGoalDraft(draft.form)).join(", ")}.`);
+        return;
+      }
+      // Neutro: so reemite a proxima pergunta do checklist, sem confirmar passo.
+      const { reply, draft: next } = await discussGoal(
+        "seguir montagem da meta",
+        jarvisContextFromSession(session, readTopbarStoreIds()),
+        draft,
+      );
+      goalDraftRef.current = next;
+      speakAnswer(reply);
       return;
     }
     setCommitBusy(true);
@@ -640,7 +652,7 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
               .slice(-16)
               .map((m) => `${m.from}: ${m.text}`)
               .join("\n");
-            const { draft } = await discussGoal(historyBlob || q, ctx, goalDraftRef.current);
+            const { draft, reply } = await discussGoal(historyBlob || q, ctx, goalDraftRef.current);
             if (gen !== replyGen.current) return;
             goalDraftRef.current = draft;
             setGoalDraft(null);
@@ -649,9 +661,11 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
             setScheduleDraft(null);
             scheduleDraftRef.current = null;
             setCreatedItem(null);
-            if (!goalDraftReady(draft.form)) {
+            if (!goalCanCommit(draft)) {
               finish(
-                `Quase — ainda falta ${missingGoalLabels(validateGoalDraft(draft.form)).join(", ")} pra eu gravar em Metas.`,
+                !goalDraftReady(draft.form)
+                  ? `Quase — ainda falta ${missingGoalLabels(validateGoalDraft(draft.form)).join(", ")} pra eu gravar em Metas.`
+                  : reply,
               );
               return;
             }

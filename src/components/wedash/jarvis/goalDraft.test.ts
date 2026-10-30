@@ -1,14 +1,20 @@
 import { describe, expect, it } from "vitest";
 import {
   applyChallengeTierPct,
+  emptyGoalAssembly,
   emptyGoalForm,
   ensureGoalName,
+  goalCanCommit,
   goalDraftReady,
   looksLikeAcceptConfigCopy,
+  looksLikeConfirmMount,
+  looksLikeDeclineConfigCopy,
   mergeGoalUtterance,
   parseConfigSourceMonth,
   parseGoalPeriod,
   parseGoalTarget,
+  parseGroupsDistributionChoice,
+  parseSpreadUnidentifiedChoice,
   pickConfigSourceStore,
   pickGoalTargetStore,
   validateGoalDraft,
@@ -102,6 +108,39 @@ describe("looksLikeAcceptConfigCopy", () => {
     expect(looksLikeAcceptConfigCopy("sim")).toBe(true);
     expect(looksLikeAcceptConfigCopy("pode copiar")).toBe(true);
     expect(looksLikeAcceptConfigCopy("não")).toBe(false);
+    expect(looksLikeDeclineConfigCopy("não")).toBe(true);
+    expect(looksLikeDeclineConfigCopy("monta do zero")).toBe(true);
+  });
+});
+
+describe("goal assembly checklist", () => {
+  it("não grava sem confirmação de montagem", () => {
+    let form = emptyGoalForm("a");
+    form = ensureGoalName(
+      mergeGoalUtterance(form, "meta individual de novembro, R$ 270 mil na Campo Grande", ctx),
+    );
+    expect(goalDraftReady(form)).toBe(true);
+    expect(goalCanCommit({ form, assembly: emptyGoalAssembly() })).toBe(false);
+    expect(
+      goalCanCommit({
+        form,
+        assembly: {
+          path: "fresh",
+          confirmedGroups: true,
+          confirmedSpread: true,
+          confirmedTiers: true,
+          confirmedMount: true,
+        },
+      }),
+    ).toBe(true);
+  });
+
+  it("lê divisão por grupo e rateio", () => {
+    expect(parseGroupsDistributionChoice("sem divisão por grupo")).toBe(false);
+    expect(parseGroupsDistributionChoice("quero distribuição por grupos")).toBe(true);
+    expect(parseSpreadUnidentifiedChoice("sim, ratear")).toBe(true);
+    expect(parseSpreadUnidentifiedChoice("sem rateio")).toBe(false);
+    expect(looksLikeConfirmMount("pode montar")).toBe(true);
   });
 });
 

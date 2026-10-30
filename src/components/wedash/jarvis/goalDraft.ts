@@ -22,20 +22,120 @@ export type GoalDraftForm = {
   managerOn: boolean;
 };
 
+/** Checklist antes de gravar o rascunho em Metas — montagem guiada no chat. */
+export type GoalAssembly = {
+  /** copy = veio de meta anterior; fresh = montar do zero; null = ainda decidindo. */
+  path: "copy" | "fresh" | null;
+  confirmedGroups: boolean;
+  confirmedSpread: boolean;
+  confirmedTiers: boolean;
+  /** “Pode montar o rascunho?” — obrigatório mesmo após copiar config. */
+  confirmedMount: boolean;
+};
+
 export type GoalDraft = {
   form: GoalDraftForm;
   /** Janela oferecida (“quer copiar a config do mês X?”); “sim” usa isso. */
   pendingConfigCopy?: { from: string; to: string } | null;
+  assembly?: GoalAssembly;
 };
+
+export function emptyGoalAssembly(): GoalAssembly {
+  return {
+    path: null,
+    confirmedGroups: false,
+    confirmedSpread: false,
+    confirmedTiers: false,
+    confirmedMount: false,
+  };
+}
+
+/** Form válido + checklist de montagem confirmado. */
+export function goalCanCommit(draft: GoalDraft): boolean {
+  const a = draft.assembly ?? emptyGoalAssembly();
+  return (
+    goalDraftReady(draft.form) &&
+    a.confirmedGroups &&
+    a.confirmedSpread &&
+    a.confirmedTiers &&
+    a.confirmedMount
+  );
+}
 
 /** Aceite curto depois da oferta de copiar config do mês anterior. */
 export function looksLikeAcceptConfigCopy(text: string): boolean {
   const p = norm(text).trim();
-  if (/nao|não|deixa|sem copia|sem configurar|agora nao|agora não/.test(p)) return false;
+  if (looksLikeDeclineConfigCopy(text)) return false;
   return (
     /^(sim|pode|quero|copia|ok)(\b|,|$)/.test(p) ||
     /pode copiar|quero (que )?copie|copia (a |a )?config|sim,? (pode|copia|quero)|copia sim|copia isso|copia dela/.test(p)
   );
+}
+
+export function looksLikeDeclineConfigCopy(text: string): boolean {
+  const p = norm(text).trim();
+  return (
+    /^(nao|não)(\b|,|$)/.test(p) ||
+    /nao (quero )?copiar|não (quero )?copiar|sem copia|monta (do )?zero|nova configura|nao precisa|não precisa|deixa (sem|pra eu)|prefiro montar|quero montar/.test(
+      p,
+    )
+  );
+}
+
+/** Resposta à pergunta de distribuição por grupos. null = ainda não deu pra ler. */
+export function parseGroupsDistributionChoice(text: string): boolean | null {
+  const p = norm(text).trim();
+  if (/sem (divisao|distribui|grupo)|nao (quero )?(divis|grupo)|não (quero )?(divis|grupo)|sem grupo|so individual|só individual|nao precisa de grupo|não precisa de grupo/.test(p)) {
+    return false;
+  }
+  if (/com (divisao|distribui|grupo)|por grupo|dividir .{0,20}grupo|quero (a )?divis|quero grupo|distribui.{0,12}grupo/.test(p)) {
+    return true;
+  }
+  if (/^(sim|pode|quero|ok)(\b|,|$)/.test(p)) return true;
+  if (/^(nao|não)(\b|,|$)/.test(p)) return false;
+  return null;
+}
+
+/** Resposta ao rateio de venda sem vendedor identificado. */
+export function parseSpreadUnidentifiedChoice(text: string): boolean | null {
+  const p = norm(text).trim();
+  if (/sem rateio|nao ratear|não ratear|nao (quero )?marcar|não (quero )?marcar|deixa (desligado|off|sem)|nao precisa|não precisa/.test(p)) {
+    return false;
+  }
+  if (/ratear|rateio|marcar|com rateio|sim.*(rate|identif|vendedor)/.test(p)) return true;
+  if (/^(sim|pode|quero|ok)(\b|,|$)/.test(p)) return true;
+  if (/^(nao|não)(\b|,|$)/.test(p)) return false;
+  return null;
+}
+
+export function looksLikeConfirmTiers(text: string): boolean {
+  const p = norm(text).trim();
+  if (/nao|não|muda|altera|troca|outro nivel|outra escada/.test(p) && !/nao precisa mudar|não precisa mudar/.test(p)) {
+    if (/^(nao|não)(\b|,|$)/.test(p)) return false;
+    if (/muda|altera|troca/.test(p)) return false;
+  }
+  return (
+    /^(sim|pode|ok|confirma|confirmo|fechado|isso|pode ser)(\b|,|$)/.test(p) ||
+    /confirma (a |os )?(escada|niveis|níveis)|escada (ok|boa|fechada)|niveis ok|níveis ok|pode manter/.test(p)
+  );
+}
+
+export function looksLikeConfirmMount(text: string): boolean {
+  const p = norm(text).trim();
+  if (looksLikeDeclineConfigCopy(text) && !/monta/.test(p)) return false;
+  return (
+    /^(sim|pode|ok|monta|cria|autorizo|fechado)(\b|,|$)/.test(p) ||
+    /pode montar|monta (o )?rascunho|cria (a )?meta|autorizo|vamos (criar|montar)|salva(r)? (o )?rascunho|ok pode/.test(p)
+  );
+}
+
+export function formatTiersBrief(tiers: Tier[]): string {
+  return tiers
+    .map((t) => {
+      const bonus = t.bonus > 0 ? ` + bônus ${brlCent(t.bonus)}` : "";
+      return `${t.name} ${t.minAttainmentPct}% / premiação ${t.commissionPct}%${bonus}`;
+    })
+    .join("; ");
 }
 
 /** Mesmos cortes do editor (`DEFAULT_TIERS` em GoalEditorPage). */
@@ -543,8 +643,7 @@ export async function suggestGoalTarget(
   }
 }
 
-export function formatGoalProposal(form: GoalDraftForm, storeName: string): string {
-  const ready = goalDraftReady(form);
+export function formatGoalProposal(form: GoalDraftForm, storeName: string, assembly?: GoalAssembly | null): string {
   const period =
     form.startsOn && form.endsOn
       ? `${form.startsOn.slice(8, 10)}/${form.startsOn.slice(5, 7)} a ${form.endsOn.slice(8, 10)}/${form.endsOn.slice(5, 7)}`
@@ -552,16 +651,61 @@ export function formatGoalProposal(form: GoalDraftForm, storeName: string): stri
   const mode =
     form.tierMode === "GENERAL" ? "Geral" : form.tierMode === "GROUP" ? "Grupo" : "Individual";
   const base =
-    `Rascunho de meta: ${form.name || "(sem nome)"} · ${storeName || "filial?"} · ${period} · ` +
+    `Meta em montagem: ${form.name || "(sem nome)"} · ${storeName || "filial?"} · ${period} · ` +
     `${mode} · alvo ${form.target != null ? brlCent(form.target) : "a definir"} · ` +
     `${form.tiers.length} níveis na escada` +
     (form.managerOn ? " · com premiação da gerência" : "") +
+    (form.spreadUnidentified ? " · rateio sem vendedor identificado" : "") +
+    (form.groups.length > 0 ? ` · ${form.groups.length} grupos` : "") +
     ".";
-  if (ready) {
-    return `${base} Fechado pra mim no chat (so texto). Quando quiser, diga "cria a meta" / Autorizo — eu salvo como rascunho em Metas (igual Salvar rascunho); voce revisa e publica la.`;
+  if (!goalDraftReady(form)) {
+    const missing = missingGoalLabels(validateGoalDraft(form));
+    return `${base} Ainda falta: ${missing.join(", ")}. Pode falar o valor, a filial ou o mês.`;
   }
-  const missing = missingGoalLabels(validateGoalDraft(form));
-  return `${base} Ainda falta: ${missing.join(", ")}. Pode falar o valor, a filial ou o mês.`;
+  const a = assembly ?? emptyGoalAssembly();
+  if (goalCanCommit({ form, assembly: a })) {
+    return `${base} Fechado pra mim. Diz "cria a meta" / Autorizo — eu salvo como rascunho em Metas (igual Salvar rascunho); você revisa e publica lá.`;
+  }
+  return base;
+}
+
+function nextAssemblyQuestion(form: GoalDraftForm, assembly: GoalAssembly): string | null {
+  if (!goalDraftReady(form)) return null;
+  if (assembly.path === null) return null;
+  if (assembly.path === "fresh") {
+    if (!assembly.confirmedGroups) {
+      return "Quer distribuição por grupos (quanto % da meta pra cada grupo), ou deixa sem divisão por grupo?";
+    }
+    if (!assembly.confirmedSpread) {
+      return "Quer ratear vendas sem vendedor identificado entre quem estava na loja naquele dia?";
+    }
+    if (!assembly.confirmedTiers) {
+      return `Confirma esses níveis de premiação? ${formatTiersBrief(form.tiers)}. Pode dizer "confirma" ou pedir pra ajustar.`;
+    }
+  }
+  if (!assembly.confirmedMount) {
+    const groupsBit =
+      form.groups.length > 0
+        ? `${form.groups.length} grupos`
+        : assembly.path === "fresh"
+          ? "sem divisão por grupos no rascunho (dá pra completar no editor)"
+          : "grupos como na meta copiada";
+    const spreadBit = form.spreadUnidentified ? "com rateio sem identificação" : "sem rateio sem identificação";
+    return (
+      `Posso montar o rascunho com isso? Alvo ${form.target != null ? brlCent(form.target) : "—"}; ` +
+      `${spreadBit}; ${groupsBit}; escada: ${formatTiersBrief(form.tiers)}. ` +
+      `Diz "pode montar" / "sim" — só depois eu gravo em Metas.`
+    );
+  }
+  return null;
+}
+
+/** Ultima fala do user — o historico no Autorizar nao pode confirmar o checklist sozinho. */
+export function lastUserUtterance(text: string): string {
+  if (!/user:/i.test(text)) return text.trim();
+  const parts = text.split(/\n(?=user:|jarvis:)/i).filter((p) => /^user:/i.test(p.trim()));
+  const last = parts[parts.length - 1] ?? text;
+  return last.replace(/^user:\s*/i, "").trim();
 }
 
 export async function discussGoal(
@@ -571,10 +715,12 @@ export async function discussGoal(
 ): Promise<{ reply: string; draft: GoalDraft }> {
   const prevStarts = prev?.form.startsOn ?? null;
   let form = prev?.form ?? emptyGoalForm(ctx.stores.length === 1 ? ctx.stores[0]!.id : "");
+  let assembly: GoalAssembly = { ...(prev?.assembly ?? emptyGoalAssembly()) };
   form = mergeGoalUtterance(form, question, ctx);
   // Periodo mudou (ex.: maio → novembro): nao reaproveitar valor do mes antigo.
   if (prevStarts && form.startsOn && prevStarts !== form.startsOn && parseGoalTarget(question) == null) {
     form = { ...form, target: null };
+    assembly = emptyGoalAssembly();
   } else if (
     form.target != null &&
     /suger|melhorar|quanto (seria|fica)|valor vc sugere|valor voce sugere/.test(norm(question)) &&
@@ -588,19 +734,19 @@ export async function discussGoal(
     form = ensureGoalName({ ...form, startsOn, endsOn: endOfMonth(startsOn) });
   }
 
-  // Copia de config so se o Gestor pediu (ou aceitou a oferta); senao oferecemos a do mes anterior.
-  const qn = norm(question);
-  const isConfirm = /autorizo|cria a meta|pode criar|ok pode|vamos criar|salva(r)? (o )?rascunho/.test(qn);
+  const lastUser = lastUserUtterance(question);
+  const qn = norm(lastUser);
+  const isConfirm = /autorizo|cria a meta|pode criar|ok pode|vamos criar|salva(r)? (o )?rascunho|pode montar|monta (o )?rascunho/.test(
+    qn,
+  );
+
+  // Copia de config so se o Gestor pediu (ou aceitou a oferta).
   let sourceWin = parseConfigSourceMonth(question, ctx.today, form.startsOn);
-  if (
-    !sourceWin &&
-    prev?.pendingConfigCopy &&
-    looksLikeAcceptConfigCopy(question) &&
-    !isConfirm
-  ) {
+  if (!sourceWin && prev?.pendingConfigCopy && looksLikeAcceptConfigCopy(lastUser)) {
     sourceWin = prev.pendingConfigCopy;
   }
   let copiedLadder = false;
+  let skipAssemblyParse = false;
   if (sourceWin) {
     const before = JSON.stringify({ tiers: form.tiers, groups: form.groups, tierMode: form.tierMode });
     const pool = ctx.network.length > 0 ? ctx.network : ctx.stores;
@@ -609,9 +755,20 @@ export async function discussGoal(
     form = await copyGoalLadderFromPeriod(form, ctx, sourceWin, source?.id);
     copiedLadder =
       JSON.stringify({ tiers: form.tiers, groups: form.groups, tierMode: form.tierMode }) !== before;
-    if (looksLikeGoalLadderTalk(question) && /10\s*%|por cento a mais|nivel desafio|meta desafio/.test(qn)) {
+    if (looksLikeGoalLadderTalk(question) && /10\s*%|por cento a mais|nivel desafio|meta desafio/.test(norm(question))) {
       form = { ...form, tiers: applyChallengeTierPct(form.tiers, 110) };
     }
+    assembly = {
+      path: "copy",
+      confirmedGroups: true,
+      confirmedSpread: true,
+      confirmedTiers: true,
+      confirmedMount: false,
+    };
+    skipAssemblyParse = true;
+  } else if (prev?.pendingConfigCopy && looksLikeDeclineConfigCopy(lastUser)) {
+    assembly = { ...emptyGoalAssembly(), path: "fresh" };
+    skipAssemblyParse = true;
   }
 
   const period =
@@ -621,9 +778,10 @@ export async function discussGoal(
   const wantsValueHelp =
     !isConfirm &&
     lockedTarget == null &&
+    assembly.path == null &&
     (form.target == null ||
       /suger|propor|basead|historico|mes passado|melhorar|subir|aumentar|quanto (seria|fica)|valor da meta|da pra melhorar|da para melhorar/.test(
-        qn,
+        norm(question),
       ));
 
   let suggestionNote: string | null = null;
@@ -639,34 +797,79 @@ export async function discussGoal(
     form = { ...form, target: lockedTarget };
   }
 
+  form = ensureGoalName(form);
+  const basicsReady = goalDraftReady(form);
+
   let pendingConfigCopy: GoalDraft["pendingConfigCopy"] = null;
   let configOffer: string | null = null;
-  if (!copiedLadder && form.storeId && form.startsOn && !isConfirm) {
+  if (basicsReady && assembly.path == null && !copiedLadder && form.storeId && form.startsOn) {
     const prior = await findPriorGoalForStore(ctx, form.storeId, form.startsOn);
-    if (prior) {
+    if (prior && !looksLikeDeclineConfigCopy(lastUser)) {
       pendingConfigCopy = { from: prior.from, to: prior.to };
       configOffer =
         `Tem meta em ${monthYearTitle(prior.from)} nessa filial (${prior.tiers} niveis` +
         (prior.groups > 0 ? `, ${prior.groups} grupos` : "") +
-        `). Quer que eu copie a configuração (escada, bônus opcional e distribuição por grupo)?`;
+        `). Quer que eu copie a configuração (escada, bônus opcional e distribuição por grupo)? ` +
+        `Se não, a gente monta do zero (grupos, rateio sem identificação e níveis).`;
+      skipAssemblyParse = true;
+    } else {
+      assembly = { ...assembly, path: "fresh" };
+      skipAssemblyParse = true; // pergunta grupos neste turno; nao interpreta a fala atual
     }
+  }
+
+  // Montagem guiada (fresh): grupos → rateio → níveis → confirma montar.
+  if (basicsReady && assembly.path === "fresh" && !pendingConfigCopy && !skipAssemblyParse) {
+    if (!assembly.confirmedGroups) {
+      const choice = parseGroupsDistributionChoice(lastUser);
+      if (choice != null) {
+        if (choice) form = { ...form, tierMode: form.tierMode === "GENERAL" ? "GROUP" : form.tierMode };
+        assembly = { ...assembly, confirmedGroups: true };
+      }
+    } else if (!assembly.confirmedSpread) {
+      const choice = parseSpreadUnidentifiedChoice(lastUser);
+      if (choice != null) {
+        form = { ...form, spreadUnidentified: choice };
+        assembly = { ...assembly, confirmedSpread: true };
+      }
+    } else if (!assembly.confirmedTiers) {
+      if (looksLikeConfirmTiers(lastUser)) {
+        assembly = { ...assembly, confirmedTiers: true };
+      }
+    }
+  }
+
+  if (
+    basicsReady &&
+    !skipAssemblyParse &&
+    assembly.path != null &&
+    assembly.confirmedGroups &&
+    assembly.confirmedSpread &&
+    assembly.confirmedTiers &&
+    !assembly.confirmedMount &&
+    looksLikeConfirmMount(lastUser)
+  ) {
+    assembly = { ...assembly, confirmedMount: true };
   }
 
   const storeName =
     ctx.network.find((s) => s.id === form.storeId)?.tradeName ??
     ctx.stores.find((s) => s.id === form.storeId)?.tradeName ??
     "";
-  let reply = formatGoalProposal(form, storeName);
+  let reply = formatGoalProposal(form, storeName, assembly);
   if (copiedLadder) {
     reply = `Copiei escada, bônus e grupos da meta de ${monthYearTitle(sourceWin!.from)}. ${reply}`;
   }
   if (suggestionNote) {
     reply = `${suggestionNote} ${reply}`;
-  } else if (bias && bias.events.length > 0 && !isConfirm) {
+  } else if (bias && bias.events.length > 0 && !isConfirm && assembly.path == null) {
     reply = `${bias.summary} ${reply}`;
   }
   if (configOffer) {
     reply = `${reply} ${configOffer}`;
+  } else {
+    const nextQ = nextAssemblyQuestion(form, assembly);
+    if (nextQ) reply = `${reply} ${nextQ}`;
   }
-  return { reply, draft: { form, pendingConfigCopy } };
+  return { reply, draft: { form, pendingConfigCopy, assembly } };
 }
