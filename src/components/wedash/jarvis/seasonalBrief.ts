@@ -148,3 +148,87 @@ export function formatSeasonalBrief(events: SeasonalEvent[], today: string): str
 export function loadSeasonalBrief(today: string): string {
   return formatSeasonalBrief(buildSeasonalBrief(today), today);
 }
+
+/** Fator comercial tipico sobre o valor-alvo (somatorio; teto ±25%). */
+const COMMERCIAL_DELTA: Record<string, number> = {
+  Carnaval: -0.03,
+  "Dia das Maes": 0.1,
+  "Dia das Mães": 0.1,
+  "Dia dos Namorados": 0.06,
+  "Dia dos Pais": 0.05,
+  "Dia do Professor": 0.02,
+  "Black Friday": 0.12,
+  Natal: 0.15,
+};
+
+/** Eventos (comerciais + feriados) que caem dentro de [from, to]. */
+export function eventsInPeriod(from: string, to: string): SeasonalEvent[] {
+  const y0 = Number(from.slice(0, 4));
+  const y1 = Number(to.slice(0, 4));
+  const years = y0 === y1 ? [y0] : [y0, y1];
+  const pool: SeasonalEvent[] = [];
+  for (const y of years) {
+    pool.push(...commercialDates(y), ...nationalHolidays(y).map(holidayToEvent));
+  }
+  const seen = new Set<string>();
+  return pool
+    .filter((e) => e.date >= from && e.date <= to)
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .filter((e) => {
+      const key = `${e.date}|${e.name}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+}
+
+export type SeasonalBias = {
+  /** Multiplicador no alvo (1 = neutro). */
+  factor: number;
+  events: SeasonalEvent[];
+  /** Uma linha pra falar com o Gestor. */
+  summary: string;
+};
+
+/**
+ * Quanto o periodo puxa a meta pra cima/baixo por sazonal + feriado.
+ * Black Friday / Natal / Dia das Maes sobem; Carnaval e muitos feriados baixam um pouco.
+ */
+export function seasonalBiasForPeriod(from: string, to: string): SeasonalBias {
+  const events = eventsInPeriod(from, to);
+  let delta = 0;
+  const bits: string[] = [];
+  for (const e of events) {
+    if (e.kind === "commercial") {
+      const d = COMMERCIAL_DELTA[e.name] ?? 0;
+      if (d !== 0) {
+        delta += d;
+        bits.push(`${e.name} (${d > 0 ? "+" : ""}${Math.round(d * 100)}%)`);
+      } else {
+        bits.push(`${e.name} em ${fmt(e.date)}`);
+      }
+    } else {
+      delta -= 0.01;
+      bits.push(`feriado ${e.name} (${fmt(e.date)})`);
+    }
+  }
+  delta = Math.max(-0.25, Math.min(0.25, delta));
+  const factor = Math.round((1 + delta) * 1000) / 1000;
+  const summary =
+    bits.length === 0
+      ? "Sem data sazonal forte no periodo."
+      : `No periodo: ${bits.slice(0, 6).join("; ")}${bits.length > 6 ? "…" : ""}. Ajuste tipico no alvo: ${
+          delta === 0 ? "neutro" : `${delta > 0 ? "+" : ""}${Math.round(delta * 100)}%`
+        }.`;
+  return { factor, events, summary };
+}
+
+/** Resumo curto das proximas datas (contexto da sessao LLM). */
+export function compactSeasonalContext(today: string, monthsAhead = 2): string {
+  const rows = buildSeasonalBrief(today, monthsAhead);
+  if (rows.length === 0) return "Nenhuma data sazonal relevante nos proximos meses.";
+  return rows
+    .slice(0, 6)
+    .map((e) => `${e.name} ${fmt(e.date)}`)
+    .join("; ");
+}

@@ -60,6 +60,7 @@ Como pensar (sempre):
 3) Preciso criar/ajustar proposta? → draft_* certo.
 4) Responda à pergunta; nunca despeje o texto cru da tool no lugar da resposta.
 5) Follow-up curto (“e aí?”, “10% a mais”, “igual outubro”) continua o assunto anterior.
+6) Meta/desafio: ja considere sazonal e feriados do periodo (contexto da sessao + analyze_seasonal se faltar). Black Friday, Natal, Dia das Maes, Carnaval etc. puxam o valor pra cima ou pra baixo — cite em 1 frase sem o Gestor precisar pedir.
 
 Domínio (não misture):
 - META (Performance > Metas): valor-alvo, escada/níveis, modo, grupos, “nível desafio” / “meta desafio” / último degrau / +10% / copiar config de outro mês → analyze_goal e/ou draft_goal.
@@ -124,7 +125,8 @@ const TOOLS = [
     type: "function",
     function: {
       name: "analyze_seasonal",
-      description: "Próximas datas sazonais e feriados relevantes.",
+      description:
+        "Datas sazonais e feriados (Black Friday, Natal, Dia das Maes, feriados nacionais…). Use ao montar/sugerir meta ou desafio do periodo — nao espere o Gestor lembrar.",
       parameters: { type: "object", properties: {} },
     },
   },

@@ -5,6 +5,7 @@ import { fetchSalesDayAggs } from "@/data/wedash/salesRepo";
 import { brlCent, monthYearTitle } from "@/lib/format";
 import { matchStoresInText, type JarvisContext, type JarvisStoreRef } from "./context";
 import { looksLikeGoalLadderTalk } from "./respond";
+import { seasonalBiasForPeriod } from "./seasonalBrief";
 
 export type GoalDraftForm = {
   name: string;
@@ -356,21 +357,74 @@ function preferAllBrand<T extends { brand: string }>(rows: T[]): T[] {
   return all.length > 0 ? all : rows.filter((r) => r.brand !== "ALL");
 }
 
-/** Sugere meta ≈ faturamento do mês passado + 10% (arredondado). */
-export async function suggestGoalTarget(ctx: JarvisContext, storeId: string): Promise<number | null> {
+export type GoalTargetSuggestion = {
+  amount: number;
+  /** Ex.: "mes passado + sazonal (Black Friday +12%)" */
+  rationale: string;
+  seasonalSummary: string;
+};
+
+/** Sugere meta: base historica × fator sazonal do periodo alvo. */
+export async function suggestGoalTarget(
+  ctx: JarvisContext,
+  storeId: string,
+  period?: { from: string; to: string } | null,
+): Promise<GoalTargetSuggestion | null> {
   if (!storeId) return null;
+  const targetFrom = period?.from ?? shiftMonthStart(ctx.today, 1);
+  const targetTo = period?.to ?? endOfMonth(targetFrom);
+  const bias = seasonalBiasForPeriod(targetFrom, targetTo);
+
   const last = shiftMonthStart(ctx.today, -1);
+  const yoyFrom = shiftMonthStart(targetFrom, -12);
+  const yoyTo = endOfMonth(yoyFrom);
+
   try {
-    const rows = await fetchSalesDayAggs({
-      tenantId: ctx.tenantId,
-      storeIds: [storeId],
-      from: last,
-      to: endOfMonth(last),
-    });
-    const cents = preferAllBrand(rows).reduce((s, r) => s + r.revenueCents, 0);
-    if (cents <= 0) return null;
-    const suggested = Math.round((cents / 100) * 1.1);
-    return Math.round(suggested / 100) * 100;
+    const [lastRows, yoyRows] = await Promise.all([
+      fetchSalesDayAggs({
+        tenantId: ctx.tenantId,
+        storeIds: [storeId],
+        from: last,
+        to: endOfMonth(last),
+      }),
+      fetchSalesDayAggs({
+        tenantId: ctx.tenantId,
+        storeIds: [storeId],
+        from: yoyFrom,
+        to: yoyTo,
+      }),
+    ]);
+    const lastCents = preferAllBrand(lastRows).reduce((s, r) => s + r.revenueCents, 0);
+    const yoyCents = preferAllBrand(yoyRows).reduce((s, r) => s + r.revenueCents, 0);
+
+    let baseCents = 0;
+    let baseLabel = "";
+    if (yoyCents > 0 && lastCents > 0) {
+      // Media do mesmo mes ano passado e do mes recente — depois aplica sazonal do alvo.
+      baseCents = (yoyCents + lastCents) / 2;
+      baseLabel = "media do mesmo mes ano passado e do mes recente";
+    } else if (yoyCents > 0) {
+      baseCents = yoyCents;
+      baseLabel = "mesmo mes ano passado";
+    } else if (lastCents > 0) {
+      baseCents = lastCents;
+      baseLabel = "mes passado";
+    } else {
+      return null;
+    }
+
+    const growth = 1.05; // piso de crescimento alem do sazonal
+    const raw = (baseCents / 100) * growth * bias.factor;
+    const amount = Math.round(raw / 100) * 100;
+    if (amount <= 0) return null;
+
+    const pct = Math.round((bias.factor - 1) * 100);
+    const sazonalBit =
+      bias.factor === 1
+        ? "sem ajuste sazonal forte"
+        : `sazonal ${pct > 0 ? "+" : ""}${pct}%`;
+    const rationale = `${baseLabel} (+5% crescimento, ${sazonalBit})`;
+    return { amount, rationale, seasonalSummary: bias.summary };
   } catch {
     return null;
   }
@@ -419,22 +473,42 @@ export async function discussGoal(
     }
   }
 
-  if (form.target == null && form.storeId && /suger|propor|basead|historico|histórico|mes passado|mês passado/.test(norm(question))) {
-    const suggested = await suggestGoalTarget(ctx, form.storeId);
-    if (suggested != null) form = { ...form, target: suggested };
-  }
-
   if (!form.startsOn) {
     const startsOn = shiftMonthStart(ctx.today, 1);
     form = ensureGoalName({ ...form, startsOn, endsOn: endOfMonth(startsOn) });
   }
 
-  const storeName = ctx.stores.find((s) => s.id === form.storeId)?.tradeName ?? "";
+  const period =
+    form.startsOn && form.endsOn ? { from: form.startsOn, to: form.endsOn } : null;
+  const bias = period ? seasonalBiasForPeriod(period.from, period.to) : null;
+  const qn = norm(question);
+  const wantsValueHelp =
+    form.target == null ||
+    /suger|propor|basead|historico|historico|mes passado|melhorar|subir|aumentar|quanto (seria|fica)|valor da meta|da pra melhorar|da para melhorar/.test(
+      qn,
+    );
+
+  let suggestionNote: string | null = null;
+  if (wantsValueHelp && form.storeId) {
+    const suggested = await suggestGoalTarget(ctx, form.storeId, period);
+    if (suggested != null) {
+      form = { ...form, target: suggested.amount };
+      suggestionNote = `Sugeri ${brlCent(suggested.amount)} (${suggested.rationale}). ${suggested.seasonalSummary}`;
+    }
+  }
+
+  const storeName =
+    ctx.network.find((s) => s.id === form.storeId)?.tradeName ??
+    ctx.stores.find((s) => s.id === form.storeId)?.tradeName ??
+    "";
   let reply = formatGoalProposal(form, storeName);
   if (copiedLadder) {
-    reply = `Mantive a escada/modo da meta de ${monthYearTitle(sourceWin!.from)} e só ajustei o que você pediu. ${reply}`;
-  } else if (form.target != null && /suger|propor|basead|historico|histórico/.test(norm(question))) {
-    reply = `Sugeri ${brlCent(form.target)} com base no mês passado (+10%). ${reply}`;
+    reply = `Mantive a escada/modo da meta de ${monthYearTitle(sourceWin!.from)} e so ajustei o que voce pediu. ${reply}`;
+  }
+  if (suggestionNote) {
+    reply = `${suggestionNote} ${reply}`;
+  } else if (bias && bias.events.length > 0 && !/autorizo|cria a meta|vamos criar/.test(qn)) {
+    reply = `${bias.summary} ${reply}`;
   }
   return { reply, draft: { form } };
 }

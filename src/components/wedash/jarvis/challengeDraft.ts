@@ -19,6 +19,7 @@ import {
 import { addDays, dateToIso, isoToDate } from "@/lib/format";
 import { brlCent } from "@/lib/format";
 import { matchStoresInText, type JarvisContext } from "./context";
+import { seasonalBiasForPeriod } from "./seasonalBrief";
 import { pickStalledProducts } from "./stockStalled";
 import { fetchSalesProductPeriodAggs } from "@/data/wedash/salesRepo";
 import { fetchStockCatalog, fetchStoreStock } from "@/data/wedash/stockRepo";
@@ -323,7 +324,14 @@ export async function discussChallenge(
   form = ensureChallengeName(form);
   const storeName = ctx.stores.find((s) => s.id === form.storeId)?.tradeName ?? "";
   const draft: ChallengeDraft = { form, catalog };
-  return { reply: formatChallengeProposal(form, storeName), draft };
+  let reply = formatChallengeProposal(form, storeName);
+  if (form.startsOn && form.endsOn) {
+    const bias = seasonalBiasForPeriod(dateToIso(form.startsOn), dateToIso(form.endsOn));
+    if (bias.events.length > 0) {
+      reply = `${bias.summary} ${reply}`;
+    }
+  }
+  return { reply, draft };
 }
 
 export function challengeDraftReady(form: ChallengeForm): boolean {

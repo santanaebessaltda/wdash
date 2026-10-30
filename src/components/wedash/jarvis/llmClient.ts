@@ -1,5 +1,6 @@
 import { getSupabase } from "@/lib/supabase";
 import type { JarvisContext } from "./context";
+import { compactSeasonalContext } from "./seasonalBrief";
 import { runJarvisTool, type JarvisToolName } from "./llmTools";
 
 export type LlmChatMessage = {
@@ -37,7 +38,9 @@ function contextNote(ctx: JarvisContext, session?: JarvisLlmSession | null): str
       : ctx.stores.map((s) => `${s.tradeName || s.name} (${s.code || s.id})`).join("; ");
   const lines = [
     `Hoje: ${ctx.today}. Filiais no escopo: ${stores}. Tenant: ${ctx.tenantId}.`,
+    `Sazonal/feriados a considerar sozinho (meta/desafio): ${compactSeasonalContext(ctx.today, 2)}.`,
     "Interprete a intenção pelo histórico + mensagem atual. Não roteie por palavra isolada.",
+    "Ao montar meta ou desafio, ja leve sazonal/feriado na sugestao de valor — o Gestor nao precisa lembrar de Black Friday, Natal, Dia das Maes etc.",
   ];
   if (session?.goalDraftSummary) {
     lines.push(`Rascunho de META aberto no chat: ${session.goalDraftSummary}. Continuacao (nivel, %, outubro, valor) = draft_goal, nao draft_challenge. Confirmacao (criar/autorizar) = draft_goal; o app grava rascunho em Metas.`);

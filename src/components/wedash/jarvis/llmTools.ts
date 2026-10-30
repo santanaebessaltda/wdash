@@ -30,7 +30,11 @@ export async function runJarvisTool(
     case "analyze_stock":
       return { content: await loadStockStalledBrief(ctx, question) };
     case "analyze_seasonal":
-      return { content: loadSeasonalBrief(ctx.today) };
+      return {
+        content:
+          loadSeasonalBrief(ctx.today) +
+          " Use isso ao sugerir meta/desafio do periodo — nao espere o Gestor citar Black Friday ou feriado.",
+      };
     case "draft_challenge":
       return {
         content: "Rascunho de desafio será montado no app; o Gestor precisa autorizar para gravar.",
@@ -38,7 +42,8 @@ export async function runJarvisTool(
       };
     case "draft_goal":
       return {
-        content: "Rascunho de meta sera montado; se o pedido for confirmar/criar e estiver completo, o app grava em Metas como rascunho.",
+        content:
+          "Rascunho de meta sera montado no app (com historico + sazonal/feriados do periodo embutidos na sugestao de valor). Se for confirmacao completa, grava rascunho em Metas.",
         sideEffect: { kind: "draft_goal", request: question },
       };
     case "draft_schedule":
