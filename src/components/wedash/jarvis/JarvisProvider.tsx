@@ -29,7 +29,6 @@ import {
   goalCanCommit,
   loadGoalDraftSession,
   looksLikeGoalConversation,
-  looksLikeInspectGoalDraft,
   looksLikeLeakedGoalFacts,
   looksLikeLostGoalReply,
   looksLikeStallingGoalReply,
@@ -622,7 +621,7 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
         }));
 
       let goalTurnApplied = false;
-      let goalCopyTouched = false;
+      let goalSpokenReply: string | null = null;
       const turnId = `t-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
       const llmSession = (): JarvisLlmSession => {
         const draft = goalDraftRef.current;
@@ -770,31 +769,24 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
         if (onGoalThread) {
           const before = goalDraftRef.current;
           const beforePath = before?.assembly?.path ?? null;
-          const beforeCopy = before?.copyStatus ?? null;
           const beforePending = before ? goalAssemblyPendingSteps(before).join("|") : "";
           const historyBlob = recentMsgs.map((m) => `${m.from}: ${m.text}`).join("\n");
-          const { draft, skipped } = await discussGoal(historyBlob, ctx, before, { turnId });
+          const { draft, skipped, spokenReply } = await discussGoal(historyBlob, ctx, before, {
+            turnId,
+          });
           if (gen !== replyGen.current) return;
           syncGoalDraft(draft);
           const afterPending = goalAssemblyPendingSteps(draft).join("|");
           goalTurnApplied =
             !skipped &&
             ((draft.assembly?.path ?? null) !== beforePath || afterPending !== beforePending);
-          goalCopyTouched =
-            !skipped &&
-            draft.copyStatus != null &&
-            (draft.copyStatus !== beforeCopy || Boolean(draft.copiedFrom?.goalId));
+          // Só fala determinística quando discussGoal pediu (cópia deste turno / inspeção / pesos).
+          if (!skipped && spokenReply) goalSpokenReply = spokenReply;
         }
 
-        // Cópia / inspeção: resposta determinística do estado — LLM não pode inventar nem buscar destino.
-        const draftForSpeak = goalDraftRef.current;
-        if (
-          draftForSpeak &&
-          (looksLikeInspectGoalDraft(q) ||
-            (goalCopyTouched &&
-              (draftForSpeak.copyStatus === "ok" || draftForSpeak.copyStatus === "failed")))
-        ) {
-          finish(speakGoalDraftConfig(draftForSpeak));
+        // Intenção resolvida no motor (cópia / "como ficou" / pesos) — não deixa o LLM reabrir a cópia.
+        if (goalSpokenReply) {
+          finish(goalSpokenReply);
           return;
         }
 

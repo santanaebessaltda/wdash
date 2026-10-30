@@ -12,6 +12,7 @@ import {
   looksLikeConfirmMount,
   looksLikeDeclineConfigCopy,
   looksLikeGoalConversation,
+  looksLikeAskGroupWeightAdvice,
   looksLikeInspectGoalDraft,
   looksLikeLeakedGoalFacts,
   looksLikeLadderCopyCorrection,
@@ -31,6 +32,7 @@ import {
   pickConfigSourceStore,
   pickGoalTargetStore,
   speakGoalDraftConfig,
+  speakGoalWeightAdvice,
   validateGoalDraft,
   discussGoal,
   goalAssemblyPendingSteps,
@@ -595,8 +597,15 @@ describe("continuidade copia outubro → novembro", () => {
     expect(looksLikeBareCopyAccept("Sim")).toBe(true);
   });
 
+  it("pergunta de pesos nao e inspecao nem re-copia", () => {
+    const q = "Essa divisão de peso por grupo você acha que mantém?";
+    expect(looksLikeAskGroupWeightAdvice(q)).toBe(true);
+    expect(looksLikeInspectGoalDraft(q)).toBe(false);
+    expect(looksLikeAcceptConfigCopy(q)).toBe(false);
+  });
+
   it("speakGoalDraftConfig mostra 4 niveis e 2 grupos do rascunho", () => {
-    const text = speakGoalDraftConfig(octoberCopiedDraft());
+    const text = speakGoalDraftConfig(octoberCopiedDraft(), { facet: "copyJustApplied" });
     expect(text).toMatch(/outubro/i);
     expect(text).toMatch(/novembro/i);
     expect(text).toMatch(/244/);
@@ -606,6 +615,23 @@ describe("continuidade copia outubro → novembro", () => {
     expect(text).toMatch(/Turno 1 45%/);
     expect(text).not.toMatch(/85%/);
     expect(text).not.toMatch(/publicada em novembro/i);
+  });
+
+  it("pergunta de pesos nao reabre 'Copiei a configuração'", async () => {
+    const prev = octoberCopiedDraft();
+    const { draft, spokenReply } = await discussGoal(
+      "Essa divisão de peso por grupo você acha que mantém?",
+      ctx,
+      prev,
+    );
+    expect(draft.copyStatus).toBe("ok");
+    expect(draft.form.groups.map((g) => g.pct)).toEqual([45, 55]);
+    expect(spokenReply).toBeTruthy();
+    expect(spokenReply!).toMatch(/peso|turno|mant/i);
+    expect(spokenReply!).not.toMatch(/^Copiei a configuração|^Pronto — trouxe/i);
+    expect(spokenReply!).toMatch(/inalterada|mantive|não alterei|nao alterei|recomendo|participação|participacao/i);
+    // Análise sem dados de venda no teste ainda assim não reexecuta cópia.
+    expect(speakGoalWeightAdvice(draft, null)).not.toMatch(/Copiei a configuração/);
   });
 
   it('"Como ficou?" preserva copia e expoe niveis no estado interno', async () => {
@@ -656,6 +682,7 @@ describe("continuidade copia outubro → novembro", () => {
     const t3 = await discussGoal("Mostre os níveis", ctx, t2.draft, { turnId: "t3" });
     expect(t3.draft.copyStatus).toBe("ok");
     expect(t3.draft.form.tiers).toHaveLength(4);
-    expect(speakGoalDraftConfig(t3.draft)).toMatch(/Meta desafio 110%/);
+    expect(speakGoalDraftConfig(t3.draft, { facet: "levels" })).toMatch(/Meta desafio/);
+    expect(speakGoalDraftConfig(t3.draft, { facet: "levels" })).toMatch(/110%/);
   });
 });

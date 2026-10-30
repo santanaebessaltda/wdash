@@ -130,6 +130,7 @@ export function looksLikeBareCopyAccept(text: string): boolean {
 
 /** Pediu para ver o que está no rascunho (não buscar meta publicada do destino). */
 export function looksLikeInspectGoalDraft(text: string): boolean {
+  if (looksLikeAskGroupWeightAdvice(text)) return false;
   const p = norm(text).trim();
   return (
     /como (ficou|esta|saiu|ficaria)/.test(p) ||
@@ -142,15 +143,45 @@ export function looksLikeInspectGoalDraft(text: string): boolean {
   );
 }
 
+/** Avaliar / manter / mudar pesos dos turnos — análise, não re-cópia. */
+export function looksLikeAskGroupWeightAdvice(text: string): boolean {
+  const p = norm(text).trim();
+  if (!/(peso|pesos|divisao|distribui|turno|turnos|grupo|grupos)/.test(p)) return false;
+  return (
+    /(acha|acharia|manter|mantem|mantém|recomenda|avalia|analisa|melhor|adequa|faz sentido|continua|ajusta|muda|vale (a pena)?|concorda)/.test(
+      p,
+    ) || /divisao de peso|pesos? (dos? )?(turno|grupo)/.test(p)
+  );
+}
+
+export type GoalSpeakFacet = "copyJustApplied" | "full" | "levels" | "groups" | "prize";
+
+export function goalInspectFacet(text: string): GoalSpeakFacet {
+  const p = norm(text).trim();
+  if (/niveis?|escada|atingimento/.test(p) && !/grupo|peso|turno/.test(p)) return "levels";
+  if (/comiss|bonus|bônus|premia|gerencia|gerência/.test(p) && !/grupo|peso|turno/.test(p)) {
+    return "prize";
+  }
+  if (/grupos?|turnos?|pesos?|divisao|distribui/.test(p) && !/niveis?|escada/.test(p)) {
+    return "groups";
+  }
+  return "full";
+}
+
 /** Resposta humana a partir do estado operacional (sem LLM). */
-export function speakGoalDraftConfig(draft: GoalDraft): string {
+export function speakGoalDraftConfig(
+  draft: GoalDraft,
+  opts?: { facet?: GoalSpeakFacet },
+): string {
   const form = draft.form;
   const a = draft.assembly ?? emptyGoalAssembly();
+  const facet = opts?.facet ?? "full";
   const dest =
     form.startsOn && form.endsOn
       ? monthYearTitle(form.startsOn)
       : "a meta em elaboração";
   const alvo = form.target != null ? brlCent(form.target) : "valor a definir";
+  const snap = buildGoalConfigSnapshot(form, form.target);
 
   if (draft.copyStatus === "failed") {
     const origin = draft.copiedFrom
@@ -165,28 +196,129 @@ export function speakGoalDraftConfig(draft: GoalDraft): string {
     );
   }
 
+  if (facet === "levels") {
+    return (
+      `Níveis no rascunho de ${dest}:\n\n` +
+      snap.levels
+        .map((l) => {
+          const b = l.bonus > 0 ? ` · bônus ${brlCent(l.bonus)}` : "";
+          return `· ${l.name}: ${l.minAttainmentPct}% de atingimento · ${l.commissionPct}% de comissão${b}`;
+        })
+        .join("\n")
+    );
+  }
+
+  if (facet === "groups") {
+    if (snap.groups.length === 0) {
+      return `Não há grupos no rascunho de ${dest} — a meta está sem rateio por turno.`;
+    }
+    return (
+      `Grupos no rascunho de ${dest} (${alvo}):\n\n` +
+      snap.groups
+        .map((g) =>
+          g.amount != null
+            ? `· ${g.name}: ${g.pct}% → ${brlCent(g.amount)}`
+            : `· ${g.name}: ${g.pct}%`,
+        )
+        .join("\n")
+    );
+  }
+
+  if (facet === "prize") {
+    return (
+      `Premiação no rascunho de ${dest}:\n\n` +
+      snap.levels
+        .map((l) => {
+          const b = l.bonus > 0 ? ` + bônus ${brlCent(l.bonus)}` : "";
+          const m =
+            l.managerPct != null
+              ? ` · gerência ${l.managerPct}%` +
+                (l.managerBonus != null && l.managerBonus > 0
+                  ? ` + ${brlCent(l.managerBonus)}`
+                  : "")
+              : "";
+          return `· ${l.name}: comissão ${l.commissionPct}%${b}${m}`;
+        })
+        .join("\n")
+    );
+  }
+
+  // Cópia acabou de rodar: resumo único e curto (não despejar tudo de novo nos turnos seguintes).
+  if (facet === "copyJustApplied" && draft.copyStatus === "ok") {
+    const origin = draft.copiedFrom
+      ? monthYearTitle(draft.copiedFrom.from)
+      : "a meta de referência";
+    const groupsLine =
+      snap.groups.length > 0
+        ? snap.groups
+            .map((g) =>
+              g.amount != null
+                ? `${g.name} ${g.pct}% (${brlCent(g.amount)})`
+                : `${g.name} ${g.pct}%`,
+            )
+            .join(" · ")
+        : "sem grupos";
+    const levelsLine = snap.levels
+      .map((l) => `${l.name} ${l.minAttainmentPct}%/${l.commissionPct}%`)
+      .join(" · ");
+    return (
+      `Pronto — trouxe a configuração de ${origin} para ${dest} (${alvo}).\n\n` +
+      `Escada: ${levelsLine}.\n` +
+      `Grupos: ${groupsLine}.\n\n` +
+      `Bônus e premiação da gerência vieram junto. A config está no rascunho, ainda sem gravar.\n\n` +
+      `Quer olhar os pesos dos turnos, algum nível, ou seguimos?`
+    );
+  }
+
   if (draft.copyStatus === "ok" || (a.path === "copy" && form.tiers.length > 0)) {
-    const snap = buildGoalConfigSnapshot(form, form.target);
     const origin = draft.copiedFrom
       ? monthYearTitle(draft.copiedFrom.from)
       : "a meta de referência";
     return (
-      `Copiei a configuração de ${origin} para ${dest}, com valor ${alvo}.\n\n` +
-      snap.chatBlocks.join("\n\n") +
-      "\n\nSe estiver certo, diga que pode salvar o rascunho. Se quiser, no próximo passo avaliamos os pesos dos turnos."
+      `No rascunho de ${dest} (${alvo}), a partir de ${origin}:\n\n` +
+      snap.chatBlocks.join("\n\n")
     );
   }
 
   if (a.path === "fresh" || form.tiers.length > 0) {
-    const snap = buildGoalConfigSnapshot(form, form.target);
-    return (
-      `Estado atual do rascunho de ${dest} (${alvo}):\n\n` +
-      snap.chatBlocks.join("\n\n") +
-      (a.confirmedMount ? "" : "\n\nAinda não gravei — diga se pode salvar o rascunho.")
-    );
+    return `No rascunho de ${dest} (${alvo}):\n\n` + snap.chatBlocks.join("\n\n");
   }
 
   return `Ainda não tenho uma configuração no rascunho de ${dest}. Quer copiar a meta anterior ou montar do zero?`;
+}
+
+/** Análise de pesos — nunca reabre a narrativa de cópia. */
+export function speakGoalWeightAdvice(
+  draft: GoalDraft,
+  advice: {
+    chatBlocks: string[];
+    caveat: string | null;
+    same: boolean;
+  } | null,
+): string {
+  const form = draft.form;
+  const current =
+    form.groups.length > 0
+      ? form.groups.map((g) => `${g.name} ${g.pct}%`).join(" / ")
+      : "sem grupos";
+
+  if (form.groups.length < 2) {
+    return `Não há dois grupos no rascunho para avaliar pesos. A configuração permanece como está.`;
+  }
+
+  if (!advice) {
+    return (
+      `Eu não manteria ${current} automaticamente sem olhar o desempenho recente dos turnos.\n\n` +
+      `Não tenho participação por turno confiável agora — mantive os pesos no rascunho sem alterar.\n\n` +
+      `Se quiser, ajustamos na mão (ex.: 40%/60%) ou tentamos de novo quando houver mais vendas ligadas ao turno.`
+    );
+  }
+
+  const head =
+    `Eu não manteria ${current} automaticamente sem verificar o desempenho recente dos turnos.\n\n` +
+    advice.chatBlocks.join("\n\n");
+  const tail = "\n\nA configuração copiada continua inalterada no rascunho.";
+  return head + tail;
 }
 
 function logGoalCopy(event: string, payload: Record<string, unknown>): void {
@@ -1331,12 +1463,23 @@ export type DiscussGoalOpts = {
   turnId?: string;
 };
 
+export type DiscussGoalResult = {
+  reply: string;
+  draft: GoalDraft;
+  voice: GoalDiscussVoice;
+  skipped?: boolean;
+  /** Fala determinística deste turno (cópia / inspeção / pesos) — o Provider usa em vez do LLM. */
+  spokenReply?: string | null;
+  /** true só quando a cópia rodou neste turno (ok ou failed). */
+  copyJustApplied?: boolean;
+};
+
 export async function discussGoal(
   question: string,
   ctx: JarvisContext,
   prev: GoalDraft | null,
   opts?: DiscussGoalOpts,
-): Promise<{ reply: string; draft: GoalDraft; voice: GoalDiscussVoice; skipped?: boolean }> {
+): Promise<DiscussGoalResult> {
   const turnId = opts?.turnId?.trim() || null;
   if (turnId && prev?.lastAppliedTurnId === turnId) {
     const storeName =
@@ -1351,6 +1494,8 @@ export async function discussGoal(
       draft: prev,
       voice: "silent",
       skipped: true,
+      spokenReply: null,
+      copyJustApplied: false,
     };
   }
 
@@ -1808,6 +1953,27 @@ export async function discussGoal(
     }
   }
 
+  // Pediu análise dos pesos — calcula (não aplica) para a fala determinística.
+  let weightAdviceForSpeak: {
+    chatBlocks: string[];
+    caveat: string | null;
+    same: boolean;
+  } | null = null;
+  if (looksLikeAskGroupWeightAdvice(lastUser) && form.groups.length >= 2 && form.storeId) {
+    const weights = await suggestGroupWeightsFromSales(ctx, form.storeId, form.groups);
+    if (weights) {
+      weightAdviceBlocks = weights.chatBlocks;
+      const same =
+        weights.current.length === weights.suggested.length &&
+        weights.current.every((c, i) => c.pct === weights.suggested[i]?.pct);
+      weightAdviceForSpeak = {
+        chatBlocks: weights.chatBlocks,
+        caveat: weights.caveat,
+        same,
+      };
+    }
+  }
+
   // Gestor autoriza aplicar pesos recomendados (não acontece sozinho).
   if (
     form.groups.length >= 2 &&
@@ -1830,6 +1996,11 @@ export async function discussGoal(
       ];
       const snap = buildGoalConfigSnapshot(form, form.target);
       configSnapshotBlocks = snap.chatBlocks;
+      weightAdviceForSpeak = {
+        chatBlocks: weightAdviceBlocks,
+        caveat: null,
+        same: false,
+      };
     }
   }
 
@@ -1909,7 +2080,12 @@ export async function discussGoal(
   }
   if (looksLikeInspectGoalDraft(lastUser)) {
     extras.push(
-      "instrucao_fala: O Gestor perguntou como ficou a config. Responda SO com config_no_rascunho / niveis_detalhe deste estado. PROIBIDO buscar meta publicada de novembro/destino. PROIBIDO falar Finados/Black Friday neste turno.",
+      "instrucao_fala: O Gestor perguntou um detalhe do rascunho. Responda SO ao aspecto pedido (niveis/grupos/premiação). PROIBIDO recomeçar com 'Copiei a configuração…'. PROIBIDO buscar meta do destino.",
+    );
+  }
+  if (looksLikeAskGroupWeightAdvice(lastUser)) {
+    extras.push(
+      "instrucao_fala: O Gestor perguntou sobre PESOS. Analise/recomende com pesos_turno_analise. Nao repita o resumo de copia. Nao altere pesos sozinho.",
     );
   }
   if (patternBlocks.length) {
@@ -1930,10 +2106,25 @@ export async function discussGoal(
     );
   }
   if (configOffer) extras.push(`oferta_copiar_config: ${configOffer}`);
+
+  let spokenReply: string | null = null;
+  const copyJustApplied = Boolean(sourceWin && (copiedLadder || copyStatus === "failed"));
+  if (looksLikeAskGroupWeightAdvice(lastUser)) {
+    spokenReply = speakGoalWeightAdvice(draftOut, weightAdviceForSpeak);
+  } else if (copyJustApplied && (copyStatus === "ok" || copyStatus === "failed")) {
+    spokenReply = speakGoalDraftConfig(draftOut, {
+      facet: copyStatus === "ok" ? "copyJustApplied" : "full",
+    });
+  } else if (looksLikeInspectGoalDraft(lastUser)) {
+    spokenReply = speakGoalDraftConfig(draftOut, { facet: goalInspectFacet(lastUser) });
+  }
+
   return {
     reply: formatGoalFactsForModel(draftOut, storeName, extras),
     draft: draftOut,
     voice: "silent",
+    spokenReply,
+    copyJustApplied,
   };
 }
 
