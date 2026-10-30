@@ -27,8 +27,16 @@ export type LlmSideEffect =
 /** Estado do app que a IA precisa para continuar o fio (sem keyword routing). */
 export type JarvisLlmSession = {
   goalDraftSummary?: string | null;
+  goalDraftMissing?: string | null;
   challengeDraftSummary?: string | null;
   scheduleDraftSummary?: string | null;
+};
+
+/** Hooks para aplicar rascunho no app e devolver texto denso à tool (a IA fala depois). */
+export type JarvisLlmHooks = {
+  onDraftGoal?: (request: string) => Promise<string>;
+  onDraftChallenge?: (request: string) => Promise<string>;
+  onDraftSchedule?: (request: string) => Promise<string>;
 };
 
 function contextNote(ctx: JarvisContext, session?: JarvisLlmSession | null): string {
@@ -40,10 +48,16 @@ function contextNote(ctx: JarvisContext, session?: JarvisLlmSession | null): str
     `Hoje: ${ctx.today}. Filiais no escopo: ${stores}. Tenant: ${ctx.tenantId}.`,
     `Sazonal/feriados a considerar sozinho (meta/desafio): ${compactSeasonalContext(ctx.today, 2)}.`,
     "Interprete a intenção pelo histórico + mensagem atual. Não roteie por palavra isolada.",
-    "Ao montar meta ou desafio, ja leve sazonal/feriado na sugestao de valor — o Gestor nao precisa lembrar de Black Friday, Natal, Dia das Maes etc.",
+    "Você escreve TODA a fala ao Gestor. Tools só trazem dado/estado. Nunca use travessão (—).",
+    "Ao montar meta ou desafio, ja leve sazonal/feriado na sugestao de valor quando couber (1 frase).",
   ];
   if (session?.goalDraftSummary) {
-    lines.push(`Proposta de META em discussao (so texto no chat, sem card): ${session.goalDraftSummary}. Continuacao = draft_goal. Confirmacao (cria a meta/autorizo) grava rascunho em Metas — nao invente que ja gravou.`);
+    lines.push(
+      `Proposta de META em discussao (so texto, sem card): ${session.goalDraftSummary}. Continuacao = draft_goal. Confirmacao curta (cria a meta/autorizo) grava rascunho em Metas. Nao invente que ja gravou.`,
+    );
+    if (session.goalDraftMissing) {
+      lines.push(`Ainda faltando na meta: ${session.goalDraftMissing}. Pergunte isso de forma natural.`);
+    }
   }
   if (session?.challengeDraftSummary) {
     lines.push(`Rascunho de DESAFIO (produto/disputa) aberto: ${session.challengeDraftSummary}.`);
@@ -57,12 +71,13 @@ function contextNote(ctx: JarvisContext, session?: JarvisLlmSession | null): str
   return lines.join("\n");
 }
 
-/** Um turno com loop de tools (máx. 3). Side effects (rascunho) o caller aplica. */
+/** Um turno com loop de tools (máx. 3). Side effects (rascunho) o caller aplica se o hook nao aplicou. */
 export async function jarvisLlmTurn(
   history: LlmChatMessage[],
   ctx: JarvisContext,
   userText: string,
   session?: JarvisLlmSession | null,
+  hooks?: JarvisLlmHooks | null,
 ): Promise<LlmTurnResult> {
   const sb = getSupabase();
   if (!sb) return { ok: false, reason: "supabase_missing" };
@@ -111,6 +126,31 @@ export async function jarvisLlmTurn(
             args = JSON.parse(call.function.arguments || "{}") as Record<string, unknown>;
           } catch {
             args = {};
+          }
+          const question = String(args.question ?? args.request ?? userText);
+          if (name === "draft_goal" && hooks?.onDraftGoal) {
+            const content = await hooks.onDraftGoal(question);
+            return {
+              call,
+              name,
+              ran: { content, sideEffect: { kind: "draft_goal" as const, request: question } },
+            };
+          }
+          if (name === "draft_challenge" && hooks?.onDraftChallenge) {
+            const content = await hooks.onDraftChallenge(question);
+            return {
+              call,
+              name,
+              ran: { content, sideEffect: { kind: "draft_challenge" as const, request: question } },
+            };
+          }
+          if (name === "draft_schedule" && hooks?.onDraftSchedule) {
+            const content = await hooks.onDraftSchedule(question);
+            return {
+              call,
+              name,
+              ran: { content, sideEffect: { kind: "draft_schedule" as const, request: question } },
+            };
           }
           const ran = await runJarvisTool(name, args, ctx, userText);
           return { call, name, ran };

@@ -63,6 +63,12 @@ describe("classifyIntent", () => {
     expect(classifyIntent("pode seguir assim")).toBe("authorize");
   });
 
+  it("pedido de comecar meta nao vira autorizacao", () => {
+    expect(classifyIntent("Precisava criar a meta da minha loja")).toBe("goal");
+    expect(classifyIntent("Quero criar a meta de novembro")).toBe("goal");
+    expect(classifyIntent("Preciso criar a meta")).toBe("goal");
+  });
+
   it("nao grava rascunho quando ainda esta mudando contexto ou valor", () => {
     expect(
       classifyIntent(

@@ -120,16 +120,25 @@ export function looksLikeLeaveChatRequest(raw: string): boolean {
 }
 
 export const STAY_IN_CHAT_REPLY =
-  "Aqui no chat a gente resolve — vendas, meta, desafio, escala. Me pede o que precisa; não te mando pra outra tela.";
+  "Aqui no chat a gente resolve: vendas, meta, desafio, escala. Me pede o que precisa; não te mando pra outra tela.";
 
-/** Confirmacao explicita de gravar — nao confundir com "pode seguir a escala/config". */
+/** Confirmacao explicita de gravar — nao confundir com "pode seguir a escala/config" nem "preciso criar a meta…". */
 export function looksLikeAuthorizeConfirm(raw: string): boolean {
   const p = normalizeIntentText(raw);
+  // Pedido de comecar a montar nao e autorizacao.
   if (
-    /autorizo|pode criar|pode gravar|fechado pode|vamos criar|cria(r)? (essa |a )?meta|ok(,| )?vamos criar|salva(r)? (o )?rascunho/.test(
+    /precis[oa]|queria|quero |gostaria|preciso |bora (montar|criar)|vamos montar|montar (a |uma )?meta|criar (a |uma )?meta (da|de|pra|para|do|neste|desse)/.test(
       p,
-    )
+    ) &&
+    !/autorizo|pode criar|pode gravar|ok(,| )?vamos criar|ok(,| )?pode|salva(r)? (o )?rascunho/.test(p)
   ) {
+    return false;
+  }
+  if (/autorizo|pode criar|pode gravar|fechado pode|ok(,| )?vamos criar|salva(r)? (o )?rascunho/.test(p)) {
+    return true;
+  }
+  // "cria a meta" so confirmacao curta (fim do fio), nao "criar a meta da minha loja".
+  if (/^(ok[, ]*)?(cria(r)?|vamos criar) (essa |a |o )?meta( agora| ja| já)?[!?.]*$/.test(p.trim())) {
     return true;
   }
   // "pode seguir" so se for fechar o rascunho, nao "seguir a mesma escala/config".
@@ -175,9 +184,9 @@ export function jarvisReply(question: string): string {
   const intent = classifyIntent(question);
   switch (intent) {
     case "greeting":
-      return "E aí. Tô no chat — vendas, estoque, meta, desafio, escala. Por onde vamos?";
+      return "E aí. Tô no chat: vendas, estoque, meta, desafio, escala. Por onde vamos?";
     case "capability":
-      return "No chat eu leio a base, monto e ajusto meta, desafio e escala, e passo números. Gravar só depois do seu Autorizar no card — sem te mandar pra outra tela.";
+      return "No chat eu leio a base, monto e ajusto meta, desafio e escala, e passo números. Gravar só depois do seu Autorizar no card, sem te mandar pra outra tela.";
     case "analyze_sales":
       return "Deixa eu olhar as vendas aí…";
     case "analyze_goal":
@@ -187,16 +196,16 @@ export function jarvisReply(question: string): string {
     case "seasonal":
       return "Deixa eu ver o que vem de sazonal e feriado…";
     case "challenge":
-      return "Bora montar o desafio. Me fala filial, período, modo e prêmio — ou manda um com produto parado. Eu mostro o rascunho e só gravo se você autorizar.";
+      return "Bora montar o desafio. Me fala filial, período, modo e prêmio, ou manda um com produto parado. Eu mostro o rascunho e só gravo se você autorizar.";
     case "goal":
-      return "Bora a meta. Fala a filial, o mês e o valor — ou pede uma sugestão pelo histórico. Eu mostro a escada e espero seu Autorizar.";
+      return "Vamos lá!! Qual mês você quer fechar?";
     case "schedule":
-      return "Na escala eu uso o mesmo motor do montador. Me diz a filial e o mês — proponho o rascunho e só gero de verdade com o seu OK.";
+      return "Na escala eu uso o mesmo motor do montador. Me diz a filial e o mês; proponho o rascunho e só gero de verdade com o seu OK.";
     case "stay_in_chat":
       return STAY_IN_CHAT_REPLY;
     case "authorize":
       return "Ainda não tenho rascunho pra gravar. Quando a gente montar algo, eu peço seu OK.";
     default:
-      return "Manda aí — vendas, estoque, desafio, meta ou escala. Se for criar, a gente fecha o detalhe e eu só gravo com autorização.";
+      return "Manda aí: vendas, estoque, desafio, meta ou escala. Se for criar, a gente fecha o detalhe e eu só gravo com autorização.";
   }
 }

@@ -670,8 +670,8 @@ export async function suggestGoalTarget(
         rounded === 0
           ? "no mesmo mês o faturamento ficou estável ano a ano"
           : rounded > 0
-            ? `nesse mês o faturamento cresceu cerca de ${rounded}% vs o ano anterior — usei isso de referência`
-            : `nesse mês o faturamento caiu cerca de ${Math.abs(rounded)}% vs o ano anterior — usei isso de referência`;
+            ? `nesse mês o faturamento cresceu cerca de ${rounded}% vs o ano anterior; usei isso de referência`
+            : `nesse mês o faturamento caiu cerca de ${Math.abs(rounded)}% vs o ano anterior; usei isso de referência`;
     }
 
     const growth = 1 + growthPct;
@@ -695,10 +695,10 @@ export async function suggestGoalTarget(
       chatBlocks.push(
         `Na meta de ${monthYearTitle(priorGoal.from)} vocês tinham ${brlCent(priorGoal.target)}` +
           (deltaPct === 0
-            ? " — fico na mesma faixa."
+            ? ". Fico na mesma faixa."
             : deltaPct > 0
-              ? ` — isso aqui fica uns ${deltaPct}% acima.`
-              : ` — isso aqui fica uns ${Math.abs(deltaPct)}% abaixo.`),
+              ? `. Isso aqui fica uns ${deltaPct}% acima.`
+              : `. Isso aqui fica uns ${Math.abs(deltaPct)}% abaixo.`),
       );
     } else if (bias.events.length > 0 && sazonalPct !== 0) {
       chatBlocks.push(`Sazonal do mês: ${sazonalBit}.`);
@@ -711,59 +711,79 @@ export async function suggestGoalTarget(
   }
 }
 
-export function formatGoalProposal(form: GoalDraftForm, storeName: string, assembly?: GoalAssembly | null): string {
+/** Resumo interno para a IA (não é falado no chat). */
+export function formatGoalFactsForModel(
+  draft: GoalDraft,
+  storeName: string,
+  extras: string[] = [],
+): string {
+  const form = draft.form;
+  const a = draft.assembly ?? emptyGoalAssembly();
   const period =
     form.startsOn && form.endsOn
-      ? `${form.startsOn.slice(8, 10)}/${form.startsOn.slice(5, 7)} a ${form.endsOn.slice(8, 10)}/${form.endsOn.slice(5, 7)}`
+      ? `${form.startsOn} a ${form.endsOn}`
       : "a definir";
-  const mode =
-    form.tierMode === "GENERAL" ? "Geral" : form.tierMode === "GROUP" ? "Grupo" : "Individual";
-  const bits = [
-    form.name || "Nova meta",
-    storeName || "filial?",
-    period,
-    mode,
-    form.target != null ? `alvo ${brlCent(form.target)}` : "alvo a definir",
-    `${form.tiers.length} níveis`,
+  const missing = !goalDraftReady(form) ? missingGoalLabels(validateGoalDraft(form)) : [];
+  const nextHint = nextAssemblyHint(form, a);
+  const lines = [
+    "Estado interno da proposta de META (fale naturalmente; NÃO recite como checklist):",
+    `nome: ${form.name || "Nova meta"}`,
+    `filial: ${storeName || form.storeId || "?"}`,
+    `periodo: ${period}`,
+    `alvo_centavos: ${form.target ?? "null"}`,
+    `alvo_formatado: ${form.target != null ? brlCent(form.target) : "null"}`,
+    `modo: ${form.tierMode}`,
+    `niveis: ${formatTiersBrief(form.tiers)}`,
+    `grupos: ${form.groups.length}`,
+    `rateio_sem_id: ${form.spreadUnidentified ? "sim" : "nao"}`,
+    `faltando: ${missing.length ? missing.join(", ") : "nada"}`,
+    `periodConfirmed: ${a.periodConfirmed}`,
+    `valueDiscussed: ${a.valueDiscussed}`,
+    `path: ${a.path ?? "null"}`,
+    `confirmedGroups: ${a.confirmedGroups}`,
+    `confirmedSpread: ${a.confirmedSpread}`,
+    `confirmedTiers: ${a.confirmedTiers}`,
+    `confirmedMount: ${a.confirmedMount}`,
+    `pode_gravar_rascunho: ${goalCanCommit(draft) ? "sim" : "nao"}`,
+    `pendingConfigCopy: ${draft.pendingConfigCopy ? `${draft.pendingConfigCopy.from}..${draft.pendingConfigCopy.to}` : "null"}`,
   ];
-  if (form.spreadUnidentified) bits.push("rateio sem identificação");
-  if (form.groups.length > 0) bits.push(`${form.groups.length} grupos`);
-  if (!goalDraftReady(form)) {
-    const missing = missingGoalLabels(validateGoalDraft(form));
-    return `Ainda estamos sem ${missing.join(", ")} — manda quando puder.`;
+  if (nextHint) lines.push(`proximo_passo_sugerido: ${nextHint}`);
+  for (const e of extras) {
+    if (e.trim()) lines.push(e.trim());
   }
-  const a = assembly ?? emptyGoalAssembly();
-  if (goalCanCommit({ form, assembly: a })) {
-    return `Pra mim fechou (${bits.join(" · ")}). Se autorizar, eu gravo o rascunho em Metas pra você revisar.`;
-  }
-  return "";
+  return lines.join("\n");
 }
 
-function nextAssemblyQuestion(form: GoalDraftForm, assembly: GoalAssembly): string | null {
-  if (!goalDraftReady(form)) return null;
-  if (assembly.path === null) return null;
+/** @deprecated use formatGoalFactsForModel — mantido para testes/legado. */
+export function formatGoalProposal(form: GoalDraftForm, storeName: string, assembly?: GoalAssembly | null): string {
+  return formatGoalFactsForModel(
+    { form, pendingConfigCopy: null, assembly: assembly ?? emptyGoalAssembly() },
+    storeName,
+  );
+}
+
+function nextAssemblyHint(form: GoalDraftForm, assembly: GoalAssembly): string | null {
+  if (!assembly.periodConfirmed) return "perguntar qual mes fechar (sugira o mes tipado no form.startsOn)";
+  if (!form.storeId) return "perguntar qual filial";
+  if (!assembly.valueDiscussed || form.target == null) {
+    return "perguntar valor que o Gestor tem em mente, ou se quer sugestao pelo historico";
+  }
+  if (!goalDraftReady(form)) {
+    const missing = missingGoalLabels(validateGoalDraft(form));
+    return `pedir: ${missing.join(", ")}`;
+  }
+  if (assembly.path === null) return "oferecer copiar config do mes anterior ou montar do zero";
   if (assembly.path === "fresh") {
-    if (!assembly.confirmedGroups) {
-      return "E a divisão por grupo — você quer ratear a meta entre os grupos, ou deixa a loja inteira?";
-    }
-    if (!assembly.confirmedSpread) {
-      return "Venda sem vendedor identificado: rateia na equipe do dia, ou deixa de fora?";
-    }
-    if (!assembly.confirmedTiers) {
-      return `Escada que estou pensando: ${formatTiersBrief(form.tiers)}. Serve, ou você mexe em algum nível?`;
-    }
+    if (!assembly.confirmedGroups) return "perguntar divisao por grupos vs loja inteira";
+    if (!assembly.confirmedSpread) return "perguntar rateio de venda sem vendedor identificado";
+    if (!assembly.confirmedTiers) return `confirmar escada: ${formatTiersBrief(form.tiers)}`;
   }
-  if (!assembly.confirmedMount) {
-    return (
-      `Se estiver bom pra você (${form.target != null ? brlCent(form.target) : "alvo ainda solto"}), ` +
-      `é só dizer que pode montar o rascunho — aí você revisa em Metas antes de publicar.`
-    );
-  }
+  if (!assembly.confirmedMount) return "pedir confirmacao 'pode montar' antes de gravar rascunho";
   return null;
 }
 
-/** gate = pergunta obrigatória; suggest = números calculados; talk = fala curta; silent = deixa o LLM falar. */
-export type GoalDiscussVoice = "gate" | "suggest" | "talk" | "silent";
+/** silent = a IA fala; reply/facts so alimentam a tool. */
+export type GoalDiscussVoice = "silent";
 
 /** Ultima fala do user — o historico no Autorizar nao pode confirmar o checklist sozinho. */
 export function lastUserUtterance(text: string): string {
@@ -807,54 +827,69 @@ export async function discussGoal(
     assembly = { ...assembly, periodConfirmed: true };
   }
 
-  // Nao inventar mês sozinho — pergunta antes de empurrar número.
-  // Guarda o próximo mês como proposta; “esse” / “ok” confirma sem o Gestor repetir.
+  // Nao inventar mês sozinho — tipa proximo mes; a IA pergunta.
   if (!assembly.periodConfirmed) {
     if (!form.startsOn) {
       const tipStarts = shiftMonthStart(ctx.today, 1);
       form = ensureGoalName({ ...form, startsOn: tipStarts, endsOn: endOfMonth(tipStarts), target: null });
     }
     if (!form.storeId && ctx.stores.length === 1) form = { ...form, storeId: ctx.stores[0]!.id };
-    const tipLabel = monthYearTitle(form.startsOn!);
+    const draftEarly: GoalDraft = {
+      form: { ...form, target: null },
+      pendingConfigCopy: null,
+      assembly: { ...assembly, periodConfirmed: false, valueDiscussed: false },
+    };
+    const storeEarly =
+      ctx.network.find((s) => s.id === draftEarly.form.storeId)?.tradeName ??
+      ctx.stores.find((s) => s.id === draftEarly.form.storeId)?.tradeName ??
+      "";
     return {
-      reply: `Boa. Qual mês você quer fechar? Eu iria de ${tipLabel} — topa, ou tem outro em mente?`,
-      draft: {
-        form: { ...form, target: null },
-        pendingConfigCopy: null,
-        assembly: { ...assembly, periodConfirmed: false, valueDiscussed: false },
-      },
-      voice: "gate",
+      reply: formatGoalFactsForModel(draftEarly, storeEarly, [
+        `mes_sugerido_label: ${monthYearTitle(form.startsOn!)}`,
+      ]),
+      draft: draftEarly,
+      voice: "silent",
     };
   }
 
   form = ensureGoalName(form);
   if (!form.storeId && ctx.stores.length === 1) form = { ...form, storeId: ctx.stores[0]!.id };
   if (!form.storeId && (ctx.network.length > 1 || ctx.stores.length > 1)) {
+    const draftStore: GoalDraft = { form, pendingConfigCopy: null, assembly };
     return {
-      reply: `${monthYearTitle(form.startsOn!)} então. Qual filial a gente usa?`,
-      draft: { form, pendingConfigCopy: null, assembly },
-      voice: "gate",
+      reply: formatGoalFactsForModel(draftStore, ""),
+      draft: draftStore,
+      voice: "silent",
     };
   }
 
-  const isConfirm = /autorizo|cria a meta|pode criar|ok pode|vamos criar|salva(r)? (o )?rascunho|pode montar|monta (o )?rascunho/.test(
-    qn,
-  );
+  const isConfirm =
+    /autorizo|pode criar|ok pode|ok(,| )?vamos criar|salva(r)? (o )?rascunho|pode montar|monta (o )?rascunho/.test(qn) ||
+    /^(ok[, ]*)?(cria(r)?|vamos criar) (essa |a |o )?meta( agora| ja| já)?[!?.]*$/.test(qn);
 
-  // Ainda sem valor: conversa — nao despeja sugestão.
+  // Ainda sem valor: nao despeja sugestão; a IA pergunta.
   if (lockedTarget == null && !asksSuggestion && !assembly.valueDiscussed && form.target == null && !isConfirm) {
     const bias = seasonalBiasForPeriod(form.startsOn!, form.endsOn!);
-    const teaser =
-      bias.events.length > 0
-        ? ` Em ${monthYearTitle(form.startsOn!)} pesa ${bias.events
-            .slice(0, 2)
-            .map((e) => e.name)
-            .join(" e ")}${bias.events.length > 2 ? "…" : ""}.`
-        : "";
+    const draftVal: GoalDraft = {
+      form: { ...form, target: null },
+      pendingConfigCopy: null,
+      assembly,
+    };
+    const storeVal =
+      ctx.network.find((s) => s.id === form.storeId)?.tradeName ??
+      ctx.stores.find((s) => s.id === form.storeId)?.tradeName ??
+      "";
     return {
-      reply: `Fechado, ${monthYearTitle(form.startsOn!)}.${teaser} O que você tá pensando de valor — ou quer que eu chute com o histórico?`,
-      draft: { form: { ...form, target: null }, pendingConfigCopy: null, assembly },
-      voice: "gate",
+      reply: formatGoalFactsForModel(draftVal, storeVal, [
+        bias.events.length
+          ? `sazonal_do_mes: ${bias.events
+              .slice(0, 3)
+              .map((e) => e.name)
+              .join(", ")}`
+          : "",
+      ]),
+      draft: draftVal,
+      voice: "silent",
     };
   }
 
@@ -990,32 +1025,18 @@ export async function discussGoal(
     ctx.stores.find((s) => s.id === form.storeId)?.tradeName ??
     "";
 
-  const parts: string[] = [];
-  let voice: GoalDiscussVoice = "silent";
+  const draftOut: GoalDraft = { form, pendingConfigCopy, assembly };
+  const extras: string[] = [];
   if (suggestionBlocks.length > 0) {
-    parts.push(...suggestionBlocks);
-    voice = "suggest";
+    extras.push(`sugestao_calculada:\n${suggestionBlocks.join("\n")}`);
   }
-  if (copiedLadder) {
-    parts.push(`Pronto — trouxe a escada/bônus/grupos de ${monthYearTitle(sourceWin!.from)}.`);
-    if (voice === "silent") voice = "talk";
+  if (copiedLadder && sourceWin) {
+    extras.push(`config_copiada_de: ${monthYearTitle(sourceWin.from)}`);
   }
-  if (configOffer) {
-    parts.push(configOffer);
-    if (voice === "silent") voice = "talk";
-  } else if (assembly.valueDiscussed) {
-    const nextQ = nextAssemblyQuestion(form, assembly);
-    if (nextQ) {
-      parts.push(nextQ);
-      if (voice === "silent") voice = "talk";
-    } else {
-      const summary = formatGoalProposal(form, storeName, assembly);
-      if (summary) {
-        parts.push(summary);
-        if (voice === "silent") voice = "talk";
-      }
-    }
-  }
-  const reply = parts.filter(Boolean).join("\n\n");
-  return { reply, draft: { form, pendingConfigCopy, assembly }, voice };
+  if (configOffer) extras.push(`oferta_copiar_config: ${configOffer}`);
+  return {
+    reply: formatGoalFactsForModel(draftOut, storeName, extras),
+    draft: draftOut,
+    voice: "silent",
+  };
 }

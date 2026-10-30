@@ -42,7 +42,8 @@ export async function runJarvisTool(
       };
     case "draft_goal":
       return {
-        content: "Proposta de meta em texto no chat (sem card). So grava rascunho em Metas se o Gestor confirmar cria/autorizo.",
+        content:
+          "Proposta de meta atualizada no app (so texto, sem card). Use o estado interno se o hook nao tiver devolvido fatos. So grava rascunho se o Gestor confirmar cria/autorizo. Fale naturalmente o proximo passo.",
         sideEffect: { kind: "draft_goal", request: question },
       };
     case "draft_schedule":

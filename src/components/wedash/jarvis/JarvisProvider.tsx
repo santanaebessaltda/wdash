@@ -25,8 +25,8 @@ import { splitJarvisReply, sleepMs, typingDelayMs } from "./chatBlocks";
 import { commitGoal } from "./goalCommit";
 import {
   discussGoal,
+  formatGoalFactsForModel,
   goalCanCommit,
-  goalDraftReady,
   missingGoalLabels,
   validateGoalDraft,
   type GoalDraft,
@@ -35,6 +35,7 @@ import {
   blobToBase64,
   jarvisLlmTurn,
   jarvisTranscribe,
+  type JarvisLlmHooks,
   type JarvisLlmSession,
   type LlmChatMessage,
 } from "./llmClient";
@@ -464,25 +465,15 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
     setChallengeDraft(null);
     challengeDraftRef.current = null;
     setCreatedItem({ kind: "challenge", id: res.id, name: res.name });
-    speakAnswer(`Fechado — desafio “${res.name}” criado. Tem o link aí embaixo.`);
+    speakAnswer(`Fechado. Desafio “${res.name}” criado. Tem o link aí embaixo.`);
   }, [commitBusy, session, speakAnswer]);
 
   const authorizeGoal = useCallback(async () => {
     if (!session || !goalDraftRef.current || commitBusy) return;
     const draft = goalDraftRef.current;
     if (!goalCanCommit(draft)) {
-      if (!goalDraftReady(draft.form)) {
-        speakAnswer(`Ainda falta ${missingGoalLabels(validateGoalDraft(draft.form)).join(", ")}.`);
-        return;
-      }
-      // Neutro: so reemite a proxima pergunta do checklist, sem confirmar passo.
-      const { reply, draft: next } = await discussGoal(
-        "seguir montagem da meta",
-        jarvisContextFromSession(session, readTopbarStoreIds()),
-        draft,
-      );
-      goalDraftRef.current = next;
-      speakAnswer(reply);
+      // Sem falas fixas: o Gestor completa no chat e o Gemini pergunta.
+      speakAnswer("Ainda não fechou pra gravar. Me completa no chat o que falta.");
       return;
     }
     setCommitBusy(true);
@@ -502,7 +493,7 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
         ? ` (${draft.form.startsOn.slice(8, 10)}/${draft.form.startsOn.slice(5, 7)} a ${draft.form.endsOn.slice(8, 10)}/${draft.form.endsOn.slice(5, 7)})`
         : "";
     speakAnswer(
-      `Pronto — salvei como rascunho “${res.name}”${periodLabel}, igual o botão Salvar rascunho em Metas. Abre o link, revisa/edita e publica quando quiser.`,
+      `Pronto. Salvei como rascunho “${res.name}”${periodLabel}, igual o botão Salvar rascunho em Metas. Abre o link, revisa/edita e publica quando quiser.`,
     );
   }, [commitBusy, session, speakAnswer]);
 
@@ -544,7 +535,7 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
         ? ` Mantive ${res.keptManualDays} dia${res.keptManualDays === 1 ? "" : "s"} que você tinha ajustado na mão.`
         : "";
     speakAnswer(
-      `Pronto — escala de ${label} gerada pra ${res.people} pessoa${res.people === 1 ? "" : "s"}.${keepNote}`,
+      `Pronto. Escala de ${label} gerada pra ${res.people} pessoa${res.people === 1 ? "" : "s"}.${keepNote}`,
     );
   }, [commitBusy, session, speakAnswer]);
 
@@ -662,7 +653,7 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
           void authorizeSchedule();
           return;
         }
-        // Meta: SEMPRE remonta pelo historico recente antes de gravar (evita rascunho velho de outro mes).
+        // Meta: remonta pelo historico; se pronto grava, senao o Gemini pergunta o que falta.
         if (goalDraftRef.current || /\bmeta\b/.test(n) || /vamos criar|cria(r)? |monta(r)? /.test(n)) {
           void (async () => {
             if (gen !== replyGen.current) return;
@@ -670,7 +661,7 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
               .slice(-16)
               .map((m) => `${m.from}: ${m.text}`)
               .join("\n");
-            const { draft, reply } = await discussGoal(historyBlob || q, ctx, goalDraftRef.current);
+            const { draft } = await discussGoal(historyBlob || q, ctx, goalDraftRef.current);
             if (gen !== replyGen.current) return;
             goalDraftRef.current = draft;
             setGoalDraft(null);
@@ -679,15 +670,33 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
             setScheduleDraft(null);
             scheduleDraftRef.current = null;
             setCreatedItem(null);
-            if (!goalCanCommit(draft)) {
-              finish(
-                !goalDraftReady(draft.form)
-                  ? `Quase — ainda falta ${missingGoalLabels(validateGoalDraft(draft.form)).join(", ")} pra eu gravar em Metas.`
-                  : reply,
-              );
+            if (goalCanCommit(draft)) {
+              await authorizeGoal();
               return;
             }
-            await authorizeGoal();
+            const history: LlmChatMessage[] = messagesRef.current
+              .slice(-12)
+              .map((m) => ({
+                role: m.from === "user" ? "user" : "assistant",
+                content: m.text,
+              }));
+            const g = draft.form;
+            const missing = missingGoalLabels(validateGoalDraft(g));
+            const llm = await jarvisLlmTurn(
+              history,
+              ctx,
+              q,
+              {
+                goalDraftSummary: `${g.name || "sem nome"} · alvo ${g.target ?? "?"} · ${g.startsOn ?? "?"} a ${g.endsOn ?? "?"}`,
+                goalDraftMissing: missing.length ? missing.join(", ") : null,
+              },
+            );
+            if (gen !== replyGen.current) return;
+            finish(
+              llm.ok && llm.content.trim()
+                ? llm.content
+                : "Me fala mais um detalhe pra gente fechar.",
+            );
           })();
           return;
         }
@@ -717,26 +726,69 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
         }));
 
       const llmSession = (): JarvisLlmSession => {
-        const g = goalDraftRef.current?.form;
+        const draft = goalDraftRef.current;
+        const g = draft?.form;
         const c = challengeDraftRef.current?.form;
         const s = scheduleDraftRef.current?.form;
+        const missing = g ? missingGoalLabels(validateGoalDraft(g)) : [];
         return {
           goalDraftSummary: g
             ? `${g.name || "sem nome"} · alvo ${g.target ?? "?"} · ${g.startsOn ?? "?"} a ${g.endsOn ?? "?"} · ${g.tiers.length} níveis · modo ${g.tierMode}`
             : null,
+          goalDraftMissing: missing.length ? missing.join(", ") : null,
           challengeDraftSummary: c ? `${c.name || "sem nome"} · modo ${c.mode} · métrica ${c.metric}` : null,
           scheduleDraftSummary: s ? `${s.monthStart || "?"} · loja ${s.storeId || "?"}` : null,
         };
       };
 
+      const llmHooks = (): JarvisLlmHooks => ({
+        onDraftGoal: async (request) => {
+          setChallengeDraft(null);
+          challengeDraftRef.current = null;
+          setScheduleDraft(null);
+          scheduleDraftRef.current = null;
+          const { draft, reply } = await discussGoal(request || q, ctx, goalDraftRef.current);
+          goalDraftRef.current = draft;
+          setGoalDraft(null);
+          setCreatedItem(null);
+          const storeName =
+            ctx.network.find((s) => s.id === draft.form.storeId)?.tradeName ??
+            ctx.stores.find((s) => s.id === draft.form.storeId)?.tradeName ??
+            "";
+          return reply || formatGoalFactsForModel(draft, storeName);
+        },
+        onDraftChallenge: async (request) => {
+          setGoalDraft(null);
+          goalDraftRef.current = null;
+          setScheduleDraft(null);
+          scheduleDraftRef.current = null;
+          const { draft } = await discussChallenge(request || q, ctx, challengeDraftRef.current);
+          setChallengeDraft(draft);
+          challengeDraftRef.current = draft;
+          setCreatedItem(null);
+          return "Rascunho de desafio atualizado no app (card Autorizar). Fale naturalmente; gravar so com Autorizar.";
+        },
+        onDraftSchedule: async (request) => {
+          setChallengeDraft(null);
+          challengeDraftRef.current = null;
+          setGoalDraft(null);
+          goalDraftRef.current = null;
+          const { draft } = await discussSchedule(request || q, ctx, scheduleDraftRef.current);
+          setScheduleDraft(draft);
+          scheduleDraftRef.current = draft;
+          setCreatedItem(null);
+          return "Rascunho de escala atualizado no app (card Autorizar). Fale naturalmente; gravar so com Autorizar.";
+        },
+      });
+
       void (async () => {
-        // LLM-first: a IA escolhe tools e liga ao contexto; keywords só no fallback local.
-        const llm = await jarvisLlmTurn(history, ctx, q, llmSession());
+        // LLM-first (Gemini): a IA escolhe tools e SEMPRE redige a fala.
+        const llm = await jarvisLlmTurn(history, ctx, q, llmSession(), llmHooks());
         if (gen !== replyGen.current) return;
 
         if (!llm.ok) {
-          if (llm.reason === "openai_not_configured") {
-            setMicHint("IA ainda sem chave no servidor — usando modo local.");
+          if (llm.reason === "gemini_not_configured" || llm.reason === "openai_not_configured") {
+            setMicHint("IA ainda sem chave no servidor. Usando modo local.");
           }
           applyPeriodHint();
           await replyLocal(q, ctx, finish);
@@ -745,55 +797,8 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
 
         applyPeriodHint();
 
-        let goalTextReply: string | null = null;
-        for (const effect of llm.sideEffects) {
-          if (effect.kind === "draft_challenge") {
-            setGoalDraft(null);
-            goalDraftRef.current = null;
-            setScheduleDraft(null);
-            scheduleDraftRef.current = null;
-            const { draft } = await discussChallenge(effect.request || q, ctx, challengeDraftRef.current);
-            if (gen !== replyGen.current) return;
-            setChallengeDraft(draft);
-            challengeDraftRef.current = draft;
-            setCreatedItem(null);
-          } else if (effect.kind === "draft_goal") {
-            setChallengeDraft(null);
-            challengeDraftRef.current = null;
-            setScheduleDraft(null);
-            scheduleDraftRef.current = null;
-            const { draft, reply, voice } = await discussGoal(effect.request || q, ctx, goalDraftRef.current);
-            if (gen !== replyGen.current) return;
-            // So texto no chat — sem card; memoria so no ref pra continuar o fio.
-            goalDraftRef.current = draft;
-            setGoalDraft(null);
-            setCreatedItem(null);
-            // gate/suggest: roteiro com números/perguntas; senao deixa o LLM conversar.
-            if (voice === "gate" || voice === "suggest" || (voice === "talk" && reply && !llm.content.trim())) {
-              goalTextReply = reply;
-            } else if (voice === "talk" && reply && llm.content.trim()) {
-              // LLM fala; se o roteiro tem um nudge (ex.: copiar config), anexa em bolha separada.
-              goalTextReply = `${llm.content.trim()}\n\n${reply}`;
-            } else {
-              goalTextReply = null; // usa llm.content
-            }
-          } else if (effect.kind === "draft_schedule") {
-            setChallengeDraft(null);
-            challengeDraftRef.current = null;
-            setGoalDraft(null);
-            goalDraftRef.current = null;
-            const { draft } = await discussSchedule(effect.request || q, ctx, scheduleDraftRef.current);
-            if (gen !== replyGen.current) return;
-            setScheduleDraft(draft);
-            scheduleDraftRef.current = draft;
-            setCreatedItem(null);
-          }
-        }
-
-        applyPeriodHint();
-
-        // Preferir o texto da discussao de meta (sazonal/sugestao) ao content generico da tool.
-        finish(goalTextReply ?? llm.content);
+        // Hooks ja aplicaram rascunhos; sideEffects so marcam que rodou draft_*.
+        finish(llm.content.trim() || "Me fala mais um detalhe?");
       })();
     },
     [
