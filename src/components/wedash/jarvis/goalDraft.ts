@@ -577,8 +577,12 @@ export function mergeGoalUtterance(form: GoalDraftForm, text: string, ctx: Jarvi
   const target = parseGoalTarget(text);
   if (target != null) next.target = target;
 
-  // “nível desafio / 10% a mais” = último degrau da escada em 110% (não é CRUD Desafio).
-  if (looksLikeGoalLadderTalk(text) && /10\s*%|por cento a mais|nivel desafio|meta desafio|ultimo nivel/.test(p)) {
+  // “nível desafio / 10% a mais” = último degrau em 110%. “último nível com R$ X” = alvo, não %.
+  if (
+    looksLikeGoalLadderTalk(text) &&
+    /10\s*%|por cento a mais|\d+\s*%\s*(a mais)?|nivel desafio|meta desafio/.test(p) &&
+    !/ultimo nivel.{0,48}(r\$|\d)/.test(p)
+  ) {
     next.tiers = applyChallengeTierPct(next.tiers, 110);
   }
 
@@ -813,6 +817,16 @@ export function looksLikeLostGoalReply(text: string, draft: GoalDraft): boolean 
   return false;
 }
 
+/** Prometeu montar e parou (“vou montar”, “um momento”) sem avançar o passo. */
+export function looksLikeStallingGoalReply(text: string): boolean {
+  const n = norm(text);
+  return (
+    /vou (montar|preparar|ajustar|criar|fazer)|um momento|so um segundo|só um segundo|aguarde|ja volto|já volto|deixa eu (montar|preparar|ajustar)/.test(
+      n,
+    ) && !/pode (montar|salvar|gravar)|posso (montar|salvar|gravar)|rascunho (pronto|salvo)|ficou r\$/.test(n)
+  );
+}
+
 /** Resumo interno para a IA (nunca mostrar no chat). */
 export function formatGoalFactsForModel(
   draft: GoalDraft,
@@ -942,6 +956,18 @@ export async function discussGoal(
     !assembly.periodConfirmed &&
     form.startsOn &&
     /^(esse|essa|isso|proximo|próximo|pode ser|fechado|ok|sim)(\b|,|$)/.test(qn)
+  ) {
+    assembly = { ...assembly, periodConfirmed: true };
+  }
+  // Continuação do fio (copiar escada / valor / R$ no nível) com mês já no form (histórico).
+  if (
+    !assembly.periodConfirmed &&
+    form.startsOn &&
+    (looksLikeAcceptConfigCopy(lastUser) ||
+      parseConfigSourceMonth(lastUser, ctx.today, form.startsOn) != null ||
+      lockedTarget != null ||
+      looksLikeGoalLadderTalk(lastUser) ||
+      looksLikeAskValueSuggestion(lastUser))
   ) {
     assembly = { ...assembly, periodConfirmed: true };
   }

@@ -13,6 +13,7 @@ import {
   looksLikeGoalConversation,
   looksLikeLeakedGoalFacts,
   looksLikeLostGoalReply,
+  looksLikeStallingGoalReply,
   naturalGoalAskFromDraft,
   mergeGoalUtterance,
   parseConfigSourceMonth,
@@ -346,5 +347,28 @@ describe("leaked goal facts", () => {
     expect(draft.assembly?.path).toBe("copy");
     expect(draft.pendingConfigCopy).toBeNull();
     expect(goalAssemblyPendingSteps(draft).some((p) => /copiar|zero/i.test(p))).toBe(false);
+  });
+
+  it("discussGoal copia outubro + ultimo nivel R$ sem rascunho previo", async () => {
+    const blob = [
+      "user: Preciso da meta de novembro",
+      "jarvis: Qual valor?",
+      "user: Acho que a gente pode copiar a mesma configuração de Outubro, e deixar o ultimo nivel com R$ 260.000,00",
+    ].join("\n");
+    const { draft } = await discussGoal(blob, ctx, null);
+    expect(draft.form.startsOn).toBe("2026-11-01");
+    expect(draft.form.target).toBe(260_000);
+    expect(draft.assembly?.path).toBe("copy");
+    expect(draft.assembly?.periodConfirmed).toBe(true);
+    expect(goalAssemblyPendingSteps(draft)[0]).toMatch(/rascunho/i);
+  });
+
+  it("detecta resposta que promete e nao avanca", () => {
+    expect(
+      looksLikeStallingGoalReply(
+        "Beleza! Vamos copiar a configuração de outubro. Vou montar isso. Um momento.",
+      ),
+    ).toBe(true);
+    expect(looksLikeStallingGoalReply("Ficou R$ 260.000,00. Posso salvar o rascunho?")).toBe(false);
   });
 });

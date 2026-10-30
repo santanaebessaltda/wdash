@@ -27,8 +27,12 @@ import {
   formatGoalFactsForModel,
   goalAssemblyPendingSteps,
   goalCanCommit,
+  looksLikeGoalConversation,
   looksLikeLeakedGoalFacts,
+  looksLikeLostGoalReply,
+  looksLikeStallingGoalReply,
   missingGoalLabels,
+  naturalGoalAskFromDraft,
   validateGoalDraft,
   type GoalDraft,
 } from "./goalDraft";
@@ -730,12 +734,18 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
         if (gen !== replyGen.current) return;
         memoryTextRef.current = formatMemoryForModel(facts);
 
-        // Fio de meta aberto: aplica a fala no rascunho ANTES do modelo
-        // ("sim" / copiar avança mesmo se a IA esquecer draft_goal).
-        if (goalDraftRef.current) {
-          const beforePath = goalDraftRef.current.assembly?.path ?? null;
-          const beforePending = goalAssemblyPendingSteps(goalDraftRef.current).join("|");
-          const { draft } = await discussGoal(q, ctx, goalDraftRef.current);
+        // Fio de meta (rascunho aberto OU conversa de meta): aplica a fala ANTES do modelo.
+        // Cobre "sim", "copiar outubro", "último nível R$ X" mesmo se a IA esquecer draft_goal.
+        const recentMsgs = [...messagesRef.current, { from: "user" as const, text: q }].slice(-16);
+        const onGoalThread =
+          goalDraftRef.current != null ||
+          looksLikeGoalConversation(recentMsgs, q, ctx.today);
+        if (onGoalThread) {
+          const before = goalDraftRef.current;
+          const beforePath = before?.assembly?.path ?? null;
+          const beforePending = before ? goalAssemblyPendingSteps(before).join("|") : "";
+          const historyBlob = recentMsgs.map((m) => `${m.from}: ${m.text}`).join("\n");
+          const { draft } = await discussGoal(historyBlob, ctx, before);
           if (gen !== replyGen.current) return;
           goalDraftRef.current = draft;
           const afterPending = goalAssemblyPendingSteps(draft).join("|");
@@ -764,7 +774,15 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
           return;
         }
 
-        finish(llm.content.trim());
+        let answer = llm.content.trim();
+        const draftNow = goalDraftRef.current;
+        if (
+          draftNow &&
+          (looksLikeStallingGoalReply(answer) || looksLikeLostGoalReply(answer, draftNow))
+        ) {
+          answer = naturalGoalAskFromDraft(draftNow);
+        }
+        finish(answer);
       })();
     },
     [
