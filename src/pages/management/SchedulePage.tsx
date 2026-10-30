@@ -39,12 +39,6 @@ const SCHEDULE_LEGEND: LegendItem[] = [
   { key: "holiday", color: "bg-warn", label: "FE · Feriado trabalhado" },
   { key: "comp", color: "bg-info", label: "FC · Folga compensatória" },
 ];
-const PATTERN_LABEL: Record<SchedulePattern, string> = {
-  "6x1": "6×1",
-  "5x2": "5×2",
-  "4x3": "4×3",
-  "12x36": "12×36",
-};
 const SHORT_WEEK = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 
 function monthLabel(iso: string): string {
@@ -824,7 +818,7 @@ export function SchedulePage() {
                     <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
                       <div className="min-w-0">
                         <h3 className="text-[17px] font-extrabold leading-tight tracking-tight text-t0">
-                          {storeLabel} · escala {PATTERN_LABEL[item.schedule.pattern]}
+                          {storeLabel} · ESCALA {item.schedule.pattern.toLocaleUpperCase("pt-BR")}
                         </h3>
                         <div className="mt-1 flex min-w-0 flex-wrap items-center gap-2">
                           <Badge variant="neutral">{monthLabel(item.monthStart).toLocaleUpperCase("pt-BR")}</Badge>
@@ -1163,7 +1157,7 @@ function ScheduleBoard({
           ? branchRoleLabel(person.role).toLocaleUpperCase("pt-BR")
           : "";
       const shift = person?.shiftId ? shiftById.get(person.shiftId) ?? null : null;
-      const groupLabel = shift ? shift.name.toLocaleUpperCase("pt-BR") : "";
+      const groupLabel = shift ? shift.name.toLocaleLowerCase("pt-BR") : "";
       const hoursTitle = shift ? `${shift.name} · ${shift.start}–${shift.end}` : undefined;
       return {
         id,
