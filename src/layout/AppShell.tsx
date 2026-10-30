@@ -1,4 +1,4 @@
-import { Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { padBottom } from "@/lib/safeArea";
 import { Outlet, useLocation } from "react-router-dom";
 import { Sidebar } from "./Sidebar";
@@ -14,9 +14,19 @@ import { ProfilePhotosProvider } from "@/components/wedash/PersonAvatar";
 import { PushRecover } from "@/push/PushRecover";
 import { isNotificationOpen, reloadSalesAfterOpen } from "@/push/resumeSales";
 import { JarvisFloat } from "@/components/wedash/jarvis/JarvisFloat";
-import { JarvisProvider } from "@/components/wedash/jarvis/JarvisProvider";
+import { JarvisProvider, useJarvis } from "@/components/wedash/jarvis/JarvisProvider";
 /** O banco so grava 1x a cada 5 min; aqui so evita chamadas a toa. */
 const LAST_SEEN_INTERVAL_MS = 5 * 60_000;
+
+/** Com o FAB do Chat IA, o miolo precisa de mais base — senão o rodapé da página fica sob o balão. */
+function ShellPagePad({ children }: { children: ReactNode }) {
+  const { allowed } = useJarvis();
+  return (
+    <div className="pad-base vela-page-enter min-w-0 print:pb-0" style={padBottom(allowed ? "5.5rem" : "32px")}>
+      {children}
+    </div>
+  );
+}
 
 export function AppShell() {
   const [collapsed, setCollapsed] = useState(false);
@@ -120,9 +130,9 @@ export function AppShell() {
             <ProfilePhotosProvider>
               <ChunkErrorBoundary key={location.pathname}>
                 <Suspense fallback={<PageLoader />}>
-                  <div className="pad-base vela-page-enter min-w-0 print:pb-0" style={padBottom("32px")}>
+                  <ShellPagePad>
                     <Outlet />
-                  </div>
+                  </ShellPagePad>
                 </Suspense>
               </ChunkErrorBoundary>
             </ProfilePhotosProvider>
