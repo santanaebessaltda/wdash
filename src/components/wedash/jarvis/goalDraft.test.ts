@@ -274,8 +274,8 @@ describe("leaked goal facts", () => {
     expect(draft.assembly?.periodConfirmed).toBe(true);
     expect(draft.form.startsOn).toBe("2026-11-01");
     const ask = naturalGoalAskFromDraft(draft).toLowerCase();
-    expect(ask).toMatch(/valor/);
-    expect(ask).not.toMatch(/m[eê]s/);
+    expect(ask).toMatch(/proposta|historico|sazonal/);
+    expect(ask).not.toMatch(/m[eê]s\?|qual m[eê]s/);
   });
 
   it("checklist depois do valor ainda pede config (nao so R$)", () => {

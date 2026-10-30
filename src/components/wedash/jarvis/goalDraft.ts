@@ -744,24 +744,34 @@ export async function suggestGoalTarget(
         : `ajuste sazonal ${sazonalPct > 0 ? "+" : ""}${sazonalPct}%`;
     const rationale = `${baseBits.join(" + ")}; ${growthLabel}; ${sazonalBit}`;
 
+    const conservative = Math.round((amount * 0.92) / 100) * 100;
+    const stretch = Math.round((amount * 1.08) / 100) * 100;
     const chatBlocks: string[] = [
-      `Eu iria de ${brlCent(amount)}.`,
+      `Minha proposta pra ${monthYearTitle(targetFrom)}: ${brlCent(amount)}.`,
       `${baseBits.join("; ")}. ${growthLabel.charAt(0).toUpperCase()}${growthLabel.slice(1)}.`,
     ];
     if (priorGoal && priorGoal.target > 0) {
       const deltaPct = Math.round(((amount - priorGoal.target) / priorGoal.target) * 100);
       chatBlocks.push(
-        `Na meta de ${monthYearTitle(priorGoal.from)} vocês tinham ${brlCent(priorGoal.target)}` +
+        `Ponto cego: a meta de ${monthYearTitle(priorGoal.from)} era ${brlCent(priorGoal.target)}` +
           (deltaPct === 0
-            ? ". Fico na mesma faixa."
+            ? " — fico na mesma faixa."
             : deltaPct > 0
-              ? `. Isso aqui fica uns ${deltaPct}% acima.`
-              : `. Isso aqui fica uns ${Math.abs(deltaPct)}% abaixo.`),
+              ? ` — esta proposta fica ~${deltaPct}% acima.`
+              : ` — esta proposta fica ~${Math.abs(deltaPct)}% abaixo.`),
       );
-    } else if (bias.events.length > 0 && sazonalPct !== 0) {
-      chatBlocks.push(`Sazonal do mês: ${sazonalBit}.`);
     }
-    chatBlocks.push("Faz sentido pra você, ou prefere outro número?");
+    if (bias.events.length > 0) {
+      const names = bias.events.slice(0, 3).map((e) => e.name).join(", ");
+      chatBlocks.push(
+        sazonalPct !== 0
+          ? `Já embuti ${sazonalBit} (${names}).`
+          : `No calendário: ${names} — sem peso forte no fator, mas vale lembrar na operação.`,
+      );
+    }
+    chatBlocks.push(
+      `Faixa se quiser calibrar: conservador ~${brlCent(conservative)} · ousado ~${brlCent(stretch)}. Topa a proposta, ou ajustamos?`,
+    );
 
     return { amount, rationale, seasonalSummary: bias.summary, chatBlocks };
   } catch {
@@ -802,7 +812,7 @@ export function naturalGoalAskFromDraft(draft: GoalDraft): string {
   }
   if (!a.valueDiscussed || form.target == null) {
     const month = form.startsOn ? monthYearTitle(form.startsOn) : "esse mês";
-    return `${month} então.\n\nQual valor de meta você quer? Ou prefere que eu sugira com o histórico?`;
+    return `${month} na mesa.\n\nDeixa eu cruzar histórico e sazonal e já te trago uma proposta — sem você precisar chutar número.`;
   }
   if (a.path === null) {
     return `Ficou ${brlCent(form.target!)}.\n\nCopia a escada da meta anterior dessa filial, ou monta do zero?`;
@@ -948,7 +958,9 @@ export function goalAssemblyPendingSteps(draft: GoalDraft): string[] {
   const pending: string[] = [];
   if (!a.periodConfirmed) pending.push("mês/período da meta");
   if (!form.storeId) pending.push("filial");
-  if (!a.valueDiscussed || form.target == null) pending.push("valor-alvo (R$)");
+  if (!a.valueDiscussed || form.target == null) {
+    pending.push("proposta de valor-alvo (R$) — JARVIS calcula e propõe, não pergunta o número");
+  }
   if (a.periodConfirmed && form.storeId && a.valueDiscussed && form.target != null) {
     if (a.path === null) pending.push("copiar escada/config da meta anterior ou montar do zero");
     if (draft.copyStatus === "failed") {
@@ -1079,8 +1091,30 @@ export async function discussGoal(
     /autorizo|pode criar|ok pode|ok(,| )?vamos criar|salva(r)? (o )?rascunho|pode montar|monta (o )?rascunho/.test(qn) ||
     /^(ok[, ]*)?(cria(r)?|vamos criar) (essa |a |o )?meta( agora| ja| já)?[!?.]*$/.test(qn);
 
-  // Ainda sem valor: nao despeja sugestão; a IA pergunta.
+  // Sem valor ainda: o sócio PROPÕE (não pergunta “qual valor?”).
   if (lockedTarget == null && !asksSuggestion && !assembly.valueDiscussed && form.target == null && !isConfirm) {
+    const periodEarly =
+      form.startsOn && form.endsOn ? { from: form.startsOn, to: form.endsOn } : null;
+    const suggestedEarly =
+      form.storeId ? await suggestGoalTarget(ctx, form.storeId, periodEarly) : null;
+    if (suggestedEarly) {
+      form = { ...form, target: suggestedEarly.amount };
+      assembly = { ...assembly, valueDiscussed: true };
+      const storeEarly =
+        ctx.network.find((s) => s.id === form.storeId)?.tradeName ??
+        ctx.stores.find((s) => s.id === form.storeId)?.tradeName ??
+        "";
+      const draftProp: GoalDraft = { form, pendingConfigCopy: null, assembly };
+      return {
+        reply: formatGoalFactsForModel(draftProp, storeEarly, [
+          `proposta_meta:\n${suggestedEarly.chatBlocks.join("\n")}`,
+          `racional: ${suggestedEarly.rationale}`,
+          "instrucao_fala: LIDERÉ com a proposta (1 valor + 1 insight). Nao pergunte qual valor o Gestor quer. Nao liste todos os meses.",
+        ]),
+        draft: draftProp,
+        voice: "silent",
+      };
+    }
     const bias = seasonalBiasForPeriod(form.startsOn!, form.endsOn!);
     const draftVal: GoalDraft = {
       form: { ...form, target: null },
@@ -1099,6 +1133,7 @@ export async function discussGoal(
               .map((e) => e.name)
               .join(", ")}`
           : "",
+        "instrucao_fala: Sem base pra calcular ainda. Peca so o dado que falta (filial/periodo), nunca 'qual valor voce quer'.",
       ]),
       draft: draftVal,
       voice: "silent",

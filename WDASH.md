@@ -261,7 +261,7 @@ Leitura **não** pede confirmação. Escrita **sempre** pede.
 
 **Fatia 8–9 (2026-10-29):** sem voz contínua; chat-first; **sem redirecionar páginas** — tools/prompt só no chat.
 
-**Meta = Salvar rascunho (2026-10-30; checklist no chat — 2026-10-30):** R$ é só uma peça. O fio de meta exige `draft_goal` a cada turno e avança `checklist_pendente` (mês, filial, valor, copiar/zero, grupos, rateio, escada/nível desafio %, ok para rascunho) — um passo por vez; proibido “vou preparar” sem tool. Gravar → `commit_draft` (target=goal) = **Salvar rascunho**. Descartar → `discard_draft`. Valor falado no chat prevalece. `discussGoal` = estado; o modelo redige. Bolhas curtas. Sem travessão (“—”).
+**Meta = Salvar rascunho (2026-10-30; checklist no chat — 2026-10-30; sócio propõe — 2026-10-30):** R$ é só uma peça. Com mês+filial, `discussGoal` **calcula e propõe** o alvo (`suggestGoalTarget` → `proposta_meta`); proibido abrir com “qual valor você quer?”. Fala = 1 proposta + 1 insight (ponto cego) + faixa; sem espelhar o dash mês a mês. Checklist: mês, filial, valor, copiar/zero, grupos, rateio, escada, ok rascunho. Gravar → `commit_draft`. Valor falado pelo Gestor prevalece. Sem travessão (“—”).
 
 ### Alertas (DECIDIDO — 2026-09-29)
 - **Todo alerta do app usa `Alert`** (`src/components/ui/Alert.tsx`, padrão Components > Alerts do Vela — "Storage almost full" etc.): fundo suave da cor, sem borda, ícone 18px e título em negrito na cor, texto em `text-t1`. Variantes `success · warning · danger · info · accent`; `icon` troca o ícone (Spinner, RadialProgress), `action` = links/botões à direita (`AlertLink` para link de texto), `footer` = conteúdo extra (lista expandida, checkbox).
