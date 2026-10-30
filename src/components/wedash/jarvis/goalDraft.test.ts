@@ -12,6 +12,7 @@ import {
   looksLikeDeclineConfigCopy,
   looksLikeGoalConversation,
   looksLikeLeakedGoalFacts,
+  looksLikeLadderCopyCorrection,
   looksLikeLostGoalReply,
   looksLikeStallingGoalReply,
   naturalGoalAskFromDraft,
@@ -321,9 +322,9 @@ describe("leaked goal facts", () => {
     );
     expect(draft.assembly?.path).toBe("copy");
     expect(draft.pendingConfigCopy).toBeNull();
-    const pending = goalAssemblyPendingSteps(draft);
-    expect(pending.some((p) => /copiar|zero/i.test(p))).toBe(false);
-    expect(pending[0]).toMatch(/rascunho/i);
+    // Sem meta no banco de teste → copyStatus failed (não finge 2 níveis ok).
+    expect(draft.copyStatus).toBe("failed");
+    expect(goalAssemblyPendingSteps(draft).some((p) => /buscar|falhou|cópia/i.test(p))).toBe(true);
   });
 
   it('discussGoal "Sim" na oferta de copia avanca sem repetir', async () => {
@@ -346,7 +347,9 @@ describe("leaked goal facts", () => {
     const { draft } = await discussGoal("Sim", ctx, prev);
     expect(draft.assembly?.path).toBe("copy");
     expect(draft.pendingConfigCopy).toBeNull();
-    expect(goalAssemblyPendingSteps(draft).some((p) => /copiar|zero/i.test(p))).toBe(false);
+    expect(goalAssemblyPendingSteps(draft).some((p) => /copiar escada\/config da meta anterior/i.test(p))).toBe(
+      false,
+    );
   });
 
   it("discussGoal copia outubro + ultimo nivel R$ sem rascunho previo", async () => {
@@ -360,7 +363,6 @@ describe("leaked goal facts", () => {
     expect(draft.form.target).toBe(260_000);
     expect(draft.assembly?.path).toBe("copy");
     expect(draft.assembly?.periodConfirmed).toBe(true);
-    expect(goalAssemblyPendingSteps(draft)[0]).toMatch(/rascunho/i);
   });
 
   it("detecta resposta que promete e nao avanca", () => {
@@ -370,5 +372,11 @@ describe("leaked goal facts", () => {
       ),
     ).toBe(true);
     expect(looksLikeStallingGoalReply("Ficou R$ 260.000,00. Posso salvar o rascunho?")).toBe(false);
+  });
+
+  it("detecta correcao de escada/grupos copiados", () => {
+    expect(
+      looksLikeLadderCopyCorrection("Nas configurações de Outubro tem mais de 2 niveis, e tem divisão por grupo"),
+    ).toBe(true);
   });
 });

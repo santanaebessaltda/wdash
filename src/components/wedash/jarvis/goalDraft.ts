@@ -42,6 +42,8 @@ export type GoalDraft = {
   /** Janela oferecida (“quer copiar a config do mês X?”); “sim” usa isso. */
   pendingConfigCopy?: { from: string; to: string } | null;
   assembly?: GoalAssembly;
+  /** Resultado da última tentativa de copiar escada (ok | failed). */
+  copyStatus?: "ok" | "failed" | null;
 };
 
 export function emptyGoalAssembly(): GoalAssembly {
@@ -373,23 +375,36 @@ export function ensureGoalName(f: GoalDraftForm): GoalDraftForm {
 }
 
 /**
- * Degrau “Desafio” no % pedido (padrão 110 = meta + 10%).
- * Mantém só níveis abaixo desse % e o degrau Desafio (escada crescente).
+ * Ajusta o degrau “Desafio” para o % pedido (padrão 110 = meta + 10%).
+ * Preserva a escada copiada: só remove degraus no patamar do Desafio ou acima;
+ * não derruba níveis intermediários abaixo do %.
  */
 export function applyChallengeTierPct(tiers: Tier[], pct: number): Tier[] {
   if (tiers.length === 0) {
     return [{ name: "Desafio", minAttainmentPct: pct, commissionPct: 3, bonus: 0 }];
   }
   const cloned = tiers.map((t) => ({ ...t }));
-  const below = cloned.filter((t) => t.minAttainmentPct < pct && !/desafio/i.test(t.name));
+  const kept = cloned.filter((t) => t.minAttainmentPct < pct && !/desafio/i.test(t.name));
   const prevDesafio = cloned.find((t) => /desafio/i.test(t.name));
-  const template = prevDesafio ?? cloned[cloned.length - 1]!;
+  const aboveOrAt = cloned.filter((t) => t.minAttainmentPct >= pct && !/desafio/i.test(t.name));
+  const template = prevDesafio ?? aboveOrAt[aboveOrAt.length - 1] ?? cloned[cloned.length - 1]!;
   const desafio: Tier = {
     ...template,
     name: "Desafio",
     minAttainmentPct: pct,
   };
-  return [...below, desafio];
+  return [...kept, desafio];
+}
+
+/** Gestor diz que a cópia ficou errada (níveis/grupos). */
+export function looksLikeLadderCopyCorrection(text: string): boolean {
+  const p = norm(text);
+  return (
+    /mais de \d|tem mais .{0,24}(nivel|niveis)|divis[aã]o por grupo|modo grupo|por grupo|escada (errada|incompleta|diferente)|configura[cç][aã]o (errada|incompleta|diferente)|nao (foi |eh |é )?(isso|essa|a mesma)|nao (copiou|pegou|trouxe)|esqueceu|faltou .{0,20}(nivel|grupo)|niveis? de outubro|outubro tem/.test(
+      p,
+    ) ||
+    (/\bgrupo\b/.test(p) && /nivel|niveis|escada|configura|outubro/.test(p))
+  );
 }
 
 /**
@@ -505,27 +520,47 @@ export async function findPriorGoalForStore(
   }
 }
 
-/** Copia modo/escada/rateio/gerência da meta publicada do mês de referência. */
+export type GoalCopyResult = {
+  form: GoalDraftForm;
+  ok: boolean;
+  tiers: number;
+  groups: number;
+  tierMode: GoalDraftForm["tierMode"];
+};
+
+/** Copia modo/escada/rateio/gerência da meta do mês de referência (publicada; senão rascunho). */
 export async function copyGoalLadderFromPeriod(
   form: GoalDraftForm,
   ctx: JarvisContext,
   win: { from: string; to: string },
   sourceStoreId?: string,
-): Promise<GoalDraftForm> {
+): Promise<GoalCopyResult> {
   const storeId =
     sourceStoreId || form.storeId || (ctx.stores.length === 1 ? ctx.stores[0]!.id : "");
-  if (!storeId) return form;
+  if (!storeId) return { form, ok: false, tiers: form.tiers.length, groups: form.groups.length, tierMode: form.tierMode };
   try {
-    const goals = await fetchGoals({
+    let goals = await fetchGoals({
       tenantId: ctx.tenantId,
       storeIds: [storeId],
       from: win.from,
       to: win.to,
     });
+    // Outubro pode estar só como rascunho — ainda assim é a config que o Gestor indica.
+    if (goals.length === 0) {
+      goals = await fetchGoals({
+        tenantId: ctx.tenantId,
+        storeIds: [storeId],
+        from: win.from,
+        to: win.to,
+        includeDrafts: true,
+      });
+    }
     const src = goals.find((g) => g.storeId === storeId) ?? goals[0];
-    if (!src) return form;
+    if (!src) {
+      return { form, ok: false, tiers: form.tiers.length, groups: form.groups.length, tierMode: form.tierMode };
+    }
     const hasManager = src.tiers.some((t) => t.managerPct != null);
-    return {
+    const next: GoalDraftForm = {
       ...form,
       tierMode: src.tierMode,
       spreadUnidentified: src.spreadUnidentified === true,
@@ -539,8 +574,15 @@ export async function copyGoalLadderFromPeriod(
         ...(t.managerPct != null ? { managerPct: t.managerPct, managerBonus: t.managerBonus } : {}),
       })),
     };
+    return {
+      form: next,
+      ok: true,
+      tiers: next.tiers.length,
+      groups: next.groups.length,
+      tierMode: next.tierMode,
+    };
   } catch {
-    return form;
+    return { form, ok: false, tiers: form.tiers.length, groups: form.groups.length, tierMode: form.tierMode };
   }
 }
 
@@ -577,13 +619,17 @@ export function mergeGoalUtterance(form: GoalDraftForm, text: string, ctx: Jarvi
   const target = parseGoalTarget(text);
   if (target != null) next.target = target;
 
-  // “nível desafio / 10% a mais” = último degrau em 110%. “último nível com R$ X” = alvo, não %.
-  if (
-    looksLikeGoalLadderTalk(text) &&
-    /10\s*%|por cento a mais|\d+\s*%\s*(a mais)?|nivel desafio|meta desafio/.test(p) &&
-    !/ultimo nivel.{0,48}(r\$|\d)/.test(p)
-  ) {
-    next.tiers = applyChallengeTierPct(next.tiers, 110);
+  // “nível desafio / 10% a mais” = último degrau em 110%. Só a fala do Gestor (não o histórico da IA).
+  {
+    const utter = lastUserUtterance(text);
+    const pu = norm(utter);
+    if (
+      looksLikeGoalLadderTalk(utter) &&
+      /10\s*%|por cento a mais|\d+\s*%\s*(a mais)?|nivel desafio|meta desafio/.test(pu) &&
+      !/ultimo nivel.{0,48}(r\$|\d)/.test(pu)
+    ) {
+      next.tiers = applyChallengeTierPct(next.tiers, 110);
+    }
   }
 
   const name = text.match(/(?:chamar|nome(?:ar)?|titulo|título)\s+(?:de\s+|como\s+)?["“]?([^"”\n]{3,80})["”]?/i);
@@ -770,6 +816,16 @@ export function naturalGoalAskFromDraft(draft: GoalDraft): string {
   if (a.path === "fresh" && !a.confirmedTiers) {
     return `Escada: ${formatTiersBrief(form.tiers)}. Serve?`;
   }
+  if (draft.copyStatus === "failed") {
+    return "Não achei a meta publicada daquele mês pra copiar a escada.\n\nConfirma a filial e o mês da configuração (ex.: outubro), ou montamos do zero?";
+  }
+  if (a.path === "copy" && draft.copyStatus === "ok" && !a.confirmedMount) {
+    return (
+      `Copiei ${form.tiers.length} níveis, modo ${form.tierMode}` +
+      (form.groups.length ? `, ${form.groups.length} grupos` : "") +
+      `.\n\nSe estiver certo, diga que pode salvar o rascunho.`
+    );
+  }
   if (!a.confirmedMount) {
     return "Se estiver bom, diga que pode montar o rascunho.";
   }
@@ -862,10 +918,12 @@ export function formatGoalFactsForModel(
     confirmedMount: a.confirmedMount,
     pode_gravar_rascunho: goalCanCommit(draft),
     pendingConfigCopy: draft.pendingConfigCopy,
+    copyStatus: draft.copyStatus ?? null,
+    escada_resumo: `${form.tiers.length} niveis · modo ${form.tierMode} · ${form.groups.length} grupos`,
     checklist_pendente: pending,
     proximo_passo_sugerido: nextHint,
     instrucao:
-      "Avance UM item do checklist_pendente[0] (fale humano). Se path ja e copy/fresh, NUNCA repergunte copiar vs zero. Se o Gestor ja respondeu o passo, chame draft_goal e avance — nao peca 'confirma isso?' do mesmo item. Sempre draft_goal neste fio. commit_draft so se pode_gravar_rascunho.",
+      "Avance UM item do checklist_pendente[0] (fale humano). Se copyStatus=failed, diga que nao achou a meta do mes indicado e peca filial/mes — nao invente 2 niveis. Se path ja e copy/fresh e copy ok, NUNCA repergunte copiar vs zero. Sempre draft_goal neste fio. commit_draft so se pode_gravar_rascunho.",
     extras: extras.map((e) => e.trim()).filter(Boolean),
   };
   // Sem prosa em PT: o modelo copia texto longo. Sinal curto + JSON.
@@ -893,6 +951,9 @@ export function goalAssemblyPendingSteps(draft: GoalDraft): string[] {
   if (!a.valueDiscussed || form.target == null) pending.push("valor-alvo (R$)");
   if (a.periodConfirmed && form.storeId && a.valueDiscussed && form.target != null) {
     if (a.path === null) pending.push("copiar escada/config da meta anterior ou montar do zero");
+    if (draft.copyStatus === "failed") {
+      pending.push("buscar de novo a escada/grupos do mês indicado (cópia falhou)");
+    }
     if (a.path === "fresh") {
       if (!a.confirmedGroups) pending.push("divisão: grupos vs loja inteira");
       if (!a.confirmedSpread) pending.push("venda sem vendedor identificado (rateio ou fora)");
@@ -900,7 +961,13 @@ export function goalAssemblyPendingSteps(draft: GoalDraft): string[] {
         pending.push(`escada/níveis (inclui nível desafio %): ${formatTiersBrief(form.tiers)}`);
       }
     }
-    if (!a.confirmedMount) pending.push("confirmação para salvar o rascunho em Metas");
+    if (a.path === "copy" && draft.copyStatus === "ok" && !a.confirmedMount) {
+      pending.push(
+        `conferir escada copiada (${form.tiers.length} níveis · ${form.tierMode} · ${form.groups.length} grupos) e salvar rascunho`,
+      );
+    } else if (a.path != null && !a.confirmedMount && draft.copyStatus !== "failed") {
+      pending.push("confirmação para salvar o rascunho em Metas");
+    }
   }
   return pending;
 }
@@ -1042,12 +1109,23 @@ export async function discussGoal(
     assembly = { ...assembly, valueDiscussed: true };
   }
 
-  // Copia: prioriza a fala do Gestor (o arg da tool pode parafrasear e perder "outubro/copiar").
-  let sourceWin =
-    parseConfigSourceMonth(lastUser, ctx.today, form.startsOn) ??
-    parseConfigSourceMonth(question, ctx.today, form.startsOn);
-  // "Sim" / "vamos copiar" — usa oferta pendente ou busca a meta anterior (mesmo se a IA só falou a oferta).
-  if (!sourceWin && assembly.path == null && looksLikeAcceptConfigCopy(lastUser)) {
+  // Copia: prioriza a fala do Gestor (não o histórico da IA).
+  let sourceWin = parseConfigSourceMonth(lastUser, ctx.today, form.startsOn);
+  if (!sourceWin && looksLikeLadderCopyCorrection(lastUser)) {
+    // “Outubro tem mais níveis / por grupo” → rebusca a fonte (oferta, mês citado ou mês anterior).
+    sourceWin = prev?.pendingConfigCopy ?? null;
+    if (!sourceWin && /outubro/.test(qn)) {
+      const y = Number((form.startsOn || ctx.today).slice(0, 4));
+      const from = `${y}-10-01`;
+      sourceWin = { from, to: endOfMonth(from) };
+    }
+    if (!sourceWin && form.storeId && form.startsOn) {
+      const prior = await findPriorGoalForStore(ctx, form.storeId, form.startsOn);
+      if (prior) sourceWin = { from: prior.from, to: prior.to };
+    }
+  }
+  // "Sim" / "vamos copiar" — usa oferta pendente ou busca a meta anterior.
+  if (!sourceWin && looksLikeAcceptConfigCopy(lastUser)) {
     sourceWin = prev?.pendingConfigCopy ?? null;
     if (!sourceWin && form.storeId && form.startsOn) {
       const prior = await findPriorGoalForStore(ctx, form.storeId, form.startsOn);
@@ -1055,26 +1133,44 @@ export async function discussGoal(
     }
   }
   let copiedLadder = false;
+  let copyStatus: GoalDraft["copyStatus"] = prev?.copyStatus ?? null;
   let skipAssemblyParse = false;
   if (sourceWin) {
-    const before = JSON.stringify({ tiers: form.tiers, groups: form.groups, tierMode: form.tierMode });
     const pool = ctx.network.length > 0 ? ctx.network : ctx.stores;
-    const matched = matchStoresInText(question, pool);
-    const source = pickConfigSourceStore(question, matched);
-    form = await copyGoalLadderFromPeriod(form, ctx, sourceWin, source?.id);
-    copiedLadder =
-      JSON.stringify({ tiers: form.tiers, groups: form.groups, tierMode: form.tierMode }) !== before;
-    if (looksLikeGoalLadderTalk(question) && /10\s*%|por cento a mais|nivel desafio|meta desafio/.test(norm(question))) {
+    const matched = matchStoresInText(lastUser, pool);
+    const source = pickConfigSourceStore(lastUser, matched);
+    const copied = await copyGoalLadderFromPeriod(form, ctx, sourceWin, source?.id);
+    form = copied.form;
+    copiedLadder = copied.ok;
+    copyStatus = copied.ok ? "ok" : "failed";
+    // Só aplica desafio +N% se ESTA fala do Gestor pediu — não o histórico da IA.
+    if (
+      copied.ok &&
+      looksLikeGoalLadderTalk(lastUser) &&
+      /10\s*%|por cento a mais|\d+\s*%\s*(a mais)?|nivel desafio|meta desafio/.test(qn) &&
+      !/ultimo nivel.{0,48}(r\$|\d)/.test(qn)
+    ) {
       form = { ...form, tiers: applyChallengeTierPct(form.tiers, 110) };
     }
-    assembly = {
-      ...assembly,
-      path: "copy",
-      confirmedGroups: true,
-      confirmedSpread: true,
-      confirmedTiers: true,
-      confirmedMount: false,
-    };
+    if (copied.ok) {
+      assembly = {
+        ...assembly,
+        path: "copy",
+        confirmedGroups: true,
+        confirmedSpread: true,
+        confirmedTiers: true,
+        confirmedMount: false,
+      };
+    } else {
+      assembly = {
+        ...assembly,
+        path: "copy",
+        confirmedGroups: false,
+        confirmedSpread: false,
+        confirmedTiers: false,
+        confirmedMount: false,
+      };
+    }
     skipAssemblyParse = true;
   } else if (
     assembly.path == null &&
@@ -1088,19 +1184,21 @@ export async function discussGoal(
       valueDiscussed: assembly.valueDiscussed || form.target != null,
       path: "fresh",
     };
+    copyStatus = null;
     skipAssemblyParse = true;
   } else if (
     assembly.path == null &&
     looksLikeAcceptConfigCopy(lastUser) &&
     (prev?.pendingConfigCopy != null || form.target != null)
   ) {
-    // Aceitou copiar mas não achou meta anterior — fecha o passo com a escada atual.
+    // Aceitou copiar mas não achou janela — marca falha pra não fingir 2 níveis default.
+    copyStatus = "failed";
     assembly = {
       ...assembly,
       path: "copy",
-      confirmedGroups: true,
-      confirmedSpread: true,
-      confirmedTiers: true,
+      confirmedGroups: false,
+      confirmedSpread: false,
+      confirmedTiers: false,
       confirmedMount: false,
     };
     skipAssemblyParse = true;
@@ -1198,13 +1296,20 @@ export async function discussGoal(
     ctx.stores.find((s) => s.id === form.storeId)?.tradeName ??
     "";
 
-  const draftOut: GoalDraft = { form, pendingConfigCopy, assembly };
+  const draftOut: GoalDraft = { form, pendingConfigCopy, assembly, copyStatus };
   const extras: string[] = [];
   if (suggestionBlocks.length > 0) {
     extras.push(`sugestao_calculada:\n${suggestionBlocks.join("\n")}`);
   }
   if (copiedLadder && sourceWin) {
-    extras.push(`config_copiada_de: ${monthYearTitle(sourceWin.from)}`);
+    extras.push(
+      `config_copiada_de: ${monthYearTitle(sourceWin.from)} · ${form.tiers.length} niveis · modo ${form.tierMode} · ${form.groups.length} grupos`,
+    );
+  }
+  if (copyStatus === "failed" && sourceWin) {
+    extras.push(
+      `config_copia_falhou: nao achei meta em ${monthYearTitle(sourceWin.from)} pra esta filial (tentei publicada e rascunho). Nao invente escada.`,
+    );
   }
   if (configOffer) extras.push(`oferta_copiar_config: ${configOffer}`);
   return {
