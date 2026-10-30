@@ -55,7 +55,7 @@ Você SEMPRE escreve a fala; tools só buscam dado ou mudam estado. Nunca diga q
 
 Memória de longo prazo (remember_fact / forget_fact). “Apagar conversa” zera só o thread.
 
-Tom: português do Brasil, informal, humano (2–4 frases curtas). Números das tools com centavos. Separe ideias com \\n\\n. Nunca use travessão (—).
+Tom: português do Brasil, informal, humano (2–4 frases curtas). Números das tools com centavos. Separe ideias com \\n\\n. Nunca use travessão (—). Nunca diga “confiança high/medium/low” nem jargão interno.
 
 Como decidir:
 1) O que o Gestor quer AGORA?
@@ -317,6 +317,10 @@ serve(async (req) => {
       if (!openaiKey) return json({ ok: false, error: "openai_not_configured" }, 503);
       return await handleChatOpenAi(openaiKey, body);
     }
+    if (action === "interpret_goal_op") {
+      if (!openaiKey) return json({ ok: false, error: "openai_not_configured" }, 503);
+      return await handleInterpretGoalOp(openaiKey, body);
+    }
     return json({ ok: false, error: "unknown_action" }, 400);
   } catch (err) {
     const message = err instanceof Error ? err.message : "jarvis_error";
@@ -324,6 +328,78 @@ serve(async (req) => {
     return json({ ok: false, error: message }, 502);
   }
 });
+
+/**
+ * Interpretação semântica de meta → JSON (sem mutar estado).
+ * O app valida o schema e o motor determinístico aplica.
+ */
+async function handleInterpretGoalOp(openaiKey: string, body: Record<string, unknown>) {
+  const utterance = String(body.utterance ?? "").trim();
+  if (!utterance) return json({ ok: false, error: "utterance_required" }, 400);
+  const context = typeof body.context === "string" ? body.context : "{}";
+
+  const system = `Você interpreta falas do Gestor sobre META de loja no WDash.
+Responda APENAS com JSON válido (sem markdown) no schema:
+{
+  "kind": "question"|"analysis"|"proposal"|"correction"|"confirmation"|"change_request"|"inspect",
+  "entity": "store_target"|"tier_revenue"|"group"|"commission"|"bonus"|"period_destination"|"period_origin"|"ladder"|null,
+  "amountCents": number|null,
+  "amountRole": "store_base"|"tier_threshold"|"unknown"|null,
+  "tierRef": {"byIndex": number|null, "byName": string|null, "byPct": number|null}|null,
+  "periodRole": "origin"|"destination"|"mention"|null,
+  "periodMonth": "YYYY-MM"|null,
+  "authorizeApply": boolean,
+  "authorizeSave": boolean,
+  "confidence": "high"|"medium"|"low",
+  "ambiguity": string|null,
+  "notes": string|null
+}
+Regras:
+- amountCents = valor em REAIS inteiros (R$ 260 mil → 260000), não centavos de moeda.
+- Se o R$ é faturamento de um NÍVEL (desafio/último/110%), amountRole=tier_threshold e entity=tier_revenue. NÃO é meta-base.
+- Se é meta principal/base da loja, amountRole=store_base.
+- Mencionar outubro como fato/referência = periodRole origin|mention; NÃO mude period_destination.
+- Mudar destino exige intenção inequívoca (ex.: "mude a meta para dezembro").
+- authorizeSave quase sempre false (gravação é outro fluxo).
+- tierRef.byIndex: 1-based; último nível = -1.
+- Use os níveis do contexto (não invente 180% se o rascunho tem 50/75/100/110).
+- confidence é interno; nunca invente texto para o Gestor aqui.`;
+
+  const res = await fetch(`${OPENAI_URL}/chat/completions`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${openaiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: CHAT_MODEL,
+      temperature: 0,
+      response_format: { type: "json_object" },
+      messages: [
+        { role: "system", content: system },
+        {
+          role: "user",
+          content: `Contexto operacional:\n${context}\n\nFala do Gestor:\n${utterance}`,
+        },
+      ],
+    }),
+  });
+
+  if (!res.ok) {
+    const errBody = await res.text();
+    console.error("interpret_goal_op openai:", res.status, errBody.slice(0, 400));
+    return json({ ok: false, error: "openai_interpret_failed" }, 502);
+  }
+  const payload = await res.json();
+  const text = String(payload?.choices?.[0]?.message?.content ?? "").trim();
+  let intent: unknown = null;
+  try {
+    intent = JSON.parse(text);
+  } catch {
+    return json({ ok: false, error: "invalid_intent_json" }, 422);
+  }
+  return json({ ok: true, type: "goal_op_intent", intent });
+}
 
 async function handleChatOpenAi(openaiKey: string, body: Record<string, unknown>) {
   const rawMessages = body.messages;

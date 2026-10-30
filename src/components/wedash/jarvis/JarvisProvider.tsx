@@ -778,11 +778,13 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
           const beforePath = before?.assembly?.path ?? null;
           const beforePending = before ? goalAssemblyPendingSteps(before).join("|") : "";
           const historyBlob = recentMsgs.map((m) => `${m.from}: ${m.text}`).join("\n");
+          const { resolveGoalOpIntent } = await import("./goalOpInterpret");
+          const opIntent = await resolveGoalOpIntent(q, before, ctx.today);
           const { draft, skipped, spokenReply, shouldCommit } = await discussGoal(
             historyBlob,
             ctx,
             before,
-            { turnId },
+            { turnId, intent: opIntent },
           );
           if (gen !== replyGen.current) return;
           syncGoalDraft(draft);

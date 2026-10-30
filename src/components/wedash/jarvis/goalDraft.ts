@@ -31,6 +31,12 @@ import {
   type GoalLastSave,
   type GoalPendingCommit,
 } from "./goalContract";
+import {
+  interpretGoalOpStructural,
+  planGoalOpFromIntent,
+  scrubTechnicalSpeech,
+  type GoalOpIntent,
+} from "./goalOpIntent";
 
 export type { GoalLastSave, GoalPendingCommit } from "./goalContract";
 export { goalDraftFingerprint, pendingCommitStillValid } from "./goalContract";
@@ -1210,7 +1216,7 @@ export async function suggestGoalTarget(
 
     const rationale = `${baseBits.join(" + ")}; ${growthLabel}; ${sazonalBit}`;
     const chatBlocks: string[] = [
-      `Minha recomendação pra ${monthYearTitle(targetFrom)}: ${brlCent(recommended)} (confiança ${confidence}).`,
+      `Minha recomendação pra ${monthYearTitle(targetFrom)}: ${brlCent(recommended)}.`,
       `Cenários: conservadora ${brlCent(conservative)} · recomendada ${brlCent(recommended)} · desafiadora ${brlCent(challenging)}.`,
       `${baseBits.join("; ")}. ${growthLabel.charAt(0).toUpperCase()}${growthLabel.slice(1)}.`,
     ];
@@ -1518,6 +1524,11 @@ export function lastUserUtterance(text: string): string {
 export type DiscussGoalOpts = {
   /** Mesmo id no eager + draft_goal → segunda chamada é no-op. */
   turnId?: string;
+  /**
+   * Intenção estruturada (LLM ou teste). Se omitida, usa interpretador estrutural.
+   * O modelo NÃO muta o rascunho — só o motor aplica o plano.
+   */
+  intent?: GoalOpIntent | null;
 };
 
 export type DiscussGoalResult = {
@@ -1559,21 +1570,64 @@ export async function discussGoal(
   }
 
   const prevStarts = prev?.form.startsOn ?? null;
+  const prevEnds = prev?.form.endsOn ?? null;
   let form = prev?.form ?? emptyGoalForm(ctx.stores.length === 1 ? ctx.stores[0]!.id : "");
   let assembly: GoalAssembly = { ...(prev?.assembly ?? emptyGoalAssembly()) };
   let userLockedTarget = prev?.userLockedTarget === true;
   let proposal: GoalIntelligenceResult | null = prev?.proposal ?? null;
   const lastUser = lastUserUtterance(question);
   const qn = norm(lastUser);
-  const periodSaidNow = parseGoalPeriod(lastUser, ctx.today) != null;
-  // Fonte de verdade do R$: só a fala atual do Gestor (nunca o histórico inteiro).
-  const lockedTarget = parseGoalTarget(lastUser);
+
+  // P1: intenção semântica → plano determinístico (antes de mutar com R$/mês).
+  const opIntent: GoalOpIntent =
+    opts?.intent ??
+    interpretGoalOpStructural(lastUser, {
+      form,
+      copiedFrom: prev?.copiedFrom ?? null,
+      copyStatus: prev?.copyStatus ?? null,
+      today: ctx.today,
+    });
+  const opPlan = planGoalOpFromIntent(opIntent, {
+    form,
+    copiedFrom: prev?.copiedFrom ?? null,
+    copyStatus: prev?.copyStatus ?? null,
+    today: ctx.today,
+  });
+
+  const periodSaidNow =
+    !opPlan.freezeDestinationPeriod && parseGoalPeriod(lastUser, ctx.today) != null;
+  // Fonte de verdade do R$: só a fala atual — e só se o plano permitir travar meta-base.
+  const lockedTarget =
+    opPlan.blockDirectTargetLock || opIntent.amountRole === "tier_threshold"
+      ? null
+      : opIntent.amountRole === "store_base" && opIntent.amountCents != null
+        ? opIntent.amountCents
+        : parseGoalTarget(lastUser);
   const asksSuggestion = looksLikeAskValueSuggestion(lastUser);
 
   form = mergeGoalUtterance(form, question, ctx);
-  // Simulação cita R$ só para o cenário — merge não pode gravar isso em form.target.
-  if (looksLikeSimulateLevelsAtAmount(lastUser) && prev?.form.target != null) {
+
+  // Origem/menção de mês NÃO pode alterar o destino (novembro permanece novembro).
+  if (opPlan.freezeDestinationPeriod && prevStarts) {
+    form = { ...form, startsOn: prevStarts, endsOn: prevEnds };
+  }
+  // Troca inequívoca de destino (ex.: novembro → dezembro).
+  if (
+    opIntent.entity === "period_destination" &&
+    opIntent.periodMonth &&
+    opIntent.authorizeApply
+  ) {
+    const startsOn = `${opIntent.periodMonth}-01`;
+    form = ensureGoalName({ ...form, startsOn, endsOn: endOfMonth(startsOn) });
+  }
+  // Simulação / nível absoluto: merge não pode gravar o R$ em form.target.
+  if (
+    (looksLikeSimulateLevelsAtAmount(lastUser) || opPlan.blockDirectTargetLock) &&
+    prev?.form.target != null
+  ) {
     form = { ...form, target: prev.form.target };
+  } else if (opPlan.blockDirectTargetLock && prev?.form.target == null) {
+    form = { ...form, target: null };
   }
 
   // Periodo mudou (ex.: maio → novembro): nao reaproveitar valor do mes antigo.
@@ -1583,8 +1637,8 @@ export async function discussGoal(
     userLockedTarget = false;
     proposal = null;
   }
-  // R$ na fala aplica no rascunho — exceto simulação de níveis (“como ficaria com 257”).
-  if (lockedTarget != null && !looksLikeSimulateLevelsAtAmount(lastUser)) {
+  // R$ como meta-base explícita — nunca quando o R$ é limiar de nível.
+  if (lockedTarget != null && !looksLikeSimulateLevelsAtAmount(lastUser) && !opPlan.blockDirectTargetLock) {
     form = { ...form, target: lockedTarget };
     userLockedTarget = true;
   }
@@ -1759,6 +1813,11 @@ export async function discussGoal(
       // Não toca form.target nem userLockedTarget.
     }
   }
+  // Proposta vinda de faturamento-em-nível (P1) — sem aplicar.
+  if (opPlan.proposedTarget != null && opPlan.blockDirectTargetLock) {
+    proposedTarget = opPlan.proposedTarget;
+  }
+
   // Aceite contextual da proposta (pode ser / fechado / vamos nessa / sim) —
   // só se há proposta pendente e NÃO há confirmação de gravação aguardando.
   let justAcceptedProposal = false;
@@ -1782,9 +1841,24 @@ export async function discussGoal(
   }
 
   // Copia: prioriza a fala do Gestor (não o histórico da IA).
+  // Fato sobre mês de origem NÃO reabre cópia nem muda destino.
+  const skipCopyReentry =
+    opPlan.freezeDestinationPeriod &&
+    (opIntent.entity === "ladder" || opIntent.periodRole === "mention");
   // Se já copiou com sucesso, NÃO reentrar por "sim" solto (destrói o estado).
-  let sourceWin = parseConfigSourceMonth(lastUser, ctx.today, form.startsOn);
-  if (!sourceWin && looksLikeLadderCopyCorrection(lastUser)) {
+  let sourceWin = skipCopyReentry
+    ? null
+    : parseConfigSourceMonth(lastUser, ctx.today, form.startsOn);
+  if (
+    !sourceWin &&
+    opIntent.periodMonth &&
+    (opIntent.entity === "period_origin" ||
+      (opIntent.periodRole === "origin" && /copiar|copia|mesma configura|referencia|referência/.test(qn)))
+  ) {
+    const from = `${opIntent.periodMonth}-01`;
+    sourceWin = { from, to: endOfMonth(from) };
+  }
+  if (!sourceWin && !skipCopyReentry && looksLikeLadderCopyCorrection(lastUser)) {
     // “Outubro tem mais níveis / por grupo” → rebusca a fonte (oferta, mês citado ou mês anterior).
     sourceWin =
       prev?.pendingConfigCopy ??
@@ -1976,8 +2050,12 @@ export async function discussGoal(
       // P0: não escreve form.target.
     }
   }
-  // Alvo falado pelo Gestor ("270 mil") — não aplica se for só simulação de níveis.
-  if (lockedTarget != null && !looksLikeSimulateLevelsAtAmount(lastUser)) {
+  // Alvo falado pelo Gestor ("270 mil") — não aplica se for limiar de nível / simulação.
+  if (
+    lockedTarget != null &&
+    !looksLikeSimulateLevelsAtAmount(lastUser) &&
+    !opPlan.blockDirectTargetLock
+  ) {
     form = { ...form, target: lockedTarget };
     assembly = { ...assembly, valueDiscussed: true };
     userLockedTarget = true;
@@ -2257,10 +2335,14 @@ export async function discussGoal(
 
   let spokenReply: string | null = null;
   const copyJustApplied = Boolean(sourceWin && (copiedLadder || copyStatus === "failed"));
-  if (looksLikeValueInconsistency(lastUser)) {
+  if (opPlan.spokenReply) {
+    // P1: resposta ao ponto (nível / origem / ambiguidade) antes do fluxo de montagem.
+    spokenReply = scrubTechnicalSpeech(opPlan.spokenReply);
+  } else if (looksLikeValueInconsistency(lastUser)) {
     spokenReply = speakValueInconsistency(draftOut);
-  } else if (looksLikeSimulateLevelsAtAmount(lastUser)) {
-    const simAmount = parseGoalTarget(lastUser) ?? proposedTarget;
+  } else if (looksLikeSimulateLevelsAtAmount(lastUser) || opIntent.notes === "simulate_levels") {
+    const simAmount =
+      opIntent.amountCents ?? parseGoalTarget(lastUser) ?? proposedTarget ?? form.target;
     if (simAmount != null) {
       spokenReply = speakSimulateLevels(draftOut, simAmount);
     }
@@ -2274,11 +2356,12 @@ export async function discussGoal(
     suggestionBlocks.length + (proposal?.chatBlocks.length ?? 0) > 0
   ) {
     const blocks = suggestionBlocks.length ? suggestionBlocks : proposal!.chatBlocks;
-    spokenReply =
+    spokenReply = scrubTechnicalSpeech(
       `${blocks.join("\n\n")}\n\n` +
-      `Proposta: ${brlCent(proposedTarget)} — ainda não está no rascunho` +
-      (form.target != null ? ` (aplicado continua ${brlCent(form.target)})` : "") +
-      `. Aceita a recomendada ou manda outro R$?`;
+        `Proposta: ${brlCent(proposedTarget)} — ainda não está no rascunho` +
+        (form.target != null ? ` (aplicado continua ${brlCent(form.target)})` : "") +
+        `. Aceita a recomendada ou manda outro R$?`,
+    );
   } else if (looksLikeAskGroupWeightAdvice(lastUser)) {
     spokenReply = speakGoalWeightAdvice(draftOut, weightAdviceForSpeak);
   } else if (copyJustApplied && (copyStatus === "ok" || copyStatus === "failed")) {

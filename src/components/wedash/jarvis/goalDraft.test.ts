@@ -362,17 +362,23 @@ describe("leaked goal facts", () => {
     );
   });
 
-  it("discussGoal copia outubro + ultimo nivel R$ sem rascunho previo", async () => {
+  it("discussGoal copia outubro + ultimo nivel R$ nao aplica 260k como meta-base sem escada", async () => {
     const blob = [
       "user: Preciso da meta de novembro",
       "jarvis: Qual valor?",
       "user: Acho que a gente pode copiar a mesma configuração de Outubro, e deixar o ultimo nivel com R$ 260.000,00",
     ].join("\n");
-    const { draft } = await discussGoal(blob, ctx, null);
+    const { draft, spokenReply } = await discussGoal(blob, ctx, null);
     expect(draft.form.startsOn).toBe("2026-11-01");
-    expect(draft.form.target).toBe(260_000);
-    expect(draft.assembly?.path).toBe("copy");
+    // P1: R$ no nível ≠ meta-base; sem escada real não inventa % nem aplica 260k.
+    expect(draft.form.target).not.toBe(260_000);
+    expect(draft.proposedTarget == null || draft.proposedTarget !== 260_000).toBe(true);
     expect(draft.assembly?.periodConfirmed).toBe(true);
+    // Fala determinística pede escada real ou propõe base — nunca afirma que aplicou 260k.
+    if (spokenReply) {
+      expect(spokenReply).not.toMatch(/Apliquei R\$ 260/);
+      expect(spokenReply).toMatch(/escada|referência|referencia|nível|nivel|aplicar|meta-base|260/i);
+    }
   });
 
   it("detecta resposta que promete e nao avanca", () => {
