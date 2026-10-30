@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
-import { Avatar } from "@/components/ui";
+import { Avatar, Dropdown } from "@/components/ui";
 import { validateChallengeForm } from "@/data/wedash/challengeForm";
 import { cn } from "@/lib/cn";
 import { padBottom } from "@/lib/safeArea";
 import { paths } from "@/router/paths";
 import { SendIcon } from "@/pages/apps/icons";
+import { Icon, icons } from "@/pages/users/Icons";
 import { ChallengeProposalCard } from "./ChallengeProposalCard";
 import { ScheduleProposalCard } from "./ScheduleProposalCard";
 import {
@@ -74,14 +75,27 @@ export function JarvisFloat() {
                 <p className="truncate text-sm font-bold text-t0">JARVIS</p>
                 <p className="mt-0.5 text-xs text-ok">Online · Chat IA</p>
               </div>
-              <button
-                type="button"
-                onClick={j.clearChat}
-                disabled={busy || empty}
-                className="rounded-[10px] px-2.5 py-1.5 text-[12px] font-semibold text-t2 hover:bg-bg-3 hover:text-t0 disabled:opacity-40"
-              >
-                Limpar
-              </button>
+              <Dropdown
+                align="right"
+                portal
+                items={[
+                  {
+                    label: "Apagar conversa",
+                    danger: true,
+                    disabled: busy || empty,
+                    onClick: j.clearChat,
+                  },
+                ]}
+                trigger={
+                  <button
+                    type="button"
+                    aria-label="Mais opções"
+                    className="flex h-9 w-9 items-center justify-center rounded-[10px] border border-line text-t1 hover:bg-bg-3 hover:text-t0"
+                  >
+                    <Icon d={icons.dots} size={16} />
+                  </button>
+                }
+              />
               <button
                 type="button"
                 onClick={() => setOpen(false)}
