@@ -793,7 +793,6 @@ export function SchedulePage() {
             />
             <ExportDialog
               formats={["pdf", "xlsx"]}
-              variant="secondary"
               disabled={showSkeleton || registered.length === 0}
               onExport={onExport}
             />

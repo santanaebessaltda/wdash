@@ -22,12 +22,12 @@ export function ExportDialog({
   formats,
   onExport,
   disabled,
-  variant = "primary",
+  variant = "secondary",
 }: {
   formats: ExportFormat[];
   onExport: (format: ExportFormat) => void;
   disabled?: boolean;
-  /** Padrão primary (Dashboard). Escala usa secondary para não competir com Nova escala. */
+  /** Padrão secondary — não compete com CTAs primários da tela. */
   variant?: "primary" | "secondary" | "outline";
 }) {
   const options = formats.filter((item) => item in FORMAT_COPY);
