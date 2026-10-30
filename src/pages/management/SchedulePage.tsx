@@ -1265,12 +1265,12 @@ function ScheduleBoard({
           : "";
       const shift = person?.shiftId ? shiftById.get(person.shiftId) ?? null : null;
       const groupLabel = shift ? shift.name.toLocaleUpperCase("pt-BR") : "";
-      const detail = [role, groupLabel].filter(Boolean).join("  ·  ");
       const hoursTitle = shift ? `${shift.name} · ${shift.start}–${shift.end}` : undefined;
       return {
         id,
         name: (person?.name ?? "Pessoa").toLocaleUpperCase("pt-BR"),
-        detail,
+        role,
+        groupLabel,
         hoursTitle,
         code: person?.code ?? null,
         orphan,
@@ -1290,10 +1290,12 @@ function ScheduleBoard({
     return { working, closed: floor.closed, min: floor.min, exact: floor.exact };
   }
 
-  /* Heatmap compacto: coluna Pessoa mais larga no desktop; no celular a grade rola na horizontal. */
-  const dayCols = `repeat(${dates.length}, minmax(1.75rem, 1fr))`;
+  /* Heatmap compacto: coluna Pessoa mais larga no desktop; no celular a grade rola na horizontal.
+     Coluna do dia um pouco mais larga para caber a sigla + grupo abaixo. */
+  const dayCols = `repeat(${dates.length}, minmax(2.1rem, 1fr))`;
   const stickyPerson = "sticky left-0 z-[1] bg-bg-2 pr-2";
-  const tile = "flex aspect-square w-full min-w-0 flex-col items-center justify-center rounded-[4px] font-extrabold leading-none";
+  const tile =
+    "flex min-h-[2.1rem] w-full min-w-0 flex-col items-center justify-center gap-0.5 rounded-[4px] px-0.5 py-0.5 font-extrabold leading-none";
   /** Fora do foco (semana/dia): mesma coluna, só escurece — padrão do Heatmap/calendário. */
   const dimOut = "opacity-[0.28]";
   /** Coluna de hoje: fundo vertical sutil em cabeçalho, células e rodapé. */
@@ -1339,7 +1341,7 @@ function ScheduleBoard({
               <PersonAvatar name={person.name} employeeId={person.code} storeId={section.storeId} size="sm" />
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-[12px] font-semibold leading-tight text-t0">{person.name}</span>
-                {person.detail ? <span className="mt-0.5 block truncate text-[11px] leading-snug text-t2">{person.detail}</span> : null}
+                {person.role ? <span className="mt-0.5 block truncate text-[11px] leading-snug text-t2">{person.role}</span> : null}
                 {person.orphan && onReplacePerson && !readOnly ? (
                   <button
                     type="button"
@@ -1360,6 +1362,9 @@ function ScheduleBoard({
               const focused = inFocus(iso);
               const isToday = iso === today;
               const letterSize = mark?.tight ? "text-[8px]" : "text-[10px]";
+              const groupLine = person.groupLabel ? (
+                <span className="max-w-full truncate text-[7px] font-bold leading-none tracking-wide opacity-90">{person.groupLabel}</span>
+              ) : null;
               if (!row || !mark) {
                 return (
                   <div
@@ -1375,9 +1380,10 @@ function ScheduleBoard({
                   <div
                     key={iso}
                     className={cn(tile, letterSize, mark.className, isToday && "ring-1 ring-inset ring-acc/35", !focused && dimOut)}
-                    title={status}
+                    title={person.groupLabel ? `${status} · ${person.groupLabel}` : status}
                   >
-                    {mark.letters}
+                    <span>{mark.letters}</span>
+                    {groupLine}
                   </div>
                 );
               }
@@ -1393,10 +1399,15 @@ function ScheduleBoard({
                     isToday && "ring-1 ring-inset ring-acc/35",
                     !focused && dimOut,
                   )}
-                  aria-label={`${person.name}, ${Number(iso.slice(8))}: ${status}`}
+                  aria-label={
+                    person.groupLabel
+                      ? `${person.name}, ${Number(iso.slice(8))}: ${status}, ${person.groupLabel}`
+                      : `${person.name}, ${Number(iso.slice(8))}: ${status}`
+                  }
                   onClick={() => onOpenDay(iso, person.id)}
                 >
-                  {mark.letters}
+                  <span>{mark.letters}</span>
+                  {groupLine}
                 </button>
               );
             })}
