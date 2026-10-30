@@ -227,10 +227,10 @@ Inspiração de UX: [Néctar](https://www.meu-nectar.com/) (conversa humana, res
 
 **Tom:** informal, humano — curto, confirma o que fez, sem jargão de produto.
 
-**Roteamento (DECIDIDO — 2026-10-30 — fala só no prompt; chat = OpenAI; agente + memória — 2026-10-30):** turno pelo **OpenAI** (`jarvis-ai` action `chat`, `OPENAI_API_KEY`, `gpt-4o-mini` ou `JARVIS_CHAT_MODEL`). **Toda a conversa** = SYSTEM_PROMPT + tools (loop até 6 rodadas). Tools: `analyze_*` / `draft_*` / `commit_draft` / `discard_draft` / **`remember_fact` / `forget_fact`**. Memória de longo prazo em `jarvis_memory` (por tenant + membership), por baixo dos panos; **Apagar conversa** zera só o thread. Datas relativas usam `Hoje` no contexto (sem engessar ano). STT = Whisper; TTS OpenAI (ou Gemini se configurado).
+**Roteamento (DECIDIDO — 2026-10-30 — fala só no prompt; chat = OpenAI; agente + memória — 2026-10-30):** turno pelo **OpenAI** (`jarvis-ai` action `chat`, `OPENAI_API_KEY`, `gpt-4o-mini` ou `JARVIS_CHAT_MODEL`). **Toda a conversa** = SYSTEM_PROMPT + tools (loop até 6 rodadas). Tools: `analyze_*` / `draft_*` / `commit_draft` / `discard_draft` / **`remember_fact` / `forget_fact`**. Memória de longo prazo em `jarvis_memory` (por tenant + membership). **Apagar conversa** (2026-10-30) zera thread + rascunhos (meta/desafio/escala) + memória de longo prazo. Datas relativas usam `Hoje` no contexto (sem engessar ano). STT = Whisper; TTS OpenAI (ou Gemini se configurado).
 
 **Superfície (DECIDIDO — 2026-10-29):**
-- **Botão flutuante** no canto inferior direito (só Gestor) — painel no estilo Apps > Chat do Vela (thread + composer); mic = ditado; **Apagar conversa** zera o thread (`sessionStorage`). Memória de longo prazo só via tools. **Fora do menu.** `/chat-ia` e `/jarvis` → Visão geral. **Filial:** Topbar.
+- **Botão flutuante** no canto inferior direito (só Gestor) — painel no estilo Apps > Chat do Vela (thread + composer); mic = ditado; **Apagar tudo** zera thread, rascunhos e memória (`jarvis_memory`). **Fora do menu.** `/chat-ia` e `/jarvis` → Visão geral. **Filial:** Topbar.
 - Sem navegação/rolagem por comando.
 
 **Leituras no chat:** vendas, **meta cadastrada** (valor-alvo ≠ faturamento), estoque parado, sazonal — resposta no painel flutuante (período da pergunta pode gravar em sessionStorage para o Dashboard se o Gestor abrir depois). Pedido “quanto é a meta?” usa `analyze_goal` / `loadGoalBrief`, não `analyze_sales`.
@@ -261,7 +261,7 @@ Leitura **não** pede confirmação. Escrita **sempre** pede.
 
 **Fatia 8–9 (2026-10-29):** sem voz contínua; chat-first; **sem redirecionar páginas** — tools/prompt só no chat.
 
-**Meta = Salvar rascunho (2026-10-30; intenção por turno — 2026-10-30):** Estado operacional (`goalDraft` + `copiedFrom`) separado do chat. Cópia só na **origem**. `spokenReply` determinístico por intenção: cópia deste turno → resumo curto; “como ficou”/níveis/grupos → faceta; pergunta de pesos → `speakGoalWeightAdvice` (não reabre “Copiei…”). “Sim” solto não re-copia se já ok. Apagar conversa não zera o rascunho. Gravar → `commit_draft` com `pode_gravar_rascunho`. Sem travessão (“—”).
+**Meta = Salvar rascunho (2026-10-30; intenção por turno — 2026-10-30):** Estado operacional (`goalDraft` + `copiedFrom`) no sessionStorage durante a montagem. Cópia só na **origem**. `spokenReply` por intenção (cópia / inspeção / pesos). “Sim” solto não re-copia se já ok. **Apagar tudo** zera rascunho + memória. Gravar → `commit_draft` com `pode_gravar_rascunho`. Sem travessão (“—”).
 
 ### Alertas (DECIDIDO — 2026-09-29)
 - **Todo alerta do app usa `Alert`** (`src/components/ui/Alert.tsx`, padrão Components > Alerts do Vela — "Storage almost full" etc.): fundo suave da cor, sem borda, ícone 18px e título em negrito na cor, texto em `text-t1`. Variantes `success · warning · danger · info · accent`; `icon` troca o ícone (Spinner, RadialProgress), `action` = links/botões à direita (`AlertLink` para link de texto), `footer` = conteúdo extra (lista expandida, checkbox).

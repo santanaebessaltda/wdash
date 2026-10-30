@@ -45,14 +45,6 @@ export function JarvisFloat() {
   if (!j.allowed) return null;
 
   const busy = j.mode === "thinking" || j.dictating || j.dictateBusy;
-  const empty =
-    j.messages.length === 0 &&
-    !j.challengeDraft &&
-    !j.goalDraft &&
-    !j.scheduleDraft &&
-    !j.createdItem &&
-    j.mode === "idle";
-
   // Portal no body: o shell é position:fixed + overflow hidden; FAB no miolo some da tela.
   return createPortal(
     <div
@@ -80,9 +72,8 @@ export function JarvisFloat() {
                 portal
                 items={[
                   {
-                    label: "Apagar conversa",
+                    label: "Apagar tudo (conversa e memória)",
                     danger: true,
-                    disabled: empty,
                     onClick: () => j.clearChat(),
                   },
                 ]}

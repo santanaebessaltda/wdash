@@ -2155,7 +2155,7 @@ function goalDraftStorageSet(value: string | null): void {
   else goalDraftMemory.set(GOAL_DRAFT_STORAGE_KEY, value);
 }
 
-/** Persiste rascunho de meta na sessão (sobrevive a refresh; Apagar conversa limpa). */
+/** Persiste rascunho de meta na sessão (sobrevive a refresh; Apagar tudo limpa). */
 export function persistGoalDraftSession(draft: GoalDraft | null): void {
   if (!draft) {
     goalDraftStorageSet(null);

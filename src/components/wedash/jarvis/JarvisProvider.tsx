@@ -23,6 +23,7 @@ import { jarvisContextFromSession } from "./context";
 import { splitJarvisReply, sleepMs, typingDelayMs } from "./chatBlocks";
 import { commitGoal } from "./goalCommit";
 import {
+  clearGoalDraftSession,
   discussGoal,
   formatGoalFactsForModel,
   goalAssemblyPendingSteps,
@@ -47,7 +48,7 @@ import {
   type JarvisLlmSession,
   type LlmChatMessage,
 } from "./llmClient";
-import { formatMemoryForModel, loadJarvisMemory } from "./memoryRepo";
+import { clearJarvisMemory, formatMemoryForModel, loadJarvisMemory } from "./memoryRepo";
 import { commitSchedule } from "./scheduleCommit";
 import {
   discussSchedule,
@@ -845,8 +846,7 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
   );
 
   const clearChat = useCallback(() => {
-    // Invalida turnos em voo. Memória de longo prazo fica (só tools remember/forget).
-    // Rascunho de meta = estado operacional separado: NÃO apaga com a conversa.
+    // Reset total: thread + rascunhos + o que o JARVIS “conhece” deste Gestor.
     replyGen.current += 1;
     cancelDictate();
     setMessages([]);
@@ -858,12 +858,17 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
     setChallengeDraft(null);
     challengeDraftRef.current = null;
     setGoalDraft(null);
-    // Mantém goalDraftRef + sessionStorage — só discard_draft / clearGoalDraftSession zera.
+    syncGoalDraft(null);
+    clearGoalDraftSession();
     setScheduleDraft(null);
     scheduleDraftRef.current = null;
     setCreatedItem(null);
     setCommitBusy(false);
-  }, [cancelDictate]);
+    memoryTextRef.current = "Nenhuma memória de longo prazo ainda.";
+    if (session?.tenantId && session.membershipId) {
+      void clearJarvisMemory(session.tenantId, session.membershipId);
+    }
+  }, [cancelDictate, session?.membershipId, session?.tenantId, syncGoalDraft]);
 
   useEffect(() => {
     return () => {

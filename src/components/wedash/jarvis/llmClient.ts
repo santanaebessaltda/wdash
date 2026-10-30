@@ -44,7 +44,7 @@ export type JarvisLlmSession = {
   goalCopyStatus?: string | null;
   challengeDraftSummary?: string | null;
   scheduleDraftSummary?: string | null;
-  /** Memória de longo prazo (não some com Apagar conversa). */
+  /** Memória de longo prazo (Apagar conversa zera). */
   longTermMemory?: string | null;
 };
 
@@ -69,7 +69,7 @@ function contextNote(ctx: JarvisContext, session?: JarvisLlmSession | null): str
     `Sazonal/feriados a considerar sozinho (meta/desafio): ${compactSeasonalContext(ctx.today, 2)}.`,
     "Voce redige toda a fala. Tools so executam. Cumprimento = zero tools. Nunca use travessao (—).",
     "Agente: pode chamar varias tools no mesmo raciocinio (vendas, meta, sazonal) antes de propor. Baseie meta/desafio em numeros da tool.",
-    "Memoria de longo prazo: use remember_fact para preferencias/decisoes duraveis; Apagar conversa NAO apaga isso.",
+    "Memoria de longo prazo: use remember_fact para preferencias/decisoes duraveis. Apagar conversa zera thread, rascunhos e esta memoria.",
   ];
   if (session?.longTermMemory) {
     lines.push(`Memoria deste Gestor:\n${session.longTermMemory}`);
