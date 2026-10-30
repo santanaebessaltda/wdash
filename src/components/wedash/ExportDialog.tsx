@@ -22,10 +22,13 @@ export function ExportDialog({
   formats,
   onExport,
   disabled,
+  variant = "primary",
 }: {
   formats: ExportFormat[];
   onExport: (format: ExportFormat) => void;
   disabled?: boolean;
+  /** Padrão primary (Dashboard). Escala usa secondary para não competir com Nova escala. */
+  variant?: "primary" | "secondary" | "outline";
 }) {
   const options = formats.filter((item) => item in FORMAT_COPY);
   const items: DropdownItem[] = options.map((item) => ({
@@ -44,7 +47,7 @@ export function ExportDialog({
       menuClassName="min-w-[280px] print:hidden"
       items={items}
       trigger={
-        <Button type="button" variant="primary" size="md" className="print:hidden" disabled={disabled || options.length === 0} iconRight={<ChevronDown />}>
+        <Button type="button" variant={variant} size="md" className="print:hidden" disabled={disabled || options.length === 0} iconRight={<ChevronDown />}>
           Exportar
         </Button>
       }

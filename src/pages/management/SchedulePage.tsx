@@ -13,7 +13,7 @@ import {
   periodActivePresetId,
   periodDisplayLabel,
 } from "@/pages/dashboard/periodPicker";
-import { ReportHeader, useExportPdf } from "@/pages/dashboard/ReportHeader";
+import { ReportHeader, useExportPdf, useReportFileTitle } from "@/pages/dashboard/ReportHeader";
 import { useScope } from "@/pages/dashboard/useScope";
 import { HeaderFilters } from "@/pages/stock/shared";
 import { useScopedStores } from "@/pages/operation/shared";
@@ -30,6 +30,7 @@ import { branchRoleLabel, fetchStoreSellers, fetchStoreShifts, isBranchTeamMembe
 import { applyDayChoices, buildCompOffSummary, COMP_OFF_CLEAR_HINT, dayEditOptions, defaultDayNeeds, eligibleCompOffDays, generateMonth, inferCompLinks, issueFromUnknown, weekday, type CellChoice, type CompDue, type CompOffSummaryRow, type DayNeed, type DayStatus, type HolidayRule, type ScheduleGenerateIssue, type SchedulePattern, type Sex } from "@/data/wedash/scheduleGenerate";
 import { holidayLabel, holidaysForStore, loadHolidaySeed, loadNationalHolidays, storePlace, type Holiday } from "@/data/wedash/scheduleHolidays";
 import { deleteSchedule, fetchCompDue, fetchPreviousSnapshot, fetchSchedule, patchScheduleCompDue, replaceSchedulePerson, saveManualDay, saveSchedule, type StoredDay, type StoredSchedule } from "@/data/wedash/scheduleRepo";
+import { downloadScheduleXlsx, type ScheduleExportCard } from "./scheduleExport";
 import { ScheduleWizard, type ScheduleWizardValue, type WizardBranch } from "./ScheduleWizard";
 
 const MONTHS = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
@@ -331,6 +332,7 @@ export function SchedulePage() {
   const { session, storeRows } = useScopedStores();
   const { scope, setScope } = useScope();
   const exportPdf = useExportPdf("Escala");
+  const reportFileTitle = useReportFileTitle("Escala");
   const many = storeRows.length > 1;
   const today = calendarTodayIso();
   const janela = useMemo(() => managementScheduleWindow(scope.period, today), [scope.period, today]);
@@ -672,6 +674,54 @@ export function SchedulePage() {
         (a.view.store.tradeName || a.view.store.name).localeCompare(b.view.store.tradeName || b.view.store.name, "pt-BR"),
     );
 
+  const exportCards = useMemo((): ScheduleExportCard[] => {
+    return scheduleCards.map(({ view, item }) => {
+      const dates = monthDates(item.monthStart);
+      const shiftById = new Map(view.shifts.map((shift) => [shift.id, shift]));
+      const activeIds = new Set(view.people.map((person) => person.id));
+      const byId = new Map((view.directory ?? view.people).map((person) => [person.id, person]));
+      const ids = new Set<string>([
+        ...item.schedule.people.map((person) => person.sellerId),
+        ...view.days.filter((row) => startOfMonth(row.day) === item.monthStart).map((row) => row.sellerId),
+      ]);
+      const people = [...ids]
+        .map((id) => {
+          const person = byId.get(id);
+          const orphan = !activeIds.has(id);
+          const shift = person?.shiftId ? shiftById.get(person.shiftId) ?? null : null;
+          return {
+            id,
+            name: (person?.name ?? "Pessoa").toLocaleUpperCase("pt-BR"),
+            role: orphan ? "DESLIGADA" : person ? branchRoleLabel(person.role).toLocaleUpperCase("pt-BR") : "",
+            group: shift ? shift.name.toLocaleLowerCase("pt-BR") : "",
+          };
+        })
+        .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+      const rules = item.schedule.holidayRules;
+      const days = view.days
+        .filter((row) => startOfMonth(row.day) === item.monthStart)
+        .map((row) => ({
+          sellerId: row.sellerId,
+          day: row.day,
+          status: row.status,
+          doublePay: rules.some((rule) => rule.date === row.day && rule.pay === "double"),
+        }));
+      return {
+        storeName: view.store.tradeName || view.store.name,
+        monthLabel: monthLabel(item.monthStart),
+        pattern: item.schedule.pattern,
+        people,
+        dates,
+        days,
+      };
+    });
+  }, [scheduleCards]);
+
+  function onExport(format: "pdf" | "xlsx" | "csv") {
+    if (format === "xlsx") downloadScheduleXlsx(exportCards, reportFileTitle());
+    else if (format === "pdf") exportPdf();
+  }
+
   function openCreate() {
     const target = creatable[0] ?? withTeam[0];
     if (!target) return;
@@ -741,7 +791,12 @@ export function SchedulePage() {
               activePresetId={periodActivePresetId(scope.period)}
               maxDate={maxPickerDate(today)}
             />
-            <ExportDialog formats={["pdf"]} disabled={showSkeleton || registered.length === 0} onExport={() => exportPdf()} />
+            <ExportDialog
+              formats={["pdf", "xlsx"]}
+              variant="secondary"
+              disabled={showSkeleton || registered.length === 0}
+              onExport={onExport}
+            />
             {storeRows.length > 0 ? (
               <Button icon={<Icon d={icons.plus} size={16} />} disabled={showSkeleton || withTeam.length === 0} onClick={openCreate}>
                 Nova escala
