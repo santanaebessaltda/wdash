@@ -202,7 +202,7 @@ export function jarvisReply(question: string, firstName?: string): string {
     case "challenge":
       return "Bora montar o desafio. Me fala filial, período, modo e prêmio, ou manda um com produto parado. Eu mostro o rascunho e só gravo se você autorizar.";
     case "goal":
-      return "Vamos lá!! Qual mês você quer fechar?";
+      return "Bora montar a meta. Pra qual mês a gente monta?";
     case "schedule":
       return "Na escala eu uso o mesmo motor do montador. Me diz a filial e o mês; proponho o rascunho e só gero de verdade com o seu OK.";
     case "stay_in_chat":
@@ -210,6 +210,6 @@ export function jarvisReply(question: string, firstName?: string): string {
     case "authorize":
       return "Ainda não tenho rascunho pra gravar. Quando a gente montar algo, eu peço seu OK.";
     default:
-      return "O que você precisa? Pode ser número, meta, desafio ou escala.";
+      return "Me conta o que você quer olhar — vendas, meta, desafio ou escala.";
   }
 }

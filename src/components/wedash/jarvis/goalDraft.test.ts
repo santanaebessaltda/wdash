@@ -10,7 +10,9 @@ import {
   looksLikeAskValueSuggestion,
   looksLikeConfirmMount,
   looksLikeDeclineConfigCopy,
+  looksLikeGoalConversation,
   looksLikeLeakedGoalFacts,
+  looksLikeLostGoalReply,
   naturalGoalAskFromDraft,
   mergeGoalUtterance,
   parseConfigSourceMonth,
@@ -21,6 +23,7 @@ import {
   pickConfigSourceStore,
   pickGoalTargetStore,
   validateGoalDraft,
+  discussGoal,
 } from "./goalDraft";
 
 const ctx = {
@@ -221,6 +224,48 @@ describe("leaked goal facts", () => {
       pendingConfigCopy: null,
       assembly: { ...emptyGoalAssembly(), periodConfirmed: false },
     };
-    expect(naturalGoalAskFromDraft(draft).toLowerCase()).toMatch(/m[eê]s/);
+    const ask = naturalGoalAskFromDraft(draft).toLowerCase();
+    expect(ask).toMatch(/m[eê]s/);
+    expect(ask).not.toMatch(/quer fechar/);
+  });
+
+  it("detecta menu perdido e re-pergunta de mes", () => {
+    const draft = {
+      form: { ...emptyGoalForm("a"), startsOn: "2026-11-01", endsOn: "2026-11-30", target: null },
+      pendingConfigCopy: null,
+      assembly: { ...emptyGoalAssembly(), periodConfirmed: true },
+    };
+    expect(
+      looksLikeLostGoalReply("O que você precisa? Pode ser número, meta, desafio ou escala.", draft),
+    ).toBe(true);
+    expect(looksLikeLostGoalReply("Vamos lá!! Qual mês você quer fechar?", draft)).toBe(true);
+    expect(looksLikeLostGoalReply("Novembro então. Qual valor você quer?", draft)).toBe(false);
+  });
+
+  it("novembro sozinho continua o fio depois de pedir mes", () => {
+    expect(
+      looksLikeGoalConversation(
+        [
+          { from: "user", text: "Preciso criar a meta da minha loja" },
+          { from: "jarvis", text: "Bora montar a meta. Pra qual mês a gente monta?" },
+        ],
+        "Novembro",
+        "2026-10-29",
+      ),
+    ).toBe(true);
+  });
+
+  it("discussGoal grava novembro e nao pede mes de novo", async () => {
+    const prev = {
+      form: { ...emptyGoalForm("a"), startsOn: "2026-11-01", endsOn: "2026-11-30", target: null },
+      pendingConfigCopy: null,
+      assembly: { ...emptyGoalAssembly(), periodConfirmed: false },
+    };
+    const { draft } = await discussGoal("Novembro", ctx, prev);
+    expect(draft.assembly?.periodConfirmed).toBe(true);
+    expect(draft.form.startsOn).toBe("2026-11-01");
+    const ask = naturalGoalAskFromDraft(draft).toLowerCase();
+    expect(ask).toMatch(/valor/);
+    expect(ask).not.toMatch(/m[eê]s/);
   });
 });

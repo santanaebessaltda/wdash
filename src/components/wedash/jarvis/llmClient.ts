@@ -31,6 +31,9 @@ export type LlmSideEffect =
 export type JarvisLlmSession = {
   goalDraftSummary?: string | null;
   goalDraftMissing?: string | null;
+  /** true = Gestor já escolheu o mês — NÃO perguntar de novo. */
+  goalPeriodConfirmed?: boolean | null;
+  goalNextStep?: string | null;
   challengeDraftSummary?: string | null;
   scheduleDraftSummary?: string | null;
 };
@@ -60,11 +63,22 @@ function contextNote(ctx: JarvisContext, session?: JarvisLlmSession | null): str
   ];
   if (session?.goalDraftSummary) {
     lines.push(
-      `META em discussao (texto): ${session.goalDraftSummary}. Continue com draft_goal; gravar = commit_draft target=goal.`,
+      `META em discussao (texto): ${session.goalDraftSummary}. SEMPRE continue com draft_goal neste fio; gravar = commit_draft target=goal.`,
     );
+    if (session.goalPeriodConfirmed) {
+      lines.push("Mes JA confirmado pelo Gestor. PROIBIDO perguntar o mes de novo.");
+    } else {
+      lines.push("Mes ainda nao confirmado. Pergunte pra qual mes montar a meta (nao diga 'quer fechar').");
+    }
+    if (session.goalNextStep) {
+      lines.push(`Proximo passo da meta: ${session.goalNextStep}`);
+    }
     if (session.goalDraftMissing) {
       lines.push(`Ainda faltando na meta: ${session.goalDraftMissing}.`);
     }
+    lines.push(
+      "PROIBIDO voltar ao menu (numero/meta/desafio/escala) ou perguntar 'o que voce precisa' enquanto a meta estiver aberta.",
+    );
   }
   if (session?.challengeDraftSummary) {
     lines.push(`DESAFIO aberto (card): ${session.challengeDraftSummary}. Gravar = commit_draft target=challenge.`);
@@ -83,12 +97,13 @@ export async function jarvisLlmTurn(
   history: LlmChatMessage[],
   ctx: JarvisContext,
   userText: string,
-  session?: JarvisLlmSession | null,
+  session?: JarvisLlmSession | null | (() => JarvisLlmSession | null | undefined),
   hooks?: JarvisLlmHooks | null,
 ): Promise<LlmTurnResult> {
   const sb = getSupabase();
   if (!sb) return { ok: false, reason: "supabase_missing" };
 
+  const resolveSession = () => (typeof session === "function" ? session() : session);
   const messages: LlmChatMessage[] = [...history, { role: "user", content: userText }];
   const sideEffects: LlmSideEffect[] = [];
   const maxRounds = 4;
@@ -98,7 +113,7 @@ export async function jarvisLlmTurn(
       body: {
         action: "chat",
         messages,
-        contextNote: contextNote(ctx, session),
+        contextNote: contextNote(ctx, resolveSession()),
       },
     });
 

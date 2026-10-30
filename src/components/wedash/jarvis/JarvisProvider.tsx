@@ -27,7 +27,9 @@ import {
   discussGoal,
   formatGoalFactsForModel,
   goalCanCommit,
+  looksLikeGoalConversation,
   looksLikeLeakedGoalFacts,
+  looksLikeLostGoalReply,
   missingGoalLabels,
   naturalGoalAskFromDraft,
   validateGoalDraft,
@@ -570,14 +572,31 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
     [commitBusy, session, speakAnswer],
   );
 
-  /** Fallback sem Gemini: continua rascunho aberto ou resposta local; sem classifyIntent. */
+  /** Mantém o rascunho de meta no ref mesmo se o Gemini esquecer de chamar draft_goal. */
+  const syncGoalDraft = useCallback(
+    async (q: string, ctx: ReturnType<typeof jarvisContextFromSession>): Promise<GoalDraft | null> => {
+      if (challengeDraftRef.current && !goalDraftRef.current) return null;
+      if (
+        !goalDraftRef.current &&
+        !looksLikeGoalConversation(messagesRef.current, q, ctx.today)
+      ) {
+        return null;
+      }
+      const { draft } = await discussGoal(q, ctx, goalDraftRef.current);
+      goalDraftRef.current = draft;
+      setGoalDraft(null);
+      setCreatedItem(null);
+      return draft;
+    },
+    [],
+  );
+
+  /** Fallback sem Gemini: continua fio de meta/desafio/escala; sem menu genérico no meio da meta. */
   const replyLocal = useCallback(
     async (q: string, ctx: ReturnType<typeof jarvisContextFromSession>, finish: (a: string) => void) => {
-      if (goalDraftRef.current) {
-        const { draft } = await discussGoal(q, ctx, goalDraftRef.current);
-        goalDraftRef.current = draft;
-        setGoalDraft(null);
-        finish(naturalGoalAskFromDraft(draft));
+      const goal = await syncGoalDraft(q, ctx);
+      if (goal) {
+        finish(naturalGoalAskFromDraft(goal));
         return;
       }
       if (challengeDraftRef.current) {
@@ -596,7 +615,7 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
       }
       finish(await jarvisAnswer(q, ctx));
     },
-    [],
+    [syncGoalDraft],
   );
 
   const reply = useCallback(
@@ -638,14 +657,25 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
       const llmSession = (): JarvisLlmSession => {
         const draft = goalDraftRef.current;
         const g = draft?.form;
+        const a = draft?.assembly;
         const c = challengeDraftRef.current?.form;
         const s = scheduleDraftRef.current?.form;
         const missing = g ? missingGoalLabels(validateGoalDraft(g)) : [];
+        let goalNextStep: string | null = null;
+        if (draft && a) {
+          if (!a.periodConfirmed) goalNextStep = "pedir o mês da meta";
+          else if (!g?.storeId) goalNextStep = "pedir a filial";
+          else if (!a.valueDiscussed || g.target == null) goalNextStep = "pedir ou sugerir o valor";
+          else if (a.path == null) goalNextStep = "perguntar se copia config anterior ou monta do zero";
+          else if (!a.confirmedMount) goalNextStep = "pedir confirmação para montar o rascunho";
+        }
         return {
           goalDraftSummary: g
             ? `${g.name || "sem nome"} · alvo ${g.target ?? "?"} · ${g.startsOn ?? "?"} a ${g.endsOn ?? "?"} · ${g.tiers.length} níveis · modo ${g.tierMode}`
             : null,
           goalDraftMissing: missing.length ? missing.join(", ") : null,
+          goalPeriodConfirmed: a?.periodConfirmed ?? null,
+          goalNextStep,
           challengeDraftSummary: c ? `${c.name || "sem nome"} · modo ${c.mode} · métrica ${c.metric}` : null,
           scheduleDraftSummary: s ? `${s.monthStart || "?"} · loja ${s.storeId || "?"}` : null,
         };
@@ -744,8 +774,8 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
       });
 
       void (async () => {
-        // 100% LLM: prompt + tools. App nao roteia por keyword (autorizar/descartar/cumprimento).
-        const llm = await jarvisLlmTurn(history, ctx, q, llmSession(), llmHooks());
+        // Prompt + tools; app sincroniza estado da meta pra nao perder o fio.
+        const llm = await jarvisLlmTurn(history, ctx, q, llmSession, llmHooks());
         if (gen !== replyGen.current) return;
 
         if (!llm.ok) {
@@ -759,13 +789,21 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
 
         applyPeriodHint();
 
+        // Mesmo com Gemini ok: aplica a fala do Gestor no rascunho (Novembro, valor…).
+        const draft = await syncGoalDraft(q, ctx);
+        if (gen !== replyGen.current) return;
+
         const raw = llm.content.trim();
+        if (draft && (looksLikeLeakedGoalFacts(raw) || !raw || looksLikeLostGoalReply(raw, draft))) {
+          finish(naturalGoalAskFromDraft(draft));
+          return;
+        }
         if (raw && !looksLikeLeakedGoalFacts(raw)) {
           finish(raw);
           return;
         }
-        if (goalDraftRef.current) {
-          finish(naturalGoalAskFromDraft(goalDraftRef.current));
+        if (draft) {
+          finish(naturalGoalAskFromDraft(draft));
           return;
         }
         finish("Me fala mais um detalhe?");
@@ -781,6 +819,7 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
       replyLocal,
       session,
       speakAnswer,
+      syncGoalDraft,
     ],
   );
 

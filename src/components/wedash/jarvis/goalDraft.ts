@@ -727,38 +727,82 @@ export function looksLikeLeakedGoalFacts(text: string): boolean {
   return /faltando:/.test(t) && /valueDiscussed:/.test(t);
 }
 
-/** Fala humana de emergência quando o modelo vazou o estado interno. */
+/** Fala humana de emergência quando o modelo vazou o estado interno ou perdeu o fio. */
 export function naturalGoalAskFromDraft(draft: GoalDraft): string {
   const form = draft.form;
   const a = draft.assembly ?? emptyGoalAssembly();
   if (!a.periodConfirmed) {
     const tip = form.startsOn ? monthYearTitle(form.startsOn) : null;
     return tip
-      ? `Vamos lá!!\n\nQual mês você quer fechar? Eu iria de ${tip}. Topa, ou tem outro em mente?`
-      : `Vamos lá!!\n\nQual mês você quer fechar?`;
+      ? `Bora montar a meta.\n\nPra qual mês? Eu pensaria em ${tip}. Serve, ou é outro?`
+      : `Bora montar a meta.\n\nPra qual mês a gente monta?`;
   }
   if (!form.storeId) {
     return form.startsOn
-      ? `${monthYearTitle(form.startsOn)} então. Qual filial a gente usa?`
+      ? `${monthYearTitle(form.startsOn)}, fechado. Qual filial?`
       : "Qual filial a gente usa?";
   }
   if (!a.valueDiscussed || form.target == null) {
     const month = form.startsOn ? monthYearTitle(form.startsOn) : "esse mês";
-    return `Fechado, ${month}.\n\nQual valor você está pensando? Ou prefere que eu chute com o histórico?`;
+    return `${month} então.\n\nQual valor de meta você quer? Ou prefere que eu sugira com o histórico?`;
+  }
+  if (a.path === null) {
+    return `Ficou ${brlCent(form.target!)}.\n\nCopia a escada da meta anterior dessa filial, ou monta do zero?`;
   }
   if (a.path === "fresh" && !a.confirmedGroups) {
-    return "E a divisão por grupo: rateia entre os grupos, ou deixa a loja inteira?";
+    return "Divisão por grupo: rateia entre os grupos, ou loja inteira?";
   }
   if (a.path === "fresh" && !a.confirmedSpread) {
     return "Venda sem vendedor identificado: rateia na equipe do dia, ou deixa de fora?";
   }
   if (a.path === "fresh" && !a.confirmedTiers) {
-    return `Escada que estou pensando: ${formatTiersBrief(form.tiers)}. Serve?`;
+    return `Escada: ${formatTiersBrief(form.tiers)}. Serve?`;
   }
   if (!a.confirmedMount) {
-    return "Se estiver bom, é só dizer que pode montar o rascunho.";
+    return "Se estiver bom, diga que pode montar o rascunho.";
   }
   return "Me fala mais um detalhe pra gente fechar a meta.";
+}
+
+/** Histórico recente ainda é o fio de montar meta (não menu genérico). */
+export function looksLikeGoalConversation(
+  recent: { from: string; text: string }[],
+  q: string,
+  today: string,
+): boolean {
+  const qn = norm(q);
+  if (/\bmeta\b/.test(qn) && !/meta cadastrada|qual (e|é) a meta|quanto (e|é) a meta/.test(qn)) {
+    return true;
+  }
+  if (looksLikeAskValueSuggestion(q) || looksLikeGoalLadderTalk(q)) return true;
+
+  const lastJarvis = [...recent].reverse().find((m) => m.from === "jarvis");
+  if (!lastJarvis) return false;
+  const jn = norm(lastJarvis.text);
+  const jarvisOnGoal =
+    /\bmeta\b/.test(jn) ||
+    /pra qual m[eê]s|qual m[eê]s|montar a meta|bora montar|qual valor|sugira|filial|escada|rascunho|copiar|grupos|rateio/.test(
+      jn,
+    );
+  if (!jarvisOnGoal) return false;
+
+  if (parseGoalPeriod(q, today) != null) return true;
+  if (parseGoalTarget(q) != null) return true;
+  if (/^(isso|esse|essa|ok|sim|pode|proximo|próximo|topa|fechado)(\b|!|\?|,|$)/.test(qn)) return true;
+  if (qn.length > 0 && qn.length < 40) return true;
+  return false;
+}
+
+/** Modelo esqueceu o fio (menu) ou perguntou mês de novo com período já confirmado. */
+export function looksLikeLostGoalReply(text: string, draft: GoalDraft): boolean {
+  const n = norm(text);
+  if (/pode ser n[uú]mero.? meta.? desafio|n[uú]mero, meta, desafio ou escala/.test(n)) return true;
+  if (/^o que voc[eê] precisa\b/.test(n) && /meta|desafio|escala/.test(n)) return true;
+  const a = draft.assembly ?? emptyGoalAssembly();
+  if (a.periodConfirmed && /qual m[eê]s|m[eê]s (a gente |voc[eê] )?quer fechar|pra qual m[eê]s/.test(n)) {
+    return true;
+  }
+  return false;
 }
 
 /** Resumo interno para a IA (nunca mostrar no chat). */
@@ -811,10 +855,12 @@ export function formatGoalProposal(form: GoalDraftForm, storeName: string, assem
 }
 
 function nextAssemblyHint(form: GoalDraftForm, assembly: GoalAssembly): string | null {
-  if (!assembly.periodConfirmed) return "perguntar qual mes fechar (sugira o mes tipado no form.startsOn)";
+  if (!assembly.periodConfirmed) {
+    return "perguntar pra qual mes montar a meta (sugira o mes tipado em form.startsOn). NUNCA diga 'quer fechar'";
+  }
   if (!form.storeId) return "perguntar qual filial";
   if (!assembly.valueDiscussed || form.target == null) {
-    return "perguntar valor que o Gestor tem em mente, ou se quer sugestao pelo historico";
+    return "perguntar valor da meta, ou se quer sugestao pelo historico. Nao pergunte o mes de novo";
   }
   if (!goalDraftReady(form)) {
     const missing = missingGoalLabels(validateGoalDraft(form));

@@ -227,7 +227,7 @@ Inspiração de UX: [Néctar](https://www.meu-nectar.com/) (conversa humana, res
 
 **Tom:** informal, humano — curto, confirma o que fez, sem jargão de produto.
 
-**Roteamento (DECIDIDO — 2026-10-29, LLM-first; chat = Gemini — 2026-10-30; sem keyword no chat — 2026-10-30):** turno pelo **Gemini** (`jarvis-ai` action `chat`, `GEMINI_API_KEY`). **Conversa = só prompt + tools** — o app **não** classifica mensagem por keyword (cumprimento, autorizar, descartar, “abre tela”). A IA interpreta e chama `analyze_*` / `draft_*` / `commit_draft` / `discard_draft`. Botões Autorizar/Descartar do card continuam no UI. Fallback local (Edge offline) só continua rascunho aberto ou `jarvisAnswer` — sem `classifyIntent` no caminho do chat. STT = Whisper; TTS configurável.
+**Roteamento (DECIDIDO — 2026-10-29, LLM-first; chat = Gemini — 2026-10-30; sem keyword no chat — 2026-10-30; fio de meta — 2026-10-30):** turno pelo **Gemini** (`jarvis-ai` action `chat`, `GEMINI_API_KEY`). Conversa = prompt + tools (`analyze_*` / `draft_*` / `commit_draft` / `discard_draft`). O app **sincroniza o rascunho de meta** a cada turno do fio (mês/valor) mesmo se o modelo esquecer `draft_goal`; se a fala voltar a menu ou perguntar o mês de novo, substitui pelo próximo passo humano. Pedir mês = “pra qual mês montar”, nunca “quer fechar”. Botões Autorizar/Descartar do card continuam. STT = Whisper; TTS configurável.
 
 **Superfície (DECIDIDO — 2026-10-29):**
 - **Botão flutuante** no canto inferior direito (só Gestor) — painel no estilo Apps > Chat do Vela (thread + composer); mic = ditado; **Limpar** zera o thread; histórico da conversa fica em `sessionStorage` (sobrevive a F5 no mesmo separador). **Fora do menu.** `/chat-ia` e `/jarvis` redirecionam para Visão geral. **Filial:** Topbar.
