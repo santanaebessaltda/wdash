@@ -469,10 +469,10 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
     setCreatedItem({ kind: "goal", id: res.id, name: res.name, asDraft: true });
     const periodLabel =
       draft.form.startsOn && draft.form.endsOn
-        ? ` (${draft.form.startsOn.slice(8, 10)}/${draft.form.startsOn.slice(5, 7)} a ${draft.form.endsOn.slice(8, 10)}/${draft.form.endsOn.slice(5, 7)}, )`
+        ? ` (${draft.form.startsOn.slice(8, 10)}/${draft.form.startsOn.slice(5, 7)} a ${draft.form.endsOn.slice(8, 10)}/${draft.form.endsOn.slice(5, 7)})`
         : "";
     speakAnswer(
-      `Pronto — rascunho “${res.name}”${periodLabel} gravado em Metas. Abre o link pra revisar e publicar quando quiser.`,
+      `Pronto — salvei como rascunho “${res.name}”${periodLabel}, igual o botão Salvar rascunho em Metas. Abre o link, revisa/edita e publica quando quiser.`,
     );
   }, [commitBusy, session, speakAnswer]);
 

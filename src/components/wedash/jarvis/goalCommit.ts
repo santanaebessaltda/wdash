@@ -10,7 +10,7 @@ export type GoalCommitOptions = {
   published?: boolean;
 };
 
-/** Grava meta: por padrao como rascunho (published_at null) pra revisar em Metas. */
+/** Igual "Salvar rascunho" do editor de Metas: published_at null; Gestor revisa/publica la. */
 export async function commitGoal(
   tenantId: string,
   form: GoalDraftForm,

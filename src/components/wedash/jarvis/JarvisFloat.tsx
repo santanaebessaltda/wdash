@@ -165,7 +165,7 @@ export function JarvisFloat() {
                       <p className="font-semibold text-t0">
                         {j.createdItem.kind === "goal"
                           ? j.createdItem.asDraft
-                            ? `Rascunho da meta: ${j.createdItem.name}`
+                            ? `Rascunho salvo: ${j.createdItem.name}`
                             : `Meta criada: ${j.createdItem.name}`
                           : j.createdItem.kind === "challenge"
                             ? `Desafio criado: ${j.createdItem.name}`
@@ -187,7 +187,7 @@ export function JarvisFloat() {
                         Abrir{" "}
                         {j.createdItem.kind === "goal"
                           ? j.createdItem.asDraft
-                            ? "rascunho"
+                            ? "rascunho no editor"
                             : "meta"
                           : j.createdItem.kind === "challenge"
                             ? "desafio"

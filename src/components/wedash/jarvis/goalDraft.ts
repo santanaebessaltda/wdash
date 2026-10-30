@@ -474,7 +474,7 @@ export function formatGoalProposal(form: GoalDraftForm, storeName: string): stri
     (form.managerOn ? " · com premiação da gerência" : "") +
     ".";
   if (ready) {
-    return `${base} Fechado pra mim no chat (so texto). Quando quiser, diga "cria a meta" / Autorizo que eu gravo o rascunho em Metas.`;
+    return `${base} Fechado pra mim no chat (so texto). Quando quiser, diga "cria a meta" / Autorizo — eu salvo como rascunho em Metas (igual Salvar rascunho); voce revisa e publica la.`;
   }
   const missing = missingGoalLabels(validateGoalDraft(form));
   return `${base} Ainda falta: ${missing.join(", ")}. Pode falar o valor, a filial ou o mês.`;

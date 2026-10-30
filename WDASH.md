@@ -261,7 +261,7 @@ Leitura **não** pede confirmação. Escrita **sempre** pede.
 
 **Fatia 8–9 (2026-10-29):** sem voz contínua; chat-first; **sem redirecionar páginas** — tools/prompt só no chat.
 
-**Meta = rascunho em Metas (2026-10-29):** ao confirmar criar meta no chat, o JARVIS grava rascunho (não publica). Histórico do chat persiste em sessionStorage até Limpar.
+**Meta = Salvar rascunho (2026-10-30):** ao confirmar no chat, o JARVIS faz o mesmo que o botão **Salvar rascunho** do editor (`published_at` null). O Gestor abre o rascunho em Metas, edita se precisar e publica lá. Histórico do chat em sessionStorage até Limpar.
 
 ### Alertas (DECIDIDO — 2026-09-29)
 - **Todo alerta do app usa `Alert`** (`src/components/ui/Alert.tsx`, padrão Components > Alerts do Vela — "Storage almost full" etc.): fundo suave da cor, sem borda, ícone 18px e título em negrito na cor, texto em `text-t1`. Variantes `success · warning · danger · info · accent`; `icon` troca o ícone (Spinner, RadialProgress), `action` = links/botões à direita (`AlertLink` para link de texto), `footer` = conteúdo extra (lista expandida, checkbox).
