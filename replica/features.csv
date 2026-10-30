@@ -37,7 +37,7 @@ Menu Gestão com submenu Escala,navegacao,must,no,yes,calendário e Gerar escala
 Várias filiais no seletor mostram o mês e não editam o dia,navegacao,should,no,yes,igual Sangrias: ação do dia só com uma filial
 Rascunho automático neste navegador,persistencia,skip,yes,skip,não é o arquivo oficial
 Baixar e reabrir arquivo JSON,persistencia,skip,yes,skip,
-Imprimir a escala,exportacao,could,yes,no,
+Imprimir a escala,exportacao,could,yes,yes,Exportar PDF = layout de impressão (mesmo padrão do Dashboard)
 Exportar Excel,exportacao,could,yes,no,
 Nova escala do zero,configuracao,should,yes,no,no WDash é criar outra configuração
 Marca e texto Método EmpresaBlindada,marca,skip,yes,skip,não levar nome logo nem rodapé

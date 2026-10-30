@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Accordion, Alert, Badge, Button, Card, Checkbox, DateRangePicker, Modal, PageHeader, Select, useToast } from "@/components/ui";
 import type { DateRange, DateRangeChangeMeta } from "@/components/ui/DateRangePicker";
 import { ColorLegend, type LegendItem } from "@/components/wedash/ColorLegend";
+import { ExportDialog } from "@/components/wedash/ExportDialog";
 import { ScheduleCardsSkeleton } from "@/components/wedash/LoadingSkeletons";
 import { PersonAvatar } from "@/components/wedash/PersonAvatar";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
@@ -12,6 +13,7 @@ import {
   periodActivePresetId,
   periodDisplayLabel,
 } from "@/pages/dashboard/periodPicker";
+import { ReportHeader, useExportPdf } from "@/pages/dashboard/ReportHeader";
 import { useScope } from "@/pages/dashboard/useScope";
 import { HeaderFilters } from "@/pages/stock/shared";
 import { useScopedStores } from "@/pages/operation/shared";
@@ -334,6 +336,7 @@ export function SchedulePage() {
   const { show } = useToast();
   const { session, storeRows } = useScopedStores();
   const { scope, setScope } = useScope();
+  const exportPdf = useExportPdf("Escala");
   const many = storeRows.length > 1;
   const today = calendarTodayIso();
   const janela = useMemo(() => managementScheduleWindow(scope.period, today), [scope.period, today]);
@@ -684,7 +687,7 @@ export function SchedulePage() {
 
   function registeredActions(view: BranchSchedule, monthStart: string) {
     return (
-      <>
+      <div className="flex flex-wrap items-center gap-2 print:hidden">
         <Button
           variant="outline"
           size="sm"
@@ -703,7 +706,7 @@ export function SchedulePage() {
         >
           Editar escala
         </Button>
-      </>
+      </div>
     );
   }
 
@@ -730,7 +733,8 @@ export function SchedulePage() {
   const wizardBranches = (wizardMonth != null && wizardView ? [wizardView] : withTeam).map((view) => toBranch(view));
 
   return (
-    <div>
+    <div className="print:p-0">
+      <ReportHeader />
       <PageHeader
         crumbs={[{ label: "Escala" }]}
         title="Escala"
@@ -743,6 +747,7 @@ export function SchedulePage() {
               activePresetId={periodActivePresetId(scope.period)}
               maxDate={maxPickerDate(today)}
             />
+            <ExportDialog formats={["pdf"]} disabled={showSkeleton || registered.length === 0} onExport={() => exportPdf()} />
             {storeRows.length > 0 ? (
               <Button icon={<Icon d={icons.plus} size={16} />} disabled={showSkeleton || withTeam.length === 0} onClick={openCreate}>
                 Nova escala
@@ -751,7 +756,7 @@ export function SchedulePage() {
           </HeaderFilters>
         }
       />
-      {storeRows.length > 0 ? <ColorLegend className="mb-4" mark="square" items={SCHEDULE_LEGEND} /> : null}
+      {storeRows.length > 0 ? <ColorLegend className="mb-4 print:mb-3" mark="square" items={SCHEDULE_LEGEND} /> : null}
       <div className="min-w-0 pb-8">
         {error ? <Alert className="mb-4" variant="danger" title="Não foi possível carregar a escala. Tente novamente." /> : null}
         {storeRows.length === 0 ? (
@@ -819,18 +824,15 @@ export function SchedulePage() {
                     <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
                       <div className="min-w-0">
                         <h3 className="text-[17px] font-extrabold leading-tight tracking-tight text-t0">
-                          Escala {PATTERN_LABEL[item.schedule.pattern]}
+                          {storeLabel} · escala {PATTERN_LABEL[item.schedule.pattern]}
                         </h3>
                         <div className="mt-1 flex min-w-0 flex-wrap items-center gap-2">
-                          <Badge variant="neutral" className="max-w-full truncate">
-                            {storeLabel}
-                          </Badge>
                           <Badge variant="neutral">{monthLabel(item.monthStart).toLocaleUpperCase("pt-BR")}</Badge>
                         </div>
                       </div>
-                      <div className="flex flex-wrap items-center gap-2">{registeredActions(view, item.monthStart)}</div>
+                      {registeredActions(view, item.monthStart)}
                     </div>
-                    <div className="mb-3">
+                    <div className="mb-3 print:hidden">
                       <Checkbox
                         checked={showNeighbors}
                         onChange={(event) => setShowNeighbors(event.target.checked)}
