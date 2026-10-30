@@ -82,7 +82,16 @@ const MONTH_NAMES: Record<string, number> = {
   dezembro: 12,
 };
 
-/** Competência civil a partir do texto (próximo mês, novembro, este mês…). */
+/** Nome automatico tipo "Maio 2026" / "Novembro 2026". */
+export function isAutoMonthYearName(name: string): boolean {
+  const n = norm(name.trim());
+  return Object.keys(MONTH_NAMES).some((m) => new RegExp(`^${m}\\s+20\\d{2}$`).test(n));
+}
+
+/**
+ * Competência civil a partir do texto.
+ * Prefere mes-alvo ("meta de novembro") sobre mes de referencia ("tendo em vista a meta de outubro").
+ */
 export function parseGoalPeriod(text: string, today: string): { startsOn: string; endsOn: string } | null {
   const p = norm(text);
   if (/proximo mes|mes que vem/.test(p)) {
@@ -93,26 +102,43 @@ export function parseGoalPeriod(text: string, today: string): { startsOn: string
     const startsOn = startOfMonth(today);
     return { startsOn, endsOn: endOfMonth(startsOn) };
   }
-  if (/mes passado/.test(p)) {
+  if (/mes passado/.test(p) && !/meta de (janeiro|fevereiro|marco|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)/.test(p)) {
     const startsOn = shiftMonthStart(today, -1);
     return { startsOn, endsOn: endOfMonth(startsOn) };
   }
+
+  type Hit = { month: number; year: number; score: number };
+  const hits: Hit[] = [];
   for (const [name, month] of Object.entries(MONTH_NAMES)) {
     if (!p.includes(name)) continue;
-    // Evita tratar “config de outubro” como período da meta nova.
-    if (
-      new RegExp(
-        `(configura|igual|copiar|seguir|mesma|mesmo|escada|nivel).{0,40}${name}|${name}.{0,20}(configura|escada|nivel)`,
-      ).test(p) &&
-      !new RegExp(`meta (de |do |para |em )?${name}|${name} (com |de )?meta|competencia.{0,10}${name}`).test(p)
-    ) {
-      continue;
-    }
     const yearMatch = p.match(new RegExp(`${name}\\s+(?:de\\s+)?(20\\d{2})`));
     const y = yearMatch ? Number(yearMatch[1]) : Number(today.slice(0, 4));
-    const startsOn = `${y}-${pad(month)}-01`;
+    let score = 1 + p.lastIndexOf(name) / 10_000;
+
+    // Alvo da meta nova.
+    if (
+      new RegExp(
+        `meta (de |do |para |em |da )?${name}|${name} da (filial|loja)|para (a |o )?(filial|loja).{0,40}${name}|fazer a meta de ${name}|meta de ${name} da`,
+      ).test(p)
+    ) {
+      score += 20;
+    }
+    // Referencia / copia de config — nao deve ganhar do alvo.
+    if (
+      new RegExp(
+        `(configura|igual|copiar|seguir|mesma|mesmo|escada|nivel|tendo em vista|em vista|basead|historico|vista a meta).{0,48}${name}|${name}.{0,24}(configura|escada|nivel)`,
+      ).test(p)
+    ) {
+      score -= 15;
+    }
+    hits.push({ month, year: y, score });
+  }
+  hits.sort((a, b) => b.score - a.score);
+  if (hits[0] && hits[0].score > 0) {
+    const startsOn = `${hits[0].year}-${pad(hits[0].month)}-01`;
     return { startsOn, endsOn: endOfMonth(startsOn) };
   }
+
   const range = p.match(/de\s+(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?\s+a\s+(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?/);
   if (range) {
     const y0 = range[3] ? (range[3].length === 2 ? `20${range[3]}` : range[3]) : today.slice(0, 4);
@@ -177,8 +203,11 @@ export function goalDraftReady(f: GoalDraftForm): boolean {
 }
 
 export function ensureGoalName(f: GoalDraftForm): GoalDraftForm {
+  // Se o periodo mudou (novembro) mas o nome ficou "Maio 2026", sincroniza.
+  if (f.startsOn && (!f.name.trim() || isAutoMonthYearName(f.name))) {
+    return { ...f, name: monthYearTitle(f.startsOn) };
+  }
   if (f.name.trim()) return f;
-  if (f.startsOn) return { ...f, name: monthYearTitle(f.startsOn) };
   return { ...f, name: "Nova meta" };
 }
 
@@ -456,8 +485,19 @@ export async function discussGoal(
   ctx: JarvisContext,
   prev: GoalDraft | null,
 ): Promise<{ reply: string; draft: GoalDraft }> {
+  const prevStarts = prev?.form.startsOn ?? null;
   let form = prev?.form ?? emptyGoalForm(ctx.stores.length === 1 ? ctx.stores[0]!.id : "");
   form = mergeGoalUtterance(form, question, ctx);
+  // Periodo mudou (ex.: maio → novembro): nao reaproveitar valor do mes antigo.
+  if (prevStarts && form.startsOn && prevStarts !== form.startsOn && parseGoalTarget(question) == null) {
+    form = { ...form, target: null };
+  } else if (
+    form.target != null &&
+    /suger|melhorar|quanto (seria|fica)|valor vc sugere|valor voce sugere/.test(norm(question)) &&
+    parseGoalTarget(question) == null
+  ) {
+    form = { ...form, target: null };
+  }
 
   const sourceWin = parseConfigSourceMonth(question, ctx.today);
   let copiedLadder = false;

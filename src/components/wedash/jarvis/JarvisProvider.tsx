@@ -467,8 +467,12 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
     setGoalDraft(null);
     goalDraftRef.current = null;
     setCreatedItem({ kind: "goal", id: res.id, name: res.name, asDraft: true });
+    const periodLabel =
+      draft.form.startsOn && draft.form.endsOn
+        ? ` (${draft.form.startsOn.slice(8, 10)}/${draft.form.startsOn.slice(5, 7)} a ${draft.form.endsOn.slice(8, 10)}/${draft.form.endsOn.slice(5, 7)}, )`
+        : "";
     speakAnswer(
-      `Pronto — rascunho “${res.name}” gravado em Metas. Abre o link pra revisar e publicar quando quiser.`,
+      `Pronto — rascunho “${res.name}”${periodLabel} gravado em Metas. Abre o link pra revisar e publicar quando quiser.`,
     );
   }, [commitBusy, session, speakAnswer]);
 
@@ -624,25 +628,20 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
           void authorizeChallenge();
           return;
         }
-        if (goalDraftRef.current) {
-          void authorizeGoal();
-          return;
-        }
-        if (scheduleDraftRef.current) {
+        if (scheduleDraftRef.current && !goalDraftRef.current && !/\bmeta\b/.test(n)) {
           void authorizeSchedule();
           return;
         }
-        // "Ok vamos criar essa meta" sem card: monta pelo historico do chat e grava rascunho em Metas.
-        if (/\bmeta\b/.test(n) || /vamos criar|cria(r)? |monta(r)? /.test(n)) {
+        // Meta: SEMPRE remonta pelo historico recente antes de gravar (evita rascunho velho de outro mes).
+        if (goalDraftRef.current || /\bmeta\b/.test(n) || /vamos criar|cria(r)? |monta(r)? /.test(n)) {
           void (async () => {
             if (gen !== replyGen.current) return;
             const historyBlob = [...messagesRef.current, { from: "user", text: q }]
-              .slice(-12)
+              .slice(-16)
               .map((m) => `${m.from}: ${m.text}`)
               .join("\n");
             const { draft } = await discussGoal(historyBlob || q, ctx, goalDraftRef.current);
             if (gen !== replyGen.current) return;
-            // Meta: so texto no chat — memoria no ref; grava em Metas so na confirmacao.
             goalDraftRef.current = draft;
             setGoalDraft(null);
             setChallengeDraft(null);
@@ -658,6 +657,10 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
             }
             await authorizeGoal();
           })();
+          return;
+        }
+        if (scheduleDraftRef.current) {
+          void authorizeSchedule();
           return;
         }
         finish("Não tenho rascunho pendente. Manda um desafio, uma meta ou a escala que a gente monta.");

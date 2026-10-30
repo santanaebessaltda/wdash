@@ -32,6 +32,12 @@ describe("parseGoalPeriod", () => {
   it("nome do mês", () => {
     expect(parseGoalPeriod("meta de novembro", "2026-10-29")?.startsOn).toBe("2026-11-01");
   });
+
+  it("novembro ganha de outubro de referencia no mesmo texto", () => {
+    const q =
+      "Preciso fazer a meta de novembro da minha filial. Qual valor vc sugere tendo em vista a meta de outubro?";
+    expect(parseGoalPeriod(q, "2026-10-29")?.startsOn).toBe("2026-11-01");
+  });
 });
 
 describe("parseGoalTarget", () => {
