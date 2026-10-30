@@ -6,6 +6,15 @@ import { brlCent, monthYearTitle } from "@/lib/format";
 import { matchStoresInText, type JarvisContext, type JarvisStoreRef } from "./context";
 import { looksLikeGoalLadderTalk } from "./respond";
 import { seasonalBiasForPeriod } from "./seasonalBrief";
+import {
+  applyConfigPatternToForm,
+  buildGoalConfigSnapshot,
+  fetchRecentGoalConfigs,
+  inferConfigPatternFromHistory,
+  parseGoalCopyIntent,
+  suggestGroupWeightsFromSales,
+  type GoalCopyIntent,
+} from "./goalConfigIntel";
 
 export type GoalDraftForm = {
   name: string;
@@ -50,6 +59,8 @@ export type GoalDraft = {
   userLockedTarget?: boolean;
   /** Última proposta estruturada do motor (cenários + evidências). */
   proposal?: GoalIntelligenceResult | null;
+  /** exact = preservar tudo; reference = pode recomendar ajuste (sem aplicar sozinho). */
+  copyIntent?: GoalCopyIntent | null;
 };
 
 export function emptyGoalAssembly(): GoalAssembly {
@@ -994,10 +1005,10 @@ export function naturalGoalAskFromDraft(draft: GoalDraft): string {
     return "Não achei a meta publicada daquele mês pra copiar a escada.\n\nConfirma a filial e o mês da configuração (ex.: outubro), ou montamos do zero?";
   }
   if (a.path === "copy" && draft.copyStatus === "ok" && !a.confirmedMount) {
+    const snap = buildGoalConfigSnapshot(form, form.target);
     return (
-      `Copiei ${form.tiers.length} níveis, modo ${form.tierMode}` +
-      (form.groups.length ? `, ${form.groups.length} grupos` : "") +
-      `.\n\nSe estiver certo, diga que pode salvar o rascunho.`
+      snap.chatBlocks.join("\n\n") +
+      "\n\nSe estiver certo, diga que pode salvar o rascunho."
     );
   }
   if (!a.confirmedMount) {
@@ -1093,13 +1104,14 @@ export function formatGoalFactsForModel(
     pode_gravar_rascunho: goalCanCommit(draft),
     pendingConfigCopy: draft.pendingConfigCopy,
     copyStatus: draft.copyStatus ?? null,
+    copyIntent: draft.copyIntent ?? null,
     userLockedTarget: draft.userLockedTarget === true,
     confianca_proposta: draft.proposal?.confidence ?? null,
     escada_resumo: `${form.tiers.length} niveis · modo ${form.tierMode} · ${form.groups.length} grupos`,
     checklist_pendente: pending,
     proximo_passo_sugerido: nextHint,
     instrucao:
-      "Avance UM item do checklist_pendente[0] (fale humano). Se userLockedTarget, o R$ do Gestor manda. Se copyStatus=failed, diga que nao achou a meta do mes — nao invente escada. Se path ja e copy/fresh e copy ok, NUNCA repergunte copiar vs zero. Nao anuncie alteracao que copyStatus/estado nao confirma. commit_draft so se pode_gravar_rascunho.",
+      "Avance UM item do checklist_pendente[0] (fale humano). Se userLockedTarget, o R$ do Gestor manda. Se copyStatus=failed, diga que nao achou a meta do mes — nao invente escada. Se path ja e copy/fresh e copy ok, NUNCA repergunte copiar vs zero. Se config_no_rascunho / padrao_historico nos extras, fale esses numeros — nao invente %. copyIntent=exact → preserve pesos. Uma recomendacao por vez. commit_draft so se pode_gravar_rascunho.",
     extras: extras.map((e) => e.trim()).filter(Boolean),
   };
   // Sem prosa em PT: o modelo copia texto longo. Sinal curto + JSON.
@@ -1414,11 +1426,16 @@ export async function discussGoal(
   }
   let copiedLadder = false;
   let copyStatus: GoalDraft["copyStatus"] = prev?.copyStatus ?? null;
+  let copyIntent: GoalCopyIntent | null = prev?.copyIntent ?? null;
+  let configSnapshotBlocks: string[] = [];
+  let weightAdviceBlocks: string[] = [];
+  let patternBlocks: string[] = [];
   let skipAssemblyParse = false;
   if (sourceWin) {
     const pool = ctx.network.length > 0 ? ctx.network : ctx.stores;
     const matched = matchStoresInText(lastUser, pool);
     const source = pickConfigSourceStore(lastUser, matched);
+    copyIntent = parseGoalCopyIntent(lastUser);
     const copied = await copyGoalLadderFromPeriod(form, ctx, sourceWin, source?.id);
     form = copied.form;
     copiedLadder = copied.ok;
@@ -1433,6 +1450,24 @@ export async function discussGoal(
       form = { ...form, tiers: applyChallengeTierPct(form.tiers, 110) };
     }
     if (copied.ok) {
+      const snap = buildGoalConfigSnapshot(form, form.target);
+      configSnapshotBlocks = snap.chatBlocks;
+      // Pesos: só recomenda (nunca aplica). Em cópia exacta, pergunta se quer avaliar.
+      if (form.groups.length >= 2 && form.storeId) {
+        const weights = await suggestGroupWeightsFromSales(ctx, form.storeId, form.groups);
+        if (weights?.chatBlocks.length) {
+          weightAdviceBlocks =
+            copyIntent === "exact"
+              ? [
+                  ...weights.chatBlocks.slice(0, 2),
+                  "Como pediu cópia fiel, mantive os pesos originais no rascunho. " +
+                    (weights.caveat
+                      ? "Se quiser, no próximo passo avaliamos a distribuição com base nas vendas."
+                      : "Os pesos batem com a participação recente."),
+                ]
+              : weights.chatBlocks;
+        }
+      }
       assembly = {
         ...assembly,
         path: "copy",
@@ -1466,6 +1501,25 @@ export async function discussGoal(
     };
     copyStatus = null;
     skipAssemblyParse = true;
+    if (form.storeId && form.startsOn) {
+      const recent = await fetchRecentGoalConfigs(ctx, form.storeId, form.startsOn);
+      const inferred = inferConfigPatternFromHistory(recent);
+      if (inferred) {
+        form = applyConfigPatternToForm(form, inferred.pattern);
+        patternBlocks = inferred.chatBlocks;
+        const snap = buildGoalConfigSnapshot(form, form.target);
+        configSnapshotBlocks = snap.chatBlocks;
+        if (form.groups.length >= 2) {
+          assembly = {
+            ...assembly,
+            confirmedGroups: true,
+            confirmedSpread: true,
+            confirmedTiers: false,
+            confirmedMount: false,
+          };
+        }
+      }
+    }
   } else if (
     assembly.path == null &&
     looksLikeAcceptConfigCopy(lastUser) &&
@@ -1536,6 +1590,15 @@ export async function discussGoal(
     } else if (!prior) {
       assembly = { ...assembly, path: "fresh" };
       skipAssemblyParse = true;
+      if (form.storeId && form.startsOn && patternBlocks.length === 0) {
+        const recent = await fetchRecentGoalConfigs(ctx, form.storeId, form.startsOn);
+        const inferred = inferConfigPatternFromHistory(recent);
+        if (inferred) {
+          form = applyConfigPatternToForm(form, inferred.pattern);
+          patternBlocks = inferred.chatBlocks;
+          configSnapshotBlocks = buildGoalConfigSnapshot(form, form.target).chatBlocks;
+        }
+      }
     }
   }
 
@@ -1557,6 +1620,31 @@ export async function discussGoal(
       if (looksLikeConfirmTiers(lastUser)) {
         assembly = { ...assembly, confirmedTiers: true };
       }
+    }
+  }
+
+  // Gestor autoriza aplicar pesos recomendados (não acontece sozinho).
+  if (
+    form.groups.length >= 2 &&
+    form.storeId &&
+    /aplica (a |os )?(peso|pesos|recomend|distribu)|usa (a |os )?peso|quero (a )?recomend|pode (mudar|ajustar) (os )?peso/.test(
+      qn,
+    )
+  ) {
+    const weights = await suggestGroupWeightsFromSales(ctx, form.storeId, form.groups);
+    if (weights && weights.suggested.length === form.groups.length) {
+      form = {
+        ...form,
+        groups: form.groups.map((g, i) => ({
+          ...g,
+          pct: weights.suggested[i]?.pct ?? g.pct,
+        })),
+      };
+      weightAdviceBlocks = [
+        `Apliquei os pesos recomendados: ${weights.suggested.map((s) => `${s.name} ${s.pct}%`).join(" / ")}.`,
+      ];
+      const snap = buildGoalConfigSnapshot(form, form.target);
+      configSnapshotBlocks = snap.chatBlocks;
     }
   }
 
@@ -1586,6 +1674,7 @@ export async function discussGoal(
     lastAppliedTurnId: turnId,
     userLockedTarget,
     proposal,
+    copyIntent,
   };
   const extras: string[] = [];
   if (suggestionBlocks.length > 0) {
@@ -1606,8 +1695,23 @@ export async function discussGoal(
   }
   if (copiedLadder && sourceWin) {
     extras.push(
-      `config_copiada_de: ${monthYearTitle(sourceWin.from)} · ${form.tiers.length} niveis · modo ${form.tierMode} · ${form.groups.length} grupos`,
+      `config_copiada_de: ${monthYearTitle(sourceWin.from)} · intent=${copyIntent ?? "exact"} · ${form.tiers.length} niveis · modo ${form.tierMode} · ${form.groups.length} grupos`,
     );
+    extras.push(
+      "instrucao_fala: Mostre o resumo real (grupos com R$, niveis com %, bonus, gerencia). Nao diga so 'copiei'. Nao invente 85/100/110/120 se o estado tem outros %. Uma recomendacao por vez (pesos so se copyIntent=reference ou o Gestor perguntar).",
+    );
+  }
+  if (patternBlocks.length) {
+    extras.push(`padrao_historico:\n${patternBlocks.join("\n")}`);
+    extras.push(
+      "instrucao_fala: Diferencie padrao identificado de recomendacao nova. Nao diga que e a melhor config so por ser recente. Confirme a escada antes de gravar.",
+    );
+  }
+  if (configSnapshotBlocks.length) {
+    extras.push(`config_no_rascunho:\n${configSnapshotBlocks.join("\n")}`);
+  }
+  if (weightAdviceBlocks.length) {
+    extras.push(`pesos_turno_analise:\n${weightAdviceBlocks.join("\n")}`);
   }
   if (copyStatus === "failed" && sourceWin) {
     extras.push(
