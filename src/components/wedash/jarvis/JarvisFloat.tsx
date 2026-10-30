@@ -160,14 +160,11 @@ export function JarvisFloat() {
                         {j.commitBusy ? (
                           "Gravando…"
                         ) : (
-                          <>
-                            <span className="flex items-center gap-1" aria-hidden>
-                              <TypingDot delay={0} />
-                              <TypingDot delay={150} />
-                              <TypingDot delay={300} />
-                            </span>
-                            <span>digitando…</span>
-                          </>
+                          <span className="flex items-center gap-1" aria-hidden>
+                            <TypingDot delay={0} />
+                            <TypingDot delay={150} />
+                            <TypingDot delay={300} />
+                          </span>
                         )}
                       </div>
                     </div>
