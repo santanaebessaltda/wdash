@@ -95,7 +95,9 @@ export function Dropdown({ trigger, items, header, align = "right", menuClassNam
   }, [portal, open, align]);
 
   const menuClass = cn(
-    "z-40 min-w-[190px] rounded-[var(--radius-vela-md)] border border-line bg-bg-2 p-1.5 shadow-[var(--shadow-vela)] animate-vela-pop",
+    // portal no body: acima de overlays (chat JARVIS z-80, drawer z-90)
+    portal ? "z-[100]" : "z-40",
+    "min-w-[190px] rounded-[var(--radius-vela-md)] border border-line bg-bg-2 p-1.5 shadow-[var(--shadow-vela)] animate-vela-pop",
     !portal && cn("absolute mt-2", align === "right" ? "right-0" : "left-0"),
     menuClassName,
   );
