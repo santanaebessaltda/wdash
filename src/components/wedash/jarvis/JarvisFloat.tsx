@@ -6,11 +6,13 @@ import { validateChallengeForm } from "@/data/wedash/challengeForm";
 import { cn } from "@/lib/cn";
 import { padBottom } from "@/lib/safeArea";
 import { paths } from "@/router/paths";
+import { useSession } from "@/session/SessionProvider";
 import { SendIcon } from "@/pages/apps/icons";
 import { Icon, icons } from "@/pages/users/Icons";
 import { ChallengeProposalCard } from "./ChallengeProposalCard";
 import { GoalAssemblyPathCard } from "./GoalAssemblyPathCard";
 import { ScheduleProposalCard } from "./ScheduleProposalCard";
+import { loadPanelOpen, persistPanelOpen } from "./chatStorage";
 import {
   challengeDraftReady,
   missingChallengeLabels,
@@ -32,7 +34,22 @@ function micSupported(): boolean {
  */
 export function JarvisFloat() {
   const j = useJarvis();
+  const { session } = useSession();
+  const tenantId = session?.tenantId ?? "";
+  const membershipId = session?.membershipId ?? "";
   const [open, setOpen] = useState(false);
+  const [panelHydrated, setPanelHydrated] = useState(false);
+
+  useEffect(() => {
+    if (!tenantId || !membershipId) return;
+    setOpen(loadPanelOpen(tenantId, membershipId));
+    setPanelHydrated(true);
+  }, [tenantId, membershipId]);
+
+  useEffect(() => {
+    if (!panelHydrated || !tenantId || !membershipId) return;
+    persistPanelOpen(tenantId, membershipId, open);
+  }, [open, panelHydrated, tenantId, membershipId]);
 
   useEffect(() => {
     if (!open) return;

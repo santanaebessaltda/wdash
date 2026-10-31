@@ -70,24 +70,20 @@ import {
   validateScheduleDraft,
   type ScheduleDraft,
 } from "./scheduleDraft";
+import {
+  clearChatHistory,
+  loadChatHistory,
+  persistChatHistory,
+  type JarvisMessage,
+  type JarvisMessageLink,
+} from "./chatStorage";
 import { syncScopePeriodFromQuestion } from "./syncPeriod";
 
-export type JarvisMessageLink = { label: string; to: string };
-export type JarvisMessage = {
-  from: "user" | "jarvis";
-  text: string;
-  /** Link determinístico (ex.: editor de metas) — nunca inventado pelo LLM. */
-  link?: JarvisMessageLink | null;
-  /** Texto do usuário para “Tentar novamente” sem duplicar a bolha. */
-  retryOf?: string | null;
-};
+export type { JarvisMessage, JarvisMessageLink };
 export type JarvisMode = "idle" | "thinking";
 export type JarvisCreated =
   | { kind: "challenge"; id: string; name: string }
   | { kind: "schedule"; name: string };
-
-const CHAT_HISTORY_KEY = "wedash.jarvis.chat";
-const CHAT_HISTORY_MAX = 40;
 
 function readTopbarStoreIds(): string[] {
   try {
@@ -96,52 +92,6 @@ function readTopbarStoreIds(): string[] {
     return raw.split(",").map((id) => id.trim()).filter(Boolean);
   } catch {
     return [];
-  }
-}
-
-function loadChatHistory(): JarvisMessage[] {
-  try {
-    const raw = sessionStorage.getItem(CHAT_HISTORY_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw) as unknown;
-    if (!Array.isArray(parsed)) return [];
-    return parsed
-      .filter(
-        (m): m is JarvisMessage =>
-          Boolean(m) &&
-          typeof m === "object" &&
-          (m as JarvisMessage).from !== undefined &&
-          ((m as JarvisMessage).from === "user" || (m as JarvisMessage).from === "jarvis") &&
-          typeof (m as JarvisMessage).text === "string" &&
-          (m as JarvisMessage).text.trim().length > 0,
-      )
-      .map((m) => ({
-        from: m.from,
-        text: m.text,
-        link:
-          m.link &&
-          typeof m.link === "object" &&
-          typeof m.link.label === "string" &&
-          typeof m.link.to === "string"
-            ? { label: m.link.label, to: m.link.to }
-            : null,
-        retryOf: typeof m.retryOf === "string" ? m.retryOf : null,
-      }))
-      .slice(-CHAT_HISTORY_MAX);
-  } catch {
-    return [];
-  }
-}
-
-function persistChatHistory(messages: JarvisMessage[]) {
-  try {
-    if (messages.length === 0) {
-      sessionStorage.removeItem(CHAT_HISTORY_KEY);
-      return;
-    }
-    sessionStorage.setItem(CHAT_HISTORY_KEY, JSON.stringify(messages.slice(-CHAT_HISTORY_MAX)));
-  } catch {
-    /* quota / private mode */
   }
 }
 
@@ -201,7 +151,7 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
   const location = useLocation();
   const allowed = Boolean(session && isOwner(session.role));
 
-  const [messages, setMessages] = useState<JarvisMessage[]>(() => loadChatHistory());
+  const [messages, setMessages] = useState<JarvisMessage[]>([]);
   const [mode, setMode] = useState<JarvisMode>("idle");
   const [micHint, setMicHint] = useState<string | null>(null);
   const [draftText, setDraftText] = useState("");
@@ -234,6 +184,8 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
   messagesRef.current = messages;
   const memoryTextRef = useRef<string>("Nenhuma memória de longo prazo ainda.");
   const pendingSpeakExtrasRef = useRef<{ link?: JarvisMessageLink; retryOf?: string } | null>(null);
+  /** Escopo cuja thread já foi reidratada do disco — evita persistir [] e apagar a conversa. */
+  const chatHydratedForRef = useRef<string | null>(null);
   /** Idempotência de gravação: fingerprint → id já salvo. */
   const completedGoalSavesRef = useRef<Map<string, { id: string; name: string; target: number }>>(
     new Map(),
@@ -245,9 +197,26 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
   if (goalDraft) goalDraftRef.current = goalDraft;
   scheduleDraftRef.current = scheduleDraft;
 
+  // Reidrata thread quando a sessão fica pronta (F5 / PWA).
   useEffect(() => {
-    persistChatHistory(messages);
-  }, [messages]);
+    const tenantId = session?.tenantId;
+    const membershipId = session?.membershipId;
+    if (!tenantId || !membershipId) return;
+    const scope = `${tenantId}:${membershipId}`;
+    if (chatHydratedForRef.current === scope) return;
+    chatHydratedForRef.current = scope;
+    const loaded = loadChatHistory(tenantId, membershipId);
+    setMessages(loaded);
+    messagesRef.current = loaded;
+  }, [session?.tenantId, session?.membershipId]);
+
+  useEffect(() => {
+    const tenantId = session?.tenantId;
+    const membershipId = session?.membershipId;
+    if (!tenantId || !membershipId) return;
+    if (chatHydratedForRef.current !== `${tenantId}:${membershipId}`) return;
+    persistChatHistory(tenantId, membershipId, messages);
+  }, [messages, session?.tenantId, session?.membershipId]);
 
   const syncGoalDraft = useCallback((draft: GoalDraft | null) => {
     goalDraftRef.current = draft;
@@ -1098,7 +1067,10 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
     cancelDictate();
     setMessages([]);
     messagesRef.current = [];
-    persistChatHistory([]);
+    if (session?.tenantId && session.membershipId) {
+      clearChatHistory(session.tenantId, session.membershipId);
+      void clearJarvisMemory(session.tenantId, session.membershipId);
+    }
     setDraftText("");
     setMicHint(null);
     setMode("idle");
@@ -1115,9 +1087,6 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
     setCommitBusy(false);
     completedGoalSavesRef.current.clear();
     memoryTextRef.current = "Nenhuma memória de longo prazo ainda.";
-    if (session?.tenantId && session.membershipId) {
-      void clearJarvisMemory(session.tenantId, session.membershipId);
-    }
   }, [cancelDictate, session?.membershipId, session?.tenantId, syncGoalDraft]);
 
   useEffect(() => {

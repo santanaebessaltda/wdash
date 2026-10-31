@@ -3005,12 +3005,33 @@ export async function discussGoal(
 }
 
 const GOAL_DRAFT_STORAGE_KEY = "wedash.jarvis.goalDraft.v1";
-/** Fallback quando sessionStorage não existe (testes / private mode). */
+/** Fallback quando storage não existe (testes / private mode). */
 const goalDraftMemory = new Map<string, string>();
 
 function goalDraftStorageGet(): string | null {
+  // Preferir localStorage — sessionStorage compete com o cache do Dashboard e estoura cota.
   try {
-    if (typeof sessionStorage !== "undefined") return sessionStorage.getItem(GOAL_DRAFT_STORAGE_KEY);
+    if (typeof localStorage !== "undefined") {
+      const v = localStorage.getItem(GOAL_DRAFT_STORAGE_KEY);
+      if (v != null) return v;
+    }
+  } catch {
+    /* ignore */
+  }
+  try {
+    if (typeof sessionStorage !== "undefined") {
+      const v = sessionStorage.getItem(GOAL_DRAFT_STORAGE_KEY);
+      if (v != null) {
+        // Migra para localStorage e limpa a chave antiga.
+        try {
+          localStorage.setItem(GOAL_DRAFT_STORAGE_KEY, v);
+          sessionStorage.removeItem(GOAL_DRAFT_STORAGE_KEY);
+        } catch {
+          /* ignore */
+        }
+        return v;
+      }
+    }
   } catch {
     /* ignore */
   }
@@ -3019,9 +3040,27 @@ function goalDraftStorageGet(): string | null {
 
 function goalDraftStorageSet(value: string | null): void {
   try {
+    if (typeof localStorage !== "undefined") {
+      if (value == null) localStorage.removeItem(GOAL_DRAFT_STORAGE_KEY);
+      else localStorage.setItem(GOAL_DRAFT_STORAGE_KEY, value);
+      try {
+        sessionStorage.removeItem(GOAL_DRAFT_STORAGE_KEY);
+      } catch {
+        /* ignore */
+      }
+      if (value == null) goalDraftMemory.delete(GOAL_DRAFT_STORAGE_KEY);
+      else goalDraftMemory.set(GOAL_DRAFT_STORAGE_KEY, value);
+      return;
+    }
+  } catch {
+    /* fall through */
+  }
+  try {
     if (typeof sessionStorage !== "undefined") {
       if (value == null) sessionStorage.removeItem(GOAL_DRAFT_STORAGE_KEY);
       else sessionStorage.setItem(GOAL_DRAFT_STORAGE_KEY, value);
+      if (value == null) goalDraftMemory.delete(GOAL_DRAFT_STORAGE_KEY);
+      else goalDraftMemory.set(GOAL_DRAFT_STORAGE_KEY, value);
       return;
     }
   } catch {

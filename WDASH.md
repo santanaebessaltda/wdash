@@ -223,7 +223,7 @@ Inspiração de UX: [Néctar](https://www.meu-nectar.com/) (conversa humana, res
 
 **Quem vê:** só visão **Gestor** (`OWNER` / `ADMIN_GLOBAL`). Gerente e Vendedor não têm JARVIS na fase 1.
 
-**Onde roda:** app web e **PWA** (mic no gesto do REC). **Uma conversa só** no balão flutuante (`JarvisFloat`) — desktop e mobile no mesmo navegador/sessão compartilham o histórico (`sessionStorage`); `/chat-ia` e `/jarvis` só redirecionam. Celular e computador separados = históricos separados. **Rodapé das telas (2026-10-30):** com o FAB do Gestor, o miolo ganha `pad-base` maior (`5.5rem`) para o conteúdo não ficar sob o balão.
+**Onde roda:** app web e **PWA** (mic no gesto do REC). **Uma conversa só** no balão flutuante (`JarvisFloat`) — desktop e mobile no **mesmo navegador** compartilham o histórico em `localStorage` por tenant+membership (`wedash.jarvis.chat.v1:…`; 2026-10-31 — antes era `sessionStorage` e sumia no F5 quando o cache do Dashboard estourava a cota). Painel aberto também reidrata. `/chat-ia` e `/jarvis` só redirecionam. Celular e computador separados = históricos separados. **Apagar tudo** é o único caminho que zera o disco. **Rodapé das telas (2026-10-30):** com o FAB do Gestor, o miolo ganha `pad-base` maior (`5.5rem`) para o conteúdo não ficar sob o balão.
 
 **Tom:** informal, humano — curto, confirma o que fez, sem jargão de produto.
 
