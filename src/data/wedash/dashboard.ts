@@ -17,7 +17,7 @@ import { NOW, UPDATED_AT, TODAY_ISO, CURRENT_HOUR, SYNC_INTERVAL_MIN, LAST_SYNC,
 import { defaultWeekHours, effectiveWeekHours, hourAxisRange, unionOpenWindow, type Dow } from "./storeHours";
 import { hourShares, periodDailyGoal, weekdayWeights } from "./goalCurve";
 import { goalStoreClosing } from "./engine/goalProjection";
-import { dayInGeneralGoal, sellerGoalLevels } from "./goalView";
+import { dayInGeneralGoal, goalLevelAmount, sellerGoalLevels } from "./goalView";
 import { sellerOrigin } from "./engine/salesOrigin";
 import { dayAggregate, salesDay, salesDays, storeOpen, dayWeight, sumAggregates, type Aggregate } from "./sales";
 import { brl, brlCent, fullDate, shortDate, dayAxisLabel, dayPointDetail, isoToDate, delta as fmtDelta, hourSpan, endOfMonth, shortHour, startOfMonth, eachDay, labelUpper, monthYear, shortMonth, pct, addDays } from "@/lib/format";
@@ -4196,6 +4196,8 @@ export interface OverviewView {
   projectionClosing: string | null;
   /** Qual meta o card Atingimento mostra (nome + datas, ou soma de N lojas). */
   goalDescription?: string | null;
+  /** Sufixo do anel: "da meta" ou "do último nível" (quando há escada). */
+  goalPctLabel?: string;
   /** Delta do faturamento vs periodo anterior (badge dos cards de grafico). */
   revenueDelta?: { value: string; positive: boolean; vs?: string };
   /** Soma das categorias vs periodo anterior (card Faturamento por categoria). */
@@ -4753,7 +4755,8 @@ export function buildOverviewViewFromAggs(scope: Scope, input: OverviewAggInput)
   };
 
   // Card Atingimento = metas inteiras que cruzam o filtro (ex.: 01/09 a 30/09), com o vendido do inicio de cada
-  // meta ate hoje  -  independente do filtro. O dia contra a meta do dia fica no Faturamento x meta.
+  // meta ate hoje  -  independente do filtro. Meta / % / Faltam usam o último nível (igual ao detalhe).
+  // O dia contra a meta do dia (cadastrada) fica no Faturamento x meta. Projeção em R$ não muda.
   const soldByStoreDay = new Map<string, number>();
   for (const d of preferAllBrand(input.goalDayAggs ?? [])) {
     const k = `${d.storeId}|${d.day}`;
@@ -4763,9 +4766,12 @@ export function buildOverviewViewFromAggs(scope: Scope, input: OverviewAggInput)
   let achievedMeta = 0;
   let projected = 0;
   let projectionComplete = true;
+  let usesLastLevel = false;
   const goalDayRows = preferAllBrand(input.goalDayAggs ?? []);
   for (const g of goalsInPeriod) {
-    metaTotal += g.target;
+    const levels = g.tiers.map((t) => t.minAttainmentPct);
+    if (levels.some((p) => p > 0)) usesLastLevel = true;
+    metaTotal += goalLevelAmount(g.target, levels);
     if (g.startsOn > todayIso) continue;
     let achieved = 0;
     for (const iso of eachDay(g.startsOn, g.endsOn < todayIso ? g.endsOn : todayIso)) {
@@ -5157,6 +5163,7 @@ export function buildOverviewViewFromAggs(scope: Scope, input: OverviewAggInput)
     remainingToGoal,
     projectionClosing,
     goalDescription,
+    goalPctLabel: usesLastLevel ? "do último nível" : "da meta",
     seriesAxis,
     seriesLabel,
     categoryVsGoal,

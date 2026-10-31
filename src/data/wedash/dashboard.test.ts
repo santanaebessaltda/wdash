@@ -1318,7 +1318,30 @@ describe("Overview from sales aggregates (SYNC-06/08)", () => {
         },
       );
       expect(v.gauges[0]).toMatchObject({ target: 170_000, achieved: 2_000 });
-      expect(v.goalDescription).toMatch(/^1 de \d+ lojas com meta$/);
+      expect(v.goalDescription).toMatch(/^1 de \d+ (lojas|filiais) com meta$/);
+      expect(v.goalPctLabel).toBe("da meta");
+    });
+
+    it("Meta / % / Faltam usam o último nível da escada", () => {
+      const withLevels = {
+        ...goal("out", "f1", "2026-10-01", "2026-10-31", 530_000),
+        tiers: [
+          { name: "Meta", minAttainmentPct: 100, commissionPct: 1, bonus: 0 },
+          { name: "Super", minAttainmentPct: 120, commissionPct: 2, bonus: 0 },
+        ],
+      };
+      const v = buildOverviewView(
+        { storeIds: ["f1"], period: { kind: "custom", start: "2026-10-01", end: "2026-10-31" }, division: null },
+        {
+          dayAggs: [],
+          goals: [withLevels],
+          goalDayAggs: [sale("f1", "2026-10-10", 541_796.78)],
+        },
+      );
+      expect(v.gauges[0]).toMatchObject({ target: 636_000, achieved: 541_796.78 });
+      expect(v.gauges[0]!.pct).toBeCloseTo((541_796.78 / 636_000) * 100, 5);
+      expect(v.remainingToGoal).toMatch(/Faltam/);
+      expect(v.goalPctLabel).toBe("do último nível");
     });
 
     it("projeção do card é a mesma do detalhe da meta e ignora a venda de hoje", () => {

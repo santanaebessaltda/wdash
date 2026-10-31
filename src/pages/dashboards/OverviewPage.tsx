@@ -651,7 +651,7 @@ export default function OverviewPage() {
                   color="var(--palette-pink)"
                   trackColor="var(--palette-track)"
                   valueClassName="text-t0"
-                  label="da meta"
+                  label={view.goalPctLabel ?? "da meta"}
                 />
               </div>
               <div className="flex flex-col gap-2.5">
