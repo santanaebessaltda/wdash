@@ -89,37 +89,34 @@ function contextNote(ctx: JarvisContext, session?: JarvisLlmSession | null): str
   }
   if (session?.goalDraftSummary) {
     lines.push(
-      `META em discussao: ${session.goalDraftSummary}. Continue SEMPRE com draft_goal neste fio (valor R$ nao encerra a meta). Gravar = commit_draft target=goal.`,
+      `META em discussao: ${session.goalDraftSummary}. Mutacao so pelo motor (draft_goal e alias idempotente). Gravar = commit_draft target=goal.`,
     );
     if (session.goalPeriodConfirmed) {
       lines.push("Mes ja confirmado. Nao pergunte o mes de novo.");
-    } else {
-      lines.push("Mes ainda nao confirmado.");
     }
     if (session.goalAssemblyPath) {
       lines.push(
-        `Caminho da meta ja definido: ${session.goalAssemblyPath}. NUNCA pergunte de novo se copia escada ou monta do zero.`,
+        `Caminho: ${session.goalAssemblyPath}. Nao repergunte copiar vs zero.`,
       );
     }
     if (session.goalCopyStatus) {
-      lines.push(`copyStatus=${session.goalCopyStatus}. Se ok, a escada JA esta no rascunho — nao busque meta publicada do mes de destino.`);
+      lines.push(`copyStatus=${session.goalCopyStatus}. Se ok, escada ja no rascunho.`);
     }
     if (session.goalOperationalState) {
-      lines.push(`ESTADO_OPERACIONAL_META (fonte da verdade):\n${session.goalOperationalState}`);
-    }
-    if (session.goalNextStep) {
-      lines.push(`Proximo passo da meta (um por vez): ${session.goalNextStep}`);
+      lines.push(`ESTADO_OPERACIONAL_META (fonte da verdade — nao invente niveis/R$):\n${session.goalOperationalState}`);
     }
     if (session.goalTurnApplied) {
       lines.push(
-        "A fala DESTE turno ja foi aplicada no rascunho. Fale SO o proximo passo acima. NUNCA repita a pergunta anterior (ex.: copiar vs zero).",
+        "Este turno ja foi aplicado no motor. Nao chame draft_goal de novo para repetir a mesma mutacao. Fale com base no ESTADO; nao invente checklist.",
       );
+    } else if (session.goalNextStep) {
+      lines.push(`Proximo passo sugerido (nao obrigatorio no fim de cada fala): ${session.goalNextStep}`);
     }
     if (session.goalDraftMissing) {
-      lines.push(`Campos ainda incompletos: ${session.goalDraftMissing}.`);
+      lines.push(`Campos incompletos: ${session.goalDraftMissing}.`);
     }
     lines.push(
-      "PROIBIDO: 'vou montar/preparar', 'um momento', 'qual valor voce esta pensando?'. Voce PROPÕE (proposta_meta / alvo). Ao perguntarem 'como ficou' / niveis, recite ESTADO_OPERACIONAL_META — nao desvie para sazonalidade. Se path ja e copy/fresh, nao repergunte copiar vs zero.",
+      "Consultivo: discuta estrategia sem mutar. Numeros/niveis/grupos so do ESTADO ou analyze_*. PROIBIDO prometer analise sem tool. Sem travessao.",
     );
   }
   if (session?.challengeDraftSummary) {

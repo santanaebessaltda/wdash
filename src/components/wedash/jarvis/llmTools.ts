@@ -70,7 +70,7 @@ export async function runJarvisTool(
     case "draft_goal":
       return {
         content:
-          "Estado da meta atualizado. Leia checklist_pendente / proximo_passo_sugerido e fale o PROXIMO passo (um). Nao diga que ja preparou tudo se ainda ha pendencias. Gravar = commit_draft.",
+          "Alias do motor applyGoalTurn (idempotente no mesmo turno). Leia ESTADO_OPERACIONAL_META. Nao invente niveis/R$. Gravar = commit_draft.",
         sideEffect: { kind: "draft_goal", request: question },
       };
     case "draft_schedule":

@@ -529,6 +529,108 @@ export function looksLikeConfirmPendingSave(text: string): boolean {
   );
 }
 
+/**
+ * Papel de uma afirmação curta — derivado do ESTADO pendente, não de regex isolada.
+ * Uma interpretação por turno; o motor aplica no máximo um efeito.
+ */
+export type GoalAffirmationRole =
+  | "confirm_save"
+  | "acknowledge_copy"
+  | "clarify_choice"
+  | "none";
+
+/** Última fala do JARVIS no blob de histórico (se houver). */
+export function lastJarvisUtterance(text: string): string | null {
+  if (!/jarvis:/i.test(text)) return null;
+  const parts = text.split(/\n(?=user:|jarvis:)/i).filter((p) => /^jarvis:/i.test(p.trim()));
+  const last = parts[parts.length - 1];
+  if (!last) return null;
+  return last.replace(/^jarvis:\s*/i, "").trim() || null;
+}
+
+/** Resumo inequívoco de gravação já apresentado (“Posso salvar…?”). */
+export function looksLikeSaveConfirmPrompt(text: string | null | undefined): boolean {
+  if (!text) return false;
+  const p = norm(text);
+  return /posso salvar|salvar essa configura|como rascunho\?/.test(p);
+}
+
+/**
+ * Oferta com duas (ou mais) alternativas — “Sim” isolado não escolhe.
+ * Ex.: revisar ou salvar; olhar níveis ou seguir.
+ */
+export function looksLikeAmbiguousChoicePrompt(text: string | null | undefined): boolean {
+  if (!text) return false;
+  const p = norm(text);
+  if (looksLikeSaveConfirmPrompt(text) && !/\bou\b/.test(p)) return false;
+  return (
+    /\bou\b/.test(p) &&
+    /(revis|olhar|nivel|niveis|grupo|premia|bonus|bônus|salva|grav|seguir|seguimos)/.test(p)
+  );
+}
+
+/**
+ * Resolve o que um “Sim/Pode/…” pode fazer neste estado.
+ * Não autoriza gravação sem pendingCommit.awaitingConfirm + fingerprint válido.
+ */
+export function resolveGoalAffirmationRole(opts: {
+  text: string;
+  draft: {
+    copyStatus?: "ok" | "failed" | null;
+    assembly?: { path?: string | null; confirmedMount?: boolean } | null;
+    pendingCommit?: GoalPendingCommit | null;
+    form: GoalDraftForm;
+  } | null;
+  /** Blob completo ou só a última fala do JARVIS. */
+  historyOrJarvis?: string | null;
+}): GoalAffirmationRole {
+  const { text, draft } = opts;
+  if (!draft) return "none";
+  if (!looksLikeConfirmPendingSave(text) && !looksLikeRequestSave(text)) return "none";
+
+  const jarvis =
+    opts.historyOrJarvis && /jarvis:/i.test(opts.historyOrJarvis)
+      ? lastJarvisUtterance(opts.historyOrJarvis)
+      : (opts.historyOrJarvis ?? null);
+
+  const awaiting =
+    draft.pendingCommit?.awaitingConfirm === true &&
+    pendingCommitStillValid({
+      form: draft.form,
+      pendingCommit: draft.pendingCommit,
+    } as GoalDraft);
+
+  if (awaiting) {
+    // “Quer revisar ou salvar?” com pending aberto → Sim não basta.
+    if (looksLikeAmbiguousChoicePrompt(jarvis) && !looksLikeSaveConfirmPrompt(jarvis)) {
+      return "clarify_choice";
+    }
+    return "confirm_save";
+  }
+
+  // Pós-cópia sem resumo de gravação: afirmação só reconhece / reapresenta o estado.
+  if (
+    draft.copyStatus === "ok" &&
+    draft.assembly?.path === "copy" &&
+    !draft.pendingCommit?.awaitingConfirm
+  ) {
+    if (looksLikeAmbiguousChoicePrompt(jarvis)) return "clarify_choice";
+    if (looksLikeConfirmPendingSave(text) && !looksLikeRequestSave(text)) {
+      return "acknowledge_copy";
+    }
+  }
+
+  // Sem decisão pendente: afirmação isolada não muta.
+  return "none";
+}
+
+export function speakClarifyGoalChoice(): string {
+  return (
+    `Não ficou claro o que você quer.\n\n` +
+    `Diga objetivamente: revisar a configuração (níveis, grupos ou premiação) ou salvar o rascunho.`
+  );
+}
+
 /** Simular níveis com outro R$ — sem mutar o rascunho. */
 export function looksLikeSimulateLevelsAtAmount(text: string): boolean {
   const p = norm(text).trim();

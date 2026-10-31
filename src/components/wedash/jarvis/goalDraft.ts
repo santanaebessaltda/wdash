@@ -42,6 +42,7 @@ import {
   looksLikeValueInconsistency,
   pendingCommitStillValid,
   resolveGoalValueDecision,
+  speakClarifyGoalChoice,
   speakConsultativeTargetAdvice,
   speakProposalMoreInfo,
   speakSimulateLevels,
@@ -55,6 +56,7 @@ import {
   scrubTechnicalSpeech,
   type GoalOpIntent,
 } from "./goalOpIntent";
+import { classifyGoalTurn, type GoalTurnIntent } from "./goalTurnIntent";
 
 export type { GoalLastSave, GoalPendingCommit } from "./goalContract";
 export { goalDraftFingerprint, pendingCommitStillValid } from "./goalContract";
@@ -315,14 +317,19 @@ export function speakGoalAssemblyPathOffer(opts: {
 /** Pediu para ver o que está no rascunho (não buscar meta publicada do destino). */
 export function looksLikeInspectGoalDraft(text: string): boolean {
   if (looksLikeAskGroupWeightAdvice(text)) return false;
+  // Pedido explícito de salvar/montar ≠ inspeção.
+  if (looksLikeRequestSave(text)) return false;
   const p = norm(text).trim();
   return (
-    /como (ficou|ficam|esta|saiu|ficaria)/.test(p) ||
-    /mostr[ea](r)? (os |as |a |o )?(niveis?|escada|config|grupo|bonus|resumo)/.test(p) ||
+    /como (ficou|ficam|ficaram|esta|saiu|ficaria)/.test(p) ||
+    /mostr[ea](r)? (os |as |a |o )?(niveis?|escada|config|grupo|bonus|bônus|premia|resumo)/.test(p) ||
     /o que (voce |vc )?(copiou|montou|fez|aplicou)/.test(p) ||
-    /quais? (sao|foram) (os )?(niveis?|grupos)/.test(p) ||
-    /me (mostra|fala|diz) (a |o |os )?(config|escada|nive|resumo)/.test(p) ||
+    /quais? (sao|foram|ficaram)? (os )?(niveis?|grupos|bonus|bônus|premia)/.test(p) ||
+    /me (mostra|fala|diz) (a |o |os )?(config|escada|nive|bonus|bônus|premia|resumo)/.test(p) ||
     /resumo (da |do )?(meta|config|copia)/.test(p) ||
+    /tem (quatro|4|\d+)\s*niveis?/.test(p) ||
+    /quantos?\s*niveis?/.test(p) ||
+    /(e )?a escada\??$|(e )?os niveis?\??$|(e )?os grupos\??$/.test(p) ||
     /^(e )?os niveis\??$|^(e )?a escada\??$|^(e )?os grupos\??$/.test(p)
   );
 }
@@ -464,7 +471,14 @@ export function speakGoalDraftConfig(
     );
   }
 
-  if (a.path === "fresh" || form.tiers.length > 0) {
+  if (form.tiers.length === 0) {
+    return (
+      `No rascunho de ${dest} (${alvo}) ainda não há escada de premiação definida.\n\n` +
+      `Escolha copiar uma meta, criar com recomendações ou montar do zero.`
+    );
+  }
+
+  if (a.path === "fresh" || a.path === "recommended" || form.tiers.length > 0) {
     return `No rascunho de ${dest} (${alvo}):\n\n` + snap.chatBlocks.join("\n\n");
   }
 
@@ -570,6 +584,10 @@ export function looksLikeConfirmTiers(text: string): boolean {
   );
 }
 
+/**
+ * @deprecated Fase 3 — não usar para mutação. Afirmação passa por `classifyTurn` /
+ * `resolveGoalAffirmationRole`. Mantido só para testes legados de parsing.
+ */
 export function looksLikeConfirmMount(text: string): boolean {
   const p = norm(text).trim();
   if (looksLikeDeclineConfigCopy(text) && !/monta/.test(p)) return false;
@@ -589,7 +607,11 @@ export function formatTiersBrief(tiers: Tier[]): string {
     .join("; ");
 }
 
-/** Mesmos cortes do editor (`DEFAULT_TIERS` em GoalEditorPage). */
+/**
+ * Escada padrão do editor (`DEFAULT_TIERS` em GoalEditorPage).
+ * Só entra no rascunho do JARVIS após decisão explícita (modo do zero / confirmação).
+ * Nunca é configuração “já aceita” só por abrir a meta.
+ */
 export function defaultGoalTiers(): Tier[] {
   return [
     { name: "Nível 1", minAttainmentPct: 100, commissionPct: 1.5, bonus: 0 },
@@ -599,6 +621,7 @@ export function defaultGoalTiers(): Tier[] {
   ];
 }
 
+/** Rascunho novo: sem escada até copy / recommended aprovado / fresh confirmado. */
 export function emptyGoalForm(storeId: string): GoalDraftForm {
   return {
     name: "",
@@ -608,10 +631,15 @@ export function emptyGoalForm(storeId: string): GoalDraftForm {
     target: null,
     tierMode: "INDIVIDUAL",
     spreadUnidentified: false,
-    tiers: defaultGoalTiers(),
+    tiers: [],
     groups: [],
     managerOn: false,
   };
+}
+
+/** Há degraus no form (proposta ou cópia) — distinto de “escada confirmada p/ salvar”. */
+export function hasLadderInForm(form: GoalDraftForm): boolean {
+  return form.tiers.length > 0;
 }
 
 function norm(s: string): string {
@@ -779,20 +807,31 @@ export type GoalFormErrors = {
   tiers?: string;
 };
 
-export function validateGoalDraft(f: GoalDraftForm): GoalFormErrors {
+export function validateGoalDraft(
+  f: GoalDraftForm,
+  opts?: { requireTiers?: boolean },
+): GoalFormErrors {
+  const requireTiers = opts?.requireTiers !== false;
   const e: GoalFormErrors = {};
   if (!f.name.trim()) e.name = "nome";
   if (!f.storeId) e.storeId = "filial";
   if (!f.startsOn || !f.endsOn) e.period = "período";
   else if (f.endsOn < f.startsOn) e.period = "período";
   if (f.target == null || f.target <= 0) e.target = "valor da meta";
-  let prev = -1;
-  for (const t of f.tiers) {
-    if (!(t.minAttainmentPct > prev) || !(t.commissionPct > 0)) {
+  // Fase 2: escada vazia ≠ configuração aceita (não salvar com default residual).
+  if (requireTiers) {
+    if (f.tiers.length === 0) {
       e.tiers = "escada de premiação";
-      break;
+    } else {
+      let prev = -1;
+      for (const t of f.tiers) {
+        if (!(t.minAttainmentPct > prev) || !(t.commissionPct > 0)) {
+          e.tiers = "escada de premiação";
+          break;
+        }
+        prev = t.minAttainmentPct;
+      }
     }
-    prev = t.minAttainmentPct;
   }
   return e;
 }
@@ -801,6 +840,12 @@ export function missingGoalLabels(errors: GoalFormErrors): string[] {
   return Object.values(errors);
 }
 
+/** Nome, filial, período e valor — sem exigir escada (montagem guiada). */
+export function goalDraftCoreReady(f: GoalDraftForm): boolean {
+  return Object.keys(validateGoalDraft(f, { requireTiers: false })).length === 0;
+}
+
+/** Pronto para gravar: inclui escada válida. */
 export function goalDraftReady(f: GoalDraftForm): boolean {
   return Object.keys(validateGoalDraft(f)).length === 0;
 }
@@ -1520,6 +1565,13 @@ export function naturalGoalAskFromDraft(draft: GoalDraft): string {
     return "Venda sem vendedor identificado: rateia na equipe do dia, ou deixa de fora?";
   }
   if (a.path === "fresh" && !a.confirmedTiers) {
+    if (form.tiers.length === 0) {
+      return (
+        `Proposta inicial de escada (padrão do editor — ainda não entrou no rascunho):\n` +
+        `${formatTiersBrief(defaultGoalTiers())}.\n\n` +
+        `Serve, ou prefere montar outros níveis?`
+      );
+    }
     return `Escada: ${formatTiersBrief(form.tiers)}. Serve?`;
   }
   if (draft.copyStatus === "failed" || (a.path === "copy" && draft.copyStatus === "ok" && !a.confirmedMount)) {
@@ -1830,20 +1882,54 @@ export async function discussGoal(
     !opPlan.freezeDestinationPeriod && parseGoalPeriod(lastUser, ctx.today) != null;
   // R$ só conta se veio na FALA do Gestor — nunca amountCents inventado pelo interpret_goal_op.
   const utteredAmount = parseGoalTarget(lastUser);
-  // Decisão única de valor (stance → o que o motor pode aplicar). Aceite contextual
-  // usa proposedTarget; R$ livre só se estiver na fala.
+
+  // Fase 3: uma classificação por turno (não muta). Motor abaixo executa no máximo um efeito.
+  const turnIntent: GoalTurnIntent = classifyGoalTurn({
+    message: lastUser,
+    draft: prev,
+    historyOrJarvis: question,
+    opIntent,
+    utteredAmount,
+  });
+
+  // Decisão de valor: reusa a do classifyTurn quando ele já classificou accept/consult;
+  // senão resolve localmente (caminhos unknown / select_path / etc.).
   const proposalAwaitingEarly = hasProposalAwaitingAccept({
     form: { target: form.target },
     proposedTarget: prev?.proposedTarget ?? null,
   });
-  const valueDecision = resolveGoalValueDecision({
-    text: lastUser,
-    utteredAmount,
-    proposedTarget: prev?.proposedTarget ?? null,
-    proposalAwaiting: proposalAwaitingEarly,
-    saveAwaiting: prev?.pendingCommit?.awaitingConfirm === true,
-    scenarios: prev?.proposal?.scenarios ?? null,
-  });
+  const rawValueDecision =
+    turnIntent.value ??
+    resolveGoalValueDecision({
+      text: lastUser,
+      utteredAmount,
+      proposedTarget: prev?.proposedTarget ?? null,
+      proposalAwaiting: proposalAwaitingEarly,
+      saveAwaiting: prev?.pendingCommit?.awaitingConfirm === true,
+      scenarios: prev?.proposal?.scenarios ?? null,
+    });
+  // Bloqueia aceite de valor se o turno já foi classificado como outra operação
+  // (afirmação / inspeção / consultiva). select_path pode anexar value na mesma intenção.
+  const valueBlockedByTurn =
+    turnIntent.kind === "confirm_save" ||
+    turnIntent.kind === "acknowledge_copy" ||
+    turnIntent.kind === "clarify_choice" ||
+    turnIntent.kind === "inspect" ||
+    turnIntent.kind === "request_save" ||
+    turnIntent.kind === "agree_no_op" ||
+    turnIntent.kind === "consult_value";
+  const annexedValue =
+    turnIntent.kind === "select_path" && turnIntent.value?.applySource !== "none"
+      ? turnIntent.value
+      : null;
+  const valueDecision = valueBlockedByTurn
+    ? {
+        ...rawValueDecision,
+        applySource: "none" as const,
+        applyAmount: null,
+        keepDiscussing: turnIntent.kind === "consult_value" || rawValueDecision.keepDiscussing,
+      }
+    : annexedValue ?? rawValueDecision;
   const valueStance = valueDecision.stance;
   // Contraproposta com R$ na fala trava meta-base mesmo se o LLM marcou amountRole=unknown.
   const counterLocksBase =
@@ -2164,7 +2250,11 @@ export async function discussGoal(
   }
 
   // Caminho de montagem (copy | recommended | fresh) — separado do aceite do valor.
-  const pathChoice = opts?.forcedPath ?? parseGoalAssemblyPath(lastUser);
+  // Fase 3: classifyTurn manda quando kind=select_path; senão parsers existentes.
+  const pathChoice =
+    opts?.forcedPath ??
+    (turnIntent.kind === "select_path" ? turnIntent.path : null) ??
+    parseGoalAssemblyPath(lastUser);
   const switchingPath =
     pathChoice != null && assembly.path != null && pathChoice !== assembly.path;
   let pathOfferPresented = prev?.pathOfferPresented === true;
@@ -2181,16 +2271,27 @@ export async function discussGoal(
 
   // Copia: só com intenção explícita de copiar / path=copy — nunca por aceite de valor.
   // freezeDestinationPeriod bloqueia reentrada por FATO de escada; pedido explícito de cópia passa.
+  const pathBlockedByTurn =
+    turnIntent.kind === "inspect" ||
+    turnIntent.kind === "confirm_save" ||
+    turnIntent.kind === "acknowledge_copy" ||
+    turnIntent.kind === "clarify_choice" ||
+    turnIntent.kind === "accept_value" ||
+    turnIntent.kind === "consult_value" ||
+    turnIntent.kind === "agree_no_op";
   const skipCopyReentry =
     opPlan.freezeDestinationPeriod &&
     (opIntent.entity === "ladder" || opIntent.periodRole === "mention") &&
     pathChoice !== "copy" &&
-    !looksLikeExplicitConfigCopy(lastUser);
+    !looksLikeExplicitConfigCopy(lastUser) &&
+    turnIntent.kind !== "select_path";
   const selectingCopy =
     !resetForNewStore &&
     !skipCopyReentry &&
     !justAcceptedProposal &&
+    !pathBlockedByTurn &&
     (pathChoice === "copy" ||
+      turnIntent.kind === "select_path" && turnIntent.path === "copy" ||
       looksLikeExplicitConfigCopy(lastUser) ||
       (looksLikeBareCopyAccept(lastUser) &&
         prev?.assembly?.path === "copy" &&
@@ -2205,14 +2306,28 @@ export async function discussGoal(
   if (
     !sourceWin &&
     selectingCopy &&
-    opIntent.periodMonth &&
-    (opIntent.entity === "period_origin" ||
-      (opIntent.periodRole === "origin" && /copiar|copia|mesma configura|referencia|referência/.test(qn)))
+    (turnIntent.originMonth || opIntent.periodMonth) &&
+    (turnIntent.kind === "select_path" ||
+      opIntent.entity === "period_origin" ||
+      (opIntent.periodRole === "origin" && /copiar|copia|mesma configura|referencia|referência|usar|repete/.test(qn)))
   ) {
-    const from = `${opIntent.periodMonth}-01`;
+    const ym = turnIntent.originMonth || opIntent.periodMonth!;
+    const from = `${ym}-01`;
     sourceWin = { from, to: endOfMonth(from) };
   }
-  if (!sourceWin && !skipCopyReentry && looksLikeLadderCopyCorrection(lastUser)) {
+  // Correção de cópia só no contexto copy — “divisão por grupos” no modo do zero
+  // não pode puxar a meta anterior como se fosse correção de escada.
+  const correctingCopy =
+    looksLikeLadderCopyCorrection(lastUser) &&
+    pathChoice !== "fresh" &&
+    pathChoice !== "recommended" &&
+    assembly.path !== "fresh" &&
+    assembly.path !== "recommended" &&
+    (selectingCopy ||
+      assembly.path === "copy" ||
+      prev?.copyStatus === "ok" ||
+      prev?.copyStatus === "failed");
+  if (!sourceWin && !skipCopyReentry && correctingCopy) {
     sourceWin =
       prev?.pendingConfigCopy ??
       (prev?.copiedFrom
@@ -2240,7 +2355,7 @@ export async function discussGoal(
     sourceWin &&
     prev?.copyStatus === "ok" &&
     looksLikeInspectGoalDraft(lastUser) &&
-    !looksLikeLadderCopyCorrection(lastUser)
+    !correctingCopy
   ) {
     sourceWin = null;
   }
@@ -2263,17 +2378,21 @@ export async function discussGoal(
   const selectingRecommended =
     !resetForNewStore &&
     !justAcceptedProposal &&
+    !pathBlockedByTurn &&
     (pathChoice === "recommended" ||
+      (turnIntent.kind === "select_path" && turnIntent.path === "recommended") ||
       (assembly.path === "fresh" && looksLikeChooseRecommendedPath(lastUser)));
   const selectingFresh =
     !resetForNewStore &&
     !justAcceptedProposal &&
+    !pathBlockedByTurn &&
     (pathChoice === "fresh" ||
+      (turnIntent.kind === "select_path" && turnIntent.path === "fresh") ||
       (assembly.path == null &&
         looksLikeDeclineConfigCopy(lastUser) &&
         /monta (do )?zero|sem copia|nova configura|prefiro montar|quero montar|do zero/.test(qn)));
 
-  if (sourceWin && (selectingCopy || looksLikeLadderCopyCorrection(lastUser))) {
+  if (sourceWin && (selectingCopy || correctingCopy)) {
     const pool = ctx.network.length > 0 ? ctx.network : ctx.stores;
     const matched = matchStoresInText(lastUser, pool);
     const source = pickConfigSourceStore(lastUser, matched);
@@ -2409,7 +2528,7 @@ export async function discussGoal(
       };
     }
   } else if (selectingFresh) {
-    // Do zero: não aplica padrão histórico sozinho (isso é o caminho recommended).
+    // Do zero: limpa estrutura; NÃO aplica defaultGoalTiers até o Gestor confirmar a escada.
     const keepTarget = form.target;
     const keepStarts = form.startsOn;
     const keepEnds = form.endsOn;
@@ -2469,7 +2588,8 @@ export async function discussGoal(
   }
 
   form = ensureGoalName(form);
-  const basicsReady = goalDraftReady(form);
+  // Montagem (grupos/rateio/níveis) não exige escada já preenchida; gravação sim.
+  const basicsReady = goalDraftCoreReady(form);
 
   let pendingConfigCopy: GoalDraft["pendingConfigCopy"] =
     assembly.path === "copy" && copyStatus === "ok" ? null : (prev?.pendingConfigCopy ?? null);
@@ -2553,6 +2673,10 @@ export async function discussGoal(
     }
     if (assembly.confirmedGroups && assembly.confirmedSpread && !assembly.confirmedTiers) {
       if (looksLikeConfirmTiers(lastUser)) {
+        // Confirmação explícita: se ainda não há escada, aplica a proposta inicial do editor.
+        if (form.tiers.length === 0) {
+          form = { ...form, tiers: defaultGoalTiers() };
+        }
         assembly = { ...assembly, confirmedTiers: true };
       }
     }
@@ -2609,20 +2733,8 @@ export async function discussGoal(
     }
   }
 
-  // confirmedMount = config ok para OFERTAR save — não autoriza DB.
-  if (
-    basicsReady &&
-    !skipAssemblyParse &&
-    assembly.path != null &&
-    assembly.confirmedGroups &&
-    assembly.confirmedSpread &&
-    assembly.confirmedTiers &&
-    !assembly.confirmedMount &&
-    looksLikeConfirmMount(lastUser) &&
-    !looksLikeRequestSave(lastUser)
-  ) {
-    assembly = { ...assembly, confirmedMount: true };
-  }
+  // confirmedMount = pronto para OFERTAR save. “Sim” genérico NÃO marca mount
+  // (evita commit/LLM no turno seguinte). Só pedido explícito de salvar/montar.
   if (
     basicsReady &&
     assembly.path != null &&
@@ -2693,12 +2805,15 @@ export async function discussGoal(
   const hadAwaitingCommit = prev?.pendingCommit?.awaitingConfirm === true;
   const saveReady =
     goalConfigReadyForSaveOffer(draftOut) && !looksLikeAskGroupWeightAdvice(lastUser);
+  // Fase 3: papel de afirmação vem do classifyTurn (uma intenção por turno).
+  const affirmationRole = turnIntent.affirmation;
 
   if (
-    // 1) SIM com pending aguardando → autoriza gravação (P0).
+    // Único caminho de gravação: SIM com pending.awaitingConfirm + fingerprint válido (P0).
+    turnIntent.kind === "confirm_save" &&
+    affirmationRole === "confirm_save" &&
     hadAwaitingCommit &&
     draftOut.pendingCommit &&
-    (looksLikeConfirmPendingSave(lastUser) || looksLikeRequestSave(lastUser)) &&
     pendingCommitStillValid(draftOut) &&
     !looksLikeAskGroupWeightAdvice(lastUser) &&
     !justAcceptedProposal
@@ -2714,32 +2829,16 @@ export async function discussGoal(
     };
     shouldCommit = goalCanPersist(draftOut);
   } else if (
-    // 2) SIM sem pending (LLM pediu confirmação sozinho) + config já “pronta pra gravar”
-    // no turno anterior → autoriza. Não confundir com aceite de proposta de valor.
-    !hadAwaitingCommit &&
-    !draftOut.pendingCommit &&
-    !justAcceptedProposal &&
-    prev?.assembly?.confirmedMount === true &&
+    // Pediu salvar / “pode seguir” → apresenta resumo e AGUARDA SIM (não grava neste turno).
+    // “Sim” solto NÃO entra aqui — exige pending já apresentado no turno seguinte.
     saveReady &&
-    looksLikeConfirmPendingSave(lastUser) &&
-    form.target != null
-  ) {
-    const pending = createPendingCommit(draftOut, storeName);
-    draftOut = {
-      ...draftOut,
-      pendingCommit: {
-        ...pending,
-        awaitingConfirm: false,
-        authorized: true,
-      },
-      assembly: { ...assembly, confirmedMount: true },
-    };
-    shouldCommit = goalCanPersist(draftOut);
-  } else if (
-    // 3) Pediu salvar / “pode seguir” → apresenta resumo e AGUARDA SIM (não grava neste turno).
-    saveReady &&
-    (looksLikeRequestSave(lastUser) || looksLikeProceedToSaveOffer(lastUser)) &&
-    !looksLikeConfirmPendingSave(lastUser) // “sim” solto cai no ramo 1/2
+    (turnIntent.kind === "request_save" ||
+      looksLikeRequestSave(lastUser) ||
+      looksLikeProceedToSaveOffer(lastUser)) &&
+    turnIntent.kind !== "confirm_save" &&
+    turnIntent.kind !== "acknowledge_copy" &&
+    turnIntent.kind !== "clarify_choice" &&
+    !looksLikeConfirmPendingSave(lastUser)
   ) {
     const pending = createPendingCommit(draftOut, storeName);
     draftOut = {
@@ -2935,19 +3034,28 @@ export async function discussGoal(
     );
   } else if (looksLikeAskGroupWeightAdvice(lastUser)) {
     spokenReply = speakGoalWeightAdvice(draftOut, weightAdviceForSpeak);
+  } else if (affirmationRole === "clarify_choice") {
+    spokenReply = speakClarifyGoalChoice();
+  } else if (affirmationRole === "acknowledge_copy" && copyStatus === "ok") {
+    // “Sim” após cópia: reapresenta a config real — nunca deixa o LLM assumir o turno.
+    spokenReply = scrubTechnicalSpeech(
+      speakGoalDraftConfig(draftOut, { facet: "full" }) +
+        `\n\nNada foi gravado ainda. Diga se quer revisar níveis, grupos ou premiação, ou peça para salvar o rascunho.`,
+    );
   } else if (copyJustApplied && (copyStatus === "ok" || copyStatus === "failed")) {
     spokenReply = speakGoalDraftConfig(draftOut, {
       facet: copyStatus === "ok" ? "copyJustApplied" : "full",
     });
   } else if (recommendedJustApplied && patternBlocks.length) {
     spokenReply = scrubTechnicalSpeech(
-      `Montei uma configuração recomendada para ${form.startsOn ? monthYearTitle(form.startsOn) : "a meta"}` +
+      `Montei uma proposta de configuração para ${form.startsOn ? monthYearTitle(form.startsOn) : "a meta"}` +
         (form.target != null ? ` (${brlCent(form.target)})` : "") +
         `.\n\n` +
         patternBlocks.join("\n\n") +
         (configSnapshotBlocks.length ? `\n\n${configSnapshotBlocks.join("\n\n")}` : "") +
         (weightAdviceBlocks.length ? `\n\n${weightAdviceBlocks.join("\n\n")}` : "") +
-        `\n\nNada foi gravado. Confirma essa proposta, ajusta algum ponto, ou prefere outro caminho?`,
+        `\n\nIsso ainda é proposta — não está confirmada para gravar. ` +
+        `Confirma essa escada, ajusta algum ponto, ou prefere outro caminho?`,
     );
   } else if (patternBlocks.length && assembly.path === null && selectingRecommended) {
     spokenReply = scrubTechnicalSpeech(patternBlocks.join("\n\n"));

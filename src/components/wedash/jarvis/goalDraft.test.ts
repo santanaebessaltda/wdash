@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
   applyChallengeTierPct,
+  defaultGoalTiers,
   emptyGoalAssembly,
   emptyGoalForm,
   ensureGoalName,
   goalCanCommit,
   goalDraftReady,
+  validateGoalDraft,
   looksLikeAcceptConfigCopy,
   looksLikeAskValueSuggestion,
   looksLikeBareCopyAccept,
@@ -39,7 +41,6 @@ import {
   speakGoalAssemblyPathOffer,
   speakGoalDraftConfig,
   speakGoalWeightAdvice,
-  validateGoalDraft,
   discussGoal,
   goalAssemblyPendingSteps,
 } from "./goalDraft";
@@ -100,12 +101,17 @@ describe("mergeGoalUtterance", () => {
     expect(form.startsOn).toBe("2026-11-01");
     expect(form.target).toBe(180000);
     expect(form.storeId).toBe("a");
+    // Fase 2: sem escada escolhida o rascunho ainda não está pronto para gravar.
+    expect(form.tiers).toEqual([]);
+    expect(goalDraftReady(form)).toBe(false);
+    expect(validateGoalDraft(form).tiers).toBeTruthy();
+    form = { ...form, tiers: defaultGoalTiers() };
     expect(goalDraftReady(form)).toBe(true);
     expect(Object.keys(validateGoalDraft(form))).toEqual([]);
   });
 
   it("nível desafio +10% ajusta o último degrau para 110%", () => {
-    let form = emptyGoalForm("a");
+    let form = { ...emptyGoalForm("a"), tiers: defaultGoalTiers() };
     form = mergeGoalUtterance(
       form,
       "meta 350 mil, nível desafio 10% a mais, mesma configuração de outubro",
@@ -150,6 +156,8 @@ describe("goal assembly checklist", () => {
     form = ensureGoalName(
       mergeGoalUtterance(form, "meta individual de novembro, R$ 270 mil na Campo Grande", ctx),
     );
+    // Fase 2: merge não inventa escada — precisa níveis para goalDraftReady.
+    form = { ...form, tiers: defaultGoalTiers() };
     expect(goalDraftReady(form)).toBe(true);
     expect(goalCanCommit({ form, assembly: emptyGoalAssembly() })).toBe(false);
     // P0: confirmedMount sozinho não autoriza gravação — precisa pendingCommit.authorized.
@@ -669,6 +677,7 @@ describe("P0 proposta 244600 vs 257000", () => {
       startsOn: "2026-11-01",
       endsOn: "2026-11-30",
       target: 244_600,
+      tiers: defaultGoalTiers(),
       groups: [{ shiftId: "m", name: "T1", pct: 100 }],
     };
     const { createPendingCommit } = await import("./goalContract");
@@ -848,7 +857,7 @@ describe("P0 proposta 244600 vs 257000", () => {
     expect(spokenReply).toMatch(/244/);
   });
 
-  it("SIM sem pending (LLM pediu sozinho) autoriza gravação se config pronta", async () => {
+  it("SIM sem pendingCommit NAO autoriza gravação (Fase 1)", async () => {
     const prev = {
       form: {
         ...emptyGoalForm("a"),
@@ -877,9 +886,10 @@ describe("P0 proposta 244600 vs 257000", () => {
       pendingCommit: null,
     };
     const { draft, shouldCommit, spokenReply } = await discussGoal("SIM", ctx, prev);
-    expect(draft.pendingCommit?.authorized).toBe(true);
-    expect(shouldCommit).toBe(true);
-    expect(spokenReply).toBeNull();
+    expect(draft.pendingCommit?.authorized).toBeFalsy();
+    expect(shouldCommit).toBeFalsy();
+    expect(spokenReply).toBeTruthy();
+    expect(spokenReply).toMatch(/50%|110%|rascunho|revis/i);
   });
 
   it("vamos seguir a mesma faixa aceita proposta sem escolher caminho", async () => {
@@ -918,6 +928,7 @@ describe("P0 proposta 244600 vs 257000", () => {
         startsOn: "2026-11-01",
         endsOn: "2026-11-30",
         target: 257_000,
+        tiers: defaultGoalTiers(),
         groups: [{ shiftId: "m", name: "T1", pct: 100 }],
       },
       assembly: {
@@ -951,6 +962,7 @@ describe("P0 proposta 244600 vs 257000", () => {
       startsOn: "2026-11-01",
       endsOn: "2026-11-30",
       target: 257_000,
+      tiers: defaultGoalTiers(),
       groups: [{ shiftId: "m", name: "T1", pct: 100 }],
     };
     const { createPendingCommit } = await import("./goalContract");
@@ -1278,6 +1290,9 @@ describe("caminhos de montagem copy | recommended | fresh", () => {
     expect(draft.copyStatus).toBeNull();
     expect(draft.copiedFrom).toBeNull();
     expect(draft.form.groups).toHaveLength(0);
+    // Fase 2: do zero não aplica escada padrão até confirmação.
+    expect(draft.form.tiers).toEqual([]);
+    expect(draft.assembly?.confirmedTiers).toBe(false);
     expect(spokenReply).toMatch(/do zero|Estrutura/i);
   });
 
@@ -1302,6 +1317,8 @@ describe("caminhos de montagem copy | recommended | fresh", () => {
     expect(draft.assembly?.confirmedSpread).toBe(true);
     expect(draft.assembly?.confirmedTiers).toBe(true);
     expect(draft.form.target).toBe(244_600);
+    // Confirmação da escada aplica a proposta inicial do editor.
+    expect(draft.form.tiers.map((t) => t.minAttainmentPct)).toEqual([100, 120, 150, 180]);
   });
 
   it("6. gestor muda de caminho antes de salvar", async () => {

@@ -453,13 +453,17 @@ export function interpretGoalOpStructural(text: string, ctx: GoalOpIntentContext
     /para\s+(janeiro|fevereiro|marco|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)\b/.test(p) &&
       /mud|troc|passar|passar a meta|destino/.test(p);
 
-  // Origem / referência: “use outubro como referência”, “copiar outubro”, fato sobre outubro.
+  // Origem / referência (slots semânticos — uma leitura, não regex por frase comercial).
   const originRef =
     /como referencia|como referência|usar?\s+\w+\s+como|tendo em vista|basead|copiar?\s+(a\s+)?(mesma\s+)?(configura|escada|meta)|vamos copiar|quero copiar|mesma (escada|configura)|igual (a |ao )?/.test(
       p,
     ) ||
+    /usar (a |o )?(mesma )?(configura|escada|meta)|repete?r? (a |o )?(mesma )?(escada|configura|meta)|quero (a |usar a )?(configura|escada)|configura[cç][aã]o (de |do )?(mes passado|mes anterior)/.test(
+      p,
+    ) ||
+    /mes passado|mes anterior/.test(p) && /(escada|configura|copia|copiar|repete|repetir|usar|mesma)/.test(p) ||
     (/(janeiro|fevereiro|marco|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)/.test(p) &&
-      /(tinha|tinha o|nivel de|nível de|escada de|configura[cç][aã]o de|referencia|referência)/.test(p));
+      /(tinha|tinha o|nivel de|nível de|escada de|configura[cç][aã]o de|referencia|referência|usar|repete|repetir)/.test(p));
 
   let periodMonth: string | null = null;
   let periodRole: GoalPeriodRole = null;
@@ -540,9 +544,18 @@ export function interpretGoalOpStructural(text: string, ctx: GoalOpIntentContext
   // Referência/cópia sem R$ de nível no mesmo turno.
   if (
     amount == null &&
-    periodRole === "origin" &&
-    /referencia|referência|copiar|usar|mesma/.test(p)
+    (periodRole === "origin" ||
+      (/mes passado|mes anterior/.test(p) && /(escada|configura|copia|copiar|repete|repetir)/.test(p))) &&
+    /referencia|referência|copiar|usar|mesma|repete|repetir|configura/.test(p)
   ) {
+    if (!periodMonth && /mes passado|mes anterior/.test(p)) {
+      const base = ctx.form.startsOn || today;
+      const [y, m] = base.slice(0, 7).split("-").map(Number);
+      const prevM = (m ?? 1) - 1;
+      periodMonth =
+        prevM <= 0 ? `${(y ?? 2026) - 1}-12` : `${y}-${String(prevM).padStart(2, "0")}`;
+      periodRole = "origin";
+    }
     return emptyGoalOpIntent({
       kind: "change_request",
       entity: "period_origin",

@@ -142,6 +142,10 @@ describe("JARVIS UX — confirmacao natural", () => {
       endsOn: "2026-11-30",
       target: 257_000,
       groups: [{ shiftId: "m", name: "T1", pct: 100 }],
+      tiers: [
+        { name: "Meta", minAttainmentPct: 50, commissionPct: 1.5, bonus: 50 },
+        { name: "Desafio", minAttainmentPct: 110, commissionPct: 3, bonus: 50 },
+      ],
     };
     const assembly = {
       ...emptyGoalAssembly(),

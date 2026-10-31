@@ -26,7 +26,6 @@ import { splitJarvisReply, sleepMs, typingDelayMs } from "./chatBlocks";
 import { commitGoal } from "./goalCommit";
 import {
   clearGoalDraftSession,
-  discussGoal,
   emptyGoalAssembly,
   formatGoalFactsForModel,
   goalAssemblyPendingSteps,
@@ -51,6 +50,12 @@ import {
   speakGoalSavedSuccess,
   speakValueInconsistency,
 } from "./goalContract";
+import { applyGoalTurn } from "./goalTurnApply";
+import {
+  assertLlmSpeechAfterMutation,
+  speechClaimsCopyOk,
+  speechClaimsSaved,
+} from "./goalTurnTrace";
 import { looksLikeUnfinishedAnalysisPromise } from "./llmClient";
 import { classifyJarvisFailure, logJarvisError } from "./jarvisErrors";
 import {
@@ -84,6 +89,11 @@ export type JarvisMode = "idle" | "thinking";
 export type JarvisCreated =
   | { kind: "challenge"; id: string; name: string }
   | { kind: "schedule"; name: string };
+
+/** Correlação de sessão sem PII completa. */
+function shortSessionKey(tenantId: string, membershipId: string): string {
+  return `${tenantId.slice(0, 8)}.${membershipId.slice(0, 8)}`;
+}
 
 function readTopbarStoreIds(): string[] {
   try {
@@ -730,7 +740,10 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
       let goalTurnApplied = false;
       let goalSpokenReply: string | null = null;
       let goalShouldCommit = false;
+      let goalAllowLlm = false;
+      let goalMutatedThisTurn = false;
       const turnId = `t-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      const sessionKey = shortSessionKey(session.tenantId, session.membershipId);
       const llmSession = (): JarvisLlmSession => {
         const draft = goalDraftRef.current;
         const g = draft?.form;
@@ -771,20 +784,20 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
           challengeDraftRef.current = null;
           setScheduleDraft(null);
           scheduleDraftRef.current = null;
-          // Sempre o turno do Gestor: o arg da tool parafraseia e perde "copiar/outubro".
-          // turnId = mesma aplicação do eager (idempotente se já rodou).
+          // Alias de applyGoalTurn (mesmo turnId) — idempotente se o eager já rodou.
           const utterance = q.trim() || request;
-          const { draft, reply: toolReply } = await discussGoal(utterance, ctx, goalDraftRef.current, {
+          const turn = await applyGoalTurn(utterance, ctx, goalDraftRef.current, {
             turnId,
+            sessionKey,
           });
-          syncGoalDraft(draft);
+          syncGoalDraft(turn.draft);
           setGoalDraft(null);
           setCreatedItem(null);
-          const storeName =
-            ctx.network.find((s) => s.id === draft.form.storeId)?.tradeName ??
-            ctx.stores.find((s) => s.id === draft.form.storeId)?.tradeName ??
-            "";
-          return toolReply || formatGoalFactsForModel(draft, storeName);
+          return (
+            turn.facts ||
+            formatGoalFactsForModel(turn.draft, "") +
+              (turn.skipped ? "\nturno_ja_aplicado: true" : "")
+          );
         },
         onDraftChallenge: async (request) => {
           setGoalDraft(null);
@@ -874,8 +887,8 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
         if (gen !== replyGen.current) return;
         memoryTextRef.current = formatMemoryForModel(facts);
 
-        // Fio de meta (rascunho aberto OU conversa de meta): aplica a fala ANTES do modelo.
-        // Cobre "sim", "copiar outubro", "último nível R$ X" mesmo se a IA esquecer draft_goal.
+        // Fase 4: fio de meta → applyGoalTurn (classify + motor) antes do LLM.
+        // interpret_goal_op alimenta a classificação; não compete com ela.
         const recentMsgs = [...messagesRef.current, { from: "user" as const, text: q }].slice(-16);
         const onGoalThread =
           goalDraftRef.current != null ||
@@ -887,20 +900,25 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
           const historyBlob = recentMsgs.map((m) => `${m.from}: ${m.text}`).join("\n");
           const { resolveGoalOpIntent } = await import("./goalOpInterpret");
           const opIntent = await resolveGoalOpIntent(q, before, ctx.today);
-          const { draft, skipped, spokenReply, shouldCommit } = await discussGoal(
-            historyBlob,
-            ctx,
-            before,
-            { turnId, intent: opIntent },
-          );
+          const turn = await applyGoalTurn(historyBlob, ctx, before, {
+            turnId,
+            intent: opIntent,
+            sessionKey,
+          });
           if (gen !== replyGen.current) return;
-          syncGoalDraft(draft);
-          const afterPending = goalAssemblyPendingSteps(draft).join("|");
+          syncGoalDraft(turn.draft);
+          const afterPending = goalAssemblyPendingSteps(turn.draft).join("|");
           goalTurnApplied =
-            !skipped &&
-            ((draft.assembly?.path ?? null) !== beforePath || afterPending !== beforePending);
-          if (!skipped && spokenReply) goalSpokenReply = spokenReply;
-          if (!skipped && shouldCommit) goalShouldCommit = true;
+            !turn.skipped &&
+            (turn.mutates ||
+              (turn.draft.assembly?.path ?? null) !== beforePath ||
+              afterPending !== beforePending);
+          goalMutatedThisTurn = turn.mutates && !turn.skipped;
+          goalAllowLlm = turn.allowLlm;
+          if (!turn.skipped && turn.speech && !turn.allowLlm) {
+            goalSpokenReply = turn.speech;
+          }
+          if (!turn.skipped && turn.shouldCommit) goalShouldCommit = true;
         }
 
         // Commit autorizado neste turno — fala = resultado real de saveGoal.
@@ -911,13 +929,13 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
           return;
         }
 
-        // Intenção resolvida no motor — não deixa o LLM reabrir a cópia / inventar R$.
-        if (goalSpokenReply) {
+        // Operação com fala do motor — Provider NÃO chama chat (Fase 4).
+        if (goalSpokenReply && !goalAllowLlm) {
           finish(goalSpokenReply);
           return;
         }
 
-        // Só prompt + tools. Sem script local de conversa.
+        // Consultiva / sem speech: LLM com estado + tools (sem mutar por conta própria).
         const llm = await jarvisLlmTurn(history, ctx, q, llmSession, llmHooks());
         if (gen !== replyGen.current) return;
 
@@ -1006,6 +1024,31 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
         ) {
           answer = speakGoalDraftConfig(draftNow);
         }
+        // Fase 5: LLM não afirma cópia/gravação sem estado correspondente.
+        if (draftNow) {
+          const falseCopy = speechClaimsCopyOk(answer) && draftNow.copyStatus !== "ok";
+          const falseSave = speechClaimsSaved(answer) && !goalShouldCommit;
+          if (falseCopy || falseSave) {
+            logJarvisError("invariant.speech_vs_state", {
+              kind: "validation",
+              reason: falseCopy ? "copy_claim_without_ok" : "save_claim_without_success",
+            });
+            answer = speakGoalDraftConfig(draftNow);
+          } else if (goalMutatedThisTurn) {
+            const gate = assertLlmSpeechAfterMutation({
+              mutates: true,
+              speechSource: "llm",
+              draft: draftNow,
+            });
+            if (!gate.ok) {
+              // Só registra — a fala do LLM pode ser consultiva; commit já exige pending.
+              logJarvisError("invariant.llm_after_mutation", {
+                kind: "validation",
+                reason: gate.violation.id,
+              });
+            }
+          }
+        }
         finish(answer);
       })();
     },
@@ -1033,20 +1076,19 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
       const ctx = jarvisContextFromSession(session, readTopbarStoreIds());
       const turnId = `path-${path}-${Date.now()}`;
       try {
-        const { draft, spokenReply, shouldCommit } = await discussGoal(
-          `Selecionar caminho: ${path}`,
-          ctx,
-          before,
-          { turnId, forcedPath: path },
-        );
-        syncGoalDraft(draft);
-        if (shouldCommit) {
+        const turn = await applyGoalTurn(`Selecionar caminho: ${path}`, ctx, before, {
+          turnId,
+          forcedPath: path,
+          sessionKey: shortSessionKey(session.tenantId, session.membershipId),
+        });
+        syncGoalDraft(turn.draft);
+        if (turn.shouldCommit) {
           const msg = await authorizeGoal({ silent: true });
           await speakAnswer(msg || "Não consegui gravar a meta.");
           return;
         }
-        if (spokenReply) {
-          await speakAnswer(spokenReply);
+        if (turn.speech) {
+          await speakAnswer(turn.speech);
         } else {
           setMode("idle");
         }

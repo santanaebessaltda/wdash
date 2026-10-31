@@ -211,4 +211,50 @@ describe("P0 pendingCommit", () => {
     expect(looksLikeProceedToSaveOffer("pode seguir")).toBe(true);
     expect(looksLikeRequestSave("pode salvar o rascunho")).toBe(true);
   });
+
+  it("resolveGoalAffirmationRole depende do estado pendente", async () => {
+    const { resolveGoalAffirmationRole, looksLikeAmbiguousChoicePrompt } = await import(
+      "./goalContract"
+    );
+    const form = {
+      ...emptyGoalForm("a"),
+      target: 500_000,
+      startsOn: "2026-11-01",
+      endsOn: "2026-11-30",
+    };
+    const afterCopy = {
+      form,
+      assembly: { path: "copy" as const, confirmedMount: false },
+      copyStatus: "ok" as const,
+      pendingCommit: null,
+    };
+    expect(resolveGoalAffirmationRole({ text: "Sim", draft: afterCopy })).toBe("acknowledge_copy");
+    expect(
+      resolveGoalAffirmationRole({
+        text: "Sim",
+        draft: afterCopy,
+        historyOrJarvis: "Quer revisar a configuração ou salvar o rascunho?",
+      }),
+    ).toBe("clarify_choice");
+    expect(looksLikeAmbiguousChoicePrompt("Quer revisar ou salvar?")).toBe(true);
+
+    const pending = createPendingCommit(
+      { form, assembly: { ...emptyGoalAssembly(), path: "copy", confirmedMount: true } },
+      "Loja",
+    );
+    expect(
+      resolveGoalAffirmationRole({
+        text: "Sim",
+        draft: { form, assembly: { path: "copy" }, copyStatus: "ok", pendingCommit: pending },
+        historyOrJarvis: pending.summary,
+      }),
+    ).toBe("confirm_save");
+
+    expect(
+      resolveGoalAffirmationRole({
+        text: "Sim",
+        draft: { form, assembly: { path: null }, copyStatus: null, pendingCommit: null },
+      }),
+    ).toBe("none");
+  });
 });
