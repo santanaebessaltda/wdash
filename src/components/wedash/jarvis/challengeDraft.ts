@@ -18,7 +18,12 @@ import {
 } from "@/data/wedash/challengesRepo";
 import { addDays, dateToIso, isoToDate } from "@/lib/format";
 import { brlCent } from "@/lib/format";
-import { matchStoresInText, type JarvisContext } from "./context";
+import {
+  matchStoresInText,
+  needsStorePickForWrite,
+  speakAskWriteStore,
+  type JarvisContext,
+} from "./context";
 import { seasonalBiasForPeriod } from "./seasonalBrief";
 import { pickStalledProducts } from "./stockStalled";
 import { fetchSalesProductPeriodAggs } from "@/data/wedash/salesRepo";
@@ -293,10 +298,22 @@ export async function discussChallenge(
   question: string,
   ctx: JarvisContext,
   prev: ChallengeDraft | null,
-): Promise<{ reply: string; draft: ChallengeDraft }> {
+): Promise<{ reply: string; draft: ChallengeDraft; spokenReply?: string | null }> {
   const catalog = prev?.catalog ?? (await fetchChallengeCatalog().catch(() => null));
   let form = prev?.form ?? emptyChallengeForm(ctx.stores.length === 1 ? ctx.stores[0]!.id : "");
   form = mergeChallengeUtterance(form, question, ctx);
+
+  if (!form.storeId && ctx.stores.length === 1) form = { ...form, storeId: ctx.stores[0]!.id };
+  if (!form.storeId && needsStorePickForWrite(ctx)) {
+    form = ensureChallengeName(form);
+    const draft: ChallengeDraft = { form, catalog };
+    const ask = speakAskWriteStore(ctx, "desafio");
+    return {
+      reply: `${ask}\n\n(Não invente filial. Espere o Gestor escolher.)`,
+      draft,
+      spokenReply: ask,
+    };
+  }
 
   const p = norm(question);
   if (/parado|encalhe|estoque/.test(p) && form.products.length === 0) {
@@ -331,7 +348,7 @@ export async function discussChallenge(
       reply = `${bias.summary} ${reply}`;
     }
   }
-  return { reply, draft };
+  return { reply, draft, spokenReply: null };
 }
 
 export function challengeDraftReady(form: ChallengeForm): boolean {

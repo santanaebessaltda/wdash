@@ -2,12 +2,22 @@ import { describe, expect, it } from "vitest";
 import { emptyChallengeForm } from "@/data/wedash/challengeForm";
 import {
   challengeDraftReady,
+  discussChallenge,
   ensureChallengeName,
   mergeChallengeUtterance,
   missingChallengeLabels,
   parseChallengeDates,
 } from "./challengeDraft";
 import { validateChallengeForm } from "@/data/wedash/challengeForm";
+import { vi } from "vitest";
+
+vi.mock("@/data/wedash/challengesRepo", async (importOriginal) => {
+  const mod = await importOriginal<typeof import("@/data/wedash/challengesRepo")>();
+  return {
+    ...mod,
+    fetchChallengeCatalog: async () => null,
+  };
+});
 
 const ctx = {
   tenantId: "t",
@@ -69,5 +79,25 @@ describe("missingChallengeLabels", () => {
     expect(labels).toContain("nome");
     expect(labels).toContain("filial");
     expect(labels).toContain("período");
+  });
+});
+
+describe("Topbar Todas — desafio pede filial", () => {
+  it("nao inventa a primeira loja", async () => {
+    const multi = {
+      ...ctx,
+      storeIds: [] as string[],
+      stores: [
+        ctx.stores[0]!,
+        { id: "b", name: "CENTRO", tradeName: "Loja Centro", code: "00386" },
+      ],
+      network: [
+        ctx.stores[0]!,
+        { id: "b", name: "CENTRO", tradeName: "Loja Centro", code: "00386" },
+      ],
+    };
+    const { draft, spokenReply } = await discussChallenge("Criar um desafio", multi, null);
+    expect(draft.form.storeId).toBe("");
+    expect(spokenReply).toMatch(/todas as lojas|filial/i);
   });
 });

@@ -1368,3 +1368,45 @@ describe("caminhos de montagem copy | recommended | fresh", () => {
     }
   });
 });
+
+describe("Topbar Todas as lojas — pergunta a filial", () => {
+  const storeA = {
+    id: "a",
+    name: "CAMPO GRANDE",
+    tradeName: "Shopping Campo Grande",
+    code: "00010",
+  };
+  const storeB = {
+    id: "b",
+    name: "CENTRO",
+    tradeName: "Loja Centro",
+    code: "00386",
+  };
+  const networkCtx = {
+    tenantId: "t",
+    membershipId: "m1",
+    storeIds: [] as string[],
+    stores: [storeA, storeB],
+    network: [storeA, storeB],
+    today: "2026-10-29",
+    managerFirstName: "Romeu",
+  };
+
+  it("meta de novembro com rede: nao inventa filial e pergunta", async () => {
+    const { draft, spokenReply } = await discussGoal("Criar meta de novembro", networkCtx, null);
+    expect(draft.form.storeId).toBe("");
+    expect(draft.form.startsOn).toBe("2026-11-01");
+    expect(spokenReply).toMatch(/todas as lojas/i);
+    expect(spokenReply).toMatch(/filial/i);
+  });
+
+  it("cita a loja no texto: usa sem perguntar", async () => {
+    const { draft, spokenReply } = await discussGoal(
+      "Criar meta de novembro da Loja Centro",
+      networkCtx,
+      null,
+    );
+    expect(draft.form.storeId).toBe("b");
+    expect(spokenReply ?? "").not.toMatch(/todas as lojas/i);
+  });
+});

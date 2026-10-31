@@ -12,7 +12,12 @@ import {
   type Holiday,
 } from "@/data/wedash/scheduleHolidays";
 import { fetchStoreSellers, isBranchTeamMember, storesForSession, type Store } from "@/data/wedash/stores";
-import { matchStoresInText, type JarvisContext } from "./context";
+import {
+  matchStoresInText,
+  needsStorePickForWrite,
+  speakAskWriteStore,
+  type JarvisContext,
+} from "./context";
 
 export type SchedulePersonRef = { id: string; name: string; sex: Sex };
 
@@ -182,14 +187,27 @@ export async function discussSchedule(
   question: string,
   ctx: JarvisContext,
   prev: ScheduleDraft | null,
-): Promise<{ reply: string; draft: ScheduleDraft }> {
+): Promise<{ reply: string; draft: ScheduleDraft; spokenReply?: string | null }> {
   const p = norm(question);
   const pool = ctx.network.length > 0 ? ctx.network : ctx.stores;
   const matched = matchStoresInText(question, pool);
   let storeId = matched[0]?.id ?? prev?.form.storeId ?? (ctx.stores.length === 1 ? ctx.stores[0]!.id : "");
-  if (!storeId && /escala/.test(p) && ctx.stores.length > 0) {
-    // Sem filial falada: usa a do Topbar / primeira da sessão.
-    storeId = ctx.stores[0]!.id;
+  // Com Todas as lojas / várias no filtro: não inventa a primeira — o Gestor escolhe.
+
+  if (!storeId && needsStorePickForWrite(ctx)) {
+    const form = prev?.form
+      ? {
+          ...prev.form,
+          people: [...prev.form.people],
+          holidayRules: [...prev.form.holidayRules],
+        }
+      : emptyScheduleForm("");
+    const ask = speakAskWriteStore(ctx, "escala");
+    return {
+      reply: `${ask}\n\n(Não invente filial. Espere o Gestor escolher.)`,
+      draft: { form, storeName: "" },
+      spokenReply: ask,
+    };
   }
 
   const network = storesForSession(
@@ -231,5 +249,6 @@ export async function discussSchedule(
   return {
     reply: formatScheduleProposal(form, storeName),
     draft: { form, storeName },
+    spokenReply: null,
   };
 }

@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { matchStoresInText, resolveStoresInQuestion, type JarvisContext, type JarvisStoreRef } from "./context";
+import {
+  isTopbarNetworkScope,
+  matchStoresInText,
+  needsStorePickForWrite,
+  resolveStoresInQuestion,
+  speakAskWriteStore,
+  type JarvisContext,
+  type JarvisStoreRef,
+} from "./context";
 
 const sb: JarvisStoreRef = {
   id: "sb",
@@ -40,6 +48,37 @@ describe("matchStoresInText", () => {
     ).map((s) => s.id);
     expect(hit).toContain("sb");
     expect(hit).toContain("centro");
+  });
+});
+
+describe("isTopbarNetworkScope / needsStorePickForWrite", () => {
+  it("vazio ou lista completa = rede", () => {
+    expect(isTopbarNetworkScope([], ["a", "b"])).toBe(true);
+    expect(isTopbarNetworkScope(["a", "b"], ["a", "b"])).toBe(true);
+    expect(isTopbarNetworkScope(["a"], ["a", "b"])).toBe(false);
+    expect(isTopbarNetworkScope([], ["a"])).toBe(false);
+  });
+
+  it("escrita pede filial quando ha mais de uma no escopo", () => {
+    const multi: JarvisContext = {
+      tenantId: "t",
+      membershipId: "m1",
+      storeIds: [],
+      stores: [sb, centro],
+      network: [sb, centro],
+      today: "2026-10-29",
+      managerFirstName: "Romeu",
+    };
+    expect(needsStorePickForWrite(multi)).toBe(true);
+    expect(speakAskWriteStore(multi, "meta")).toMatch(/todas as lojas/i);
+    expect(speakAskWriteStore(multi, "meta")).toMatch(/filial/i);
+
+    const one: JarvisContext = {
+      ...multi,
+      storeIds: ["centro"],
+      stores: [centro],
+    };
+    expect(needsStorePickForWrite(one)).toBe(false);
   });
 });
 

@@ -38,15 +38,73 @@ const STORE_NAME_BLOCKLIST = new Set([
   "ponto",
 ]);
 
+/**
+ * Escopo da Topbar: vazio ou lista completa = rede (“Todas as lojas”).
+ * Alinhado a `scopeStoreIds` em useScope.
+ */
+export function isTopbarNetworkScope(
+  scopeStoreIds: string[],
+  networkIds: string[],
+): boolean {
+  if (networkIds.length <= 1) return false;
+  if (scopeStoreIds.length === 0) return true;
+  if (scopeStoreIds.length < networkIds.length) return false;
+  const set = new Set(scopeStoreIds);
+  return networkIds.every((id) => set.has(id));
+}
+
+/** Topbar em rede / várias filiais — operação por loja precisa escolher uma. */
+export function needsStorePickForWrite(ctx: JarvisContext): boolean {
+  return ctx.stores.length !== 1;
+}
+
+export function isNetworkStoreScope(ctx: JarvisContext): boolean {
+  return (
+    ctx.storeIds.length === 0 &&
+    ctx.network.length > 1 &&
+    ctx.stores.length === ctx.network.length
+  );
+}
+
+/**
+ * Meta / desafio / escala são por filial.
+ * Com Topbar em Todas (ou várias), o JARVIS pergunta — não inventa a primeira.
+ */
+export function speakAskWriteStore(
+  ctx: JarvisContext,
+  kind: "meta" | "desafio" | "escala",
+  opts?: { monthLabel?: string | null },
+): string {
+  const tip = opts?.monthLabel ? `${opts.monthLabel}, fechado.\n\n` : "";
+  const noun =
+    kind === "meta" ? "a meta" : kind === "desafio" ? "o desafio" : "a escala";
+  if (isNetworkStoreScope(ctx) || (ctx.storeIds.length === 0 && ctx.stores.length > 1)) {
+    return (
+      `${tip}Você está com o filtro em todas as lojas.\n\n` +
+      `De qual filial quer montar ${noun}?`
+    );
+  }
+  if (ctx.stores.length > 1) {
+    const names = ctx.stores.map((s) => s.tradeName || s.name).join(", ");
+    return `${tip}De qual filial? No filtro estão: ${names}.`;
+  }
+  return tip ? `${tip}Qual filial?` : `De qual filial quer montar ${noun}?`;
+}
+
 export function jarvisContextFromSession(session: Session, scopeStoreIds: string[]): JarvisContext {
   const network = storesForSession(session.stores).map(toRef);
-  const picked =
-    scopeStoreIds.length > 0 ? network.filter((s) => scopeStoreIds.includes(s.id)) : network;
+  const networkIds = network.map((s) => s.id);
+  const networkScope = isTopbarNetworkScope(scopeStoreIds, networkIds);
+  const picked = networkScope
+    ? network
+    : network.filter((s) => scopeStoreIds.includes(s.id));
   const stores = picked.length > 0 ? picked : network;
   return {
     tenantId: session.tenantId,
     membershipId: session.membershipId,
-    storeIds: stores.map((s) => s.id),
+    // Vazio = todas (igual useScope). Não expandir para a lista inteira —
+    // senão o JARVIS “esquece” que o filtro está em Todas as lojas.
+    storeIds: networkScope ? [] : stores.map((s) => s.id),
     stores,
     network,
     today: calendarTodayIso(),

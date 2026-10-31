@@ -58,10 +58,16 @@ export type JarvisLlmHooks = {
 };
 
 function contextNote(ctx: JarvisContext, session?: JarvisLlmSession | null): string {
+  const networkScope =
+    ctx.storeIds.length === 0 && ctx.network.length > 1 && ctx.stores.length === ctx.network.length;
   const stores =
     ctx.stores.length === 0
       ? "nenhuma filial no escopo"
-      : ctx.stores.map((s) => `${s.tradeName || s.name} (${s.code || s.id})`).join("; ");
+      : networkScope
+        ? `TODAS AS LOJAS (rede — Topbar sem filtro de filial): ${ctx.stores
+            .map((s) => `${s.tradeName || s.name} (${s.code || s.id})`)
+            .join("; ")}`
+        : ctx.stores.map((s) => `${s.tradeName || s.name} (${s.code || s.id})`).join("; ");
   const lines = [
     `Hoje: ${ctx.today}. Filiais no escopo: ${stores}. Tenant: ${ctx.tenantId}.`,
     `Datas relativas (ano passado, mês passado, últimos N meses) usam a data de Hoje acima — interprete você.`,
@@ -71,6 +77,11 @@ function contextNote(ctx: JarvisContext, session?: JarvisLlmSession | null): str
     "Agente: pode chamar varias tools no mesmo raciocinio (vendas, meta, sazonal) antes de propor. Baseie meta/desafio em numeros da tool.",
     "Memoria de longo prazo: use remember_fact para preferencias/decisoes duraveis. Apagar conversa zera thread, rascunhos e esta memoria.",
   ];
+  if (networkScope || ctx.stores.length > 1) {
+    lines.push(
+      "Escrita (meta/desafio/escala) e por UMA filial. Com Topbar em Todas ou varias no filtro: PERGUNTE de qual loja — nao invente nem use a primeira da lista.",
+    );
+  }
   if (session?.longTermMemory) {
     lines.push(`Memoria deste Gestor:\n${session.longTermMemory}`);
   }

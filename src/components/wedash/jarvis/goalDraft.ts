@@ -3,7 +3,13 @@ import type { GoalGroup, Tier } from "@/data/wedash/engine/goalTypes";
 import { fetchGoals } from "@/data/wedash/goalsRepo";
 import { fetchSalesDayAggs } from "@/data/wedash/salesRepo";
 import { brlCent, monthYearTitle } from "@/lib/format";
-import { matchStoresInText, type JarvisContext, type JarvisStoreRef } from "./context";
+import {
+  matchStoresInText,
+  needsStorePickForWrite,
+  speakAskWriteStore,
+  type JarvisContext,
+  type JarvisStoreRef,
+} from "./context";
 import { looksLikeGoalLadderTalk } from "./respond";
 import {
   detectSeasonalEventMention,
@@ -1402,6 +1408,21 @@ export function looksLikeLeakedGoalFacts(text: string): boolean {
   return /faltando:/.test(t) && /valueDiscussed:/.test(t);
 }
 
+/** Meta / desafio / escala são por filial — com Topbar em Todas, pergunta. */
+export function speakAskGoalStore(
+  ctx: JarvisContext,
+  opts?: { monthLabel?: string | null },
+): string {
+  return speakAskWriteStore(ctx, "meta", opts);
+}
+
+function speakAskGoalStoreFromDraft(draft: GoalDraft): string {
+  const month = draft.form.startsOn ? monthYearTitle(draft.form.startsOn) : null;
+  return month
+    ? `${month}, fechado.\n\nDe qual filial quer montar a meta?`
+    : "De qual filial quer montar a meta?";
+}
+
 /** Fala humana de emergência quando o modelo vazou o estado interno ou perdeu o fio. */
 export function naturalGoalAskFromDraft(draft: GoalDraft): string {
   const form = draft.form;
@@ -1413,9 +1434,7 @@ export function naturalGoalAskFromDraft(draft: GoalDraft): string {
       : `Bora montar a meta.\n\nPra qual mês a gente monta?`;
   }
   if (!form.storeId) {
-    return form.startsOn
-      ? `${monthYearTitle(form.startsOn)}, fechado. Qual filial?`
-      : "Qual filial a gente usa?";
+    return speakAskGoalStoreFromDraft(draft);
   }
   if (!a.valueDiscussed || form.target == null) {
     const month = form.startsOn ? monthYearTitle(form.startsOn) : "esse mês";
@@ -1853,8 +1872,9 @@ export async function discussGoal(
   }
 
   form = ensureGoalName(form);
+  // Uma loja no filtro → usa sem perguntar. Rede / várias → exige escolha explícita.
   if (!form.storeId && ctx.stores.length === 1) form = { ...form, storeId: ctx.stores[0]!.id };
-  if (!form.storeId && (ctx.network.length > 1 || ctx.stores.length > 1)) {
+  if (!form.storeId && needsStorePickForWrite(ctx)) {
     const draftStore: GoalDraft = {
       form,
       pendingConfigCopy: null,
@@ -1866,10 +1886,15 @@ export async function discussGoal(
       copiedFrom: prev?.copiedFrom ?? null,
       copyIntent: prev?.copyIntent ?? null,
     };
+    const monthLabel = form.startsOn ? monthYearTitle(form.startsOn) : null;
+    const ask = speakAskGoalStore(ctx, { monthLabel });
     return {
-      reply: formatGoalFactsForModel(draftStore, ""),
+      reply: formatGoalFactsForModel(draftStore, "", [
+        "instrucao_fala: Falta a filial. Pergunte de qual loja — nao invente filial nem siga sem storeId.",
+      ]),
       draft: draftStore,
       voice: "silent",
+      spokenReply: ask,
     };
   }
 

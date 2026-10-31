@@ -816,10 +816,17 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
           syncGoalDraft(null);
           setScheduleDraft(null);
           scheduleDraftRef.current = null;
-          const { draft } = await discussChallenge(request || q, ctx, challengeDraftRef.current);
+          const { draft, spokenReply } = await discussChallenge(
+            request || q,
+            ctx,
+            challengeDraftRef.current,
+          );
           setChallengeDraft(draft);
           challengeDraftRef.current = draft;
           setCreatedItem(null);
+          if (spokenReply) {
+            return `Falta a filial. Diga exatamente ao Gestor (sem inventar loja):\n${spokenReply}`;
+          }
           return "Rascunho de desafio atualizado no app (card Autorizar). Fale naturalmente; pra gravar use commit_draft ou o botão Autorizar.";
         },
         onDraftSchedule: async (request) => {
@@ -827,10 +834,17 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
           challengeDraftRef.current = null;
           setGoalDraft(null);
           syncGoalDraft(null);
-          const { draft } = await discussSchedule(request || q, ctx, scheduleDraftRef.current);
+          const { draft, spokenReply } = await discussSchedule(
+            request || q,
+            ctx,
+            scheduleDraftRef.current,
+          );
           setScheduleDraft(draft);
           scheduleDraftRef.current = draft;
           setCreatedItem(null);
+          if (spokenReply) {
+            return `Falta a filial. Diga exatamente ao Gestor (sem inventar loja):\n${spokenReply}`;
+          }
           return "Rascunho de escala atualizado no app (card Autorizar). Fale naturalmente; pra gravar use commit_draft ou o botão Autorizar.";
         },
         onCommitDraft: async (target) => {
