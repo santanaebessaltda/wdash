@@ -905,8 +905,9 @@ describe("P0 proposta 244600 vs 257000", () => {
     expect(draft.form.target).toBe(244_600);
     expect(draft.assembly?.path).toBeNull();
     expect(draft.copyStatus == null || draft.copyStatus !== "ok").toBe(true);
-    expect(spokenReply).toMatch(/244\.600|244600|recomenda|do zero|Copiar/i);
+    expect(spokenReply).toMatch(/244\.600|244600|Apliquei|escolha abaixo|recomenda/i);
     expect(spokenReply).not.toMatch(/Vou seguir com (isso|a c[oó]pia)|copiar a escada/i);
+    expect(spokenReply).not.toMatch(/· Copiar[\s\S]*· Criar do zero/);
   });
 
   it("pedir salvar cria pendingCommit sem shouldCommit", async () => {
@@ -1238,8 +1239,11 @@ describe("caminhos de montagem copy | recommended | fresh", () => {
     };
     const { draft, spokenReply } = await discussGoal("Vamos seguir a mesma faixa", ctx, prev);
     expect(draft.form.target).toBe(244_600);
+    expect(draft.userLockedTarget).toBe(true);
     expect(draft.assembly?.path).toBeNull();
-    expect(spokenReply).toMatch(/recomenda|do zero|Copiar/i);
+    expect(spokenReply).toMatch(/Apliquei|244|escolha abaixo|recomenda/i);
+    // Não duplica a lista integral das 3 opções no texto.
+    expect(spokenReply).not.toMatch(/· Copiar[\s\S]*· Criar com[\s\S]*· Criar do zero/);
   });
 
   it("2. selecionar copiar usa configuracao anterior", async () => {
@@ -1351,9 +1355,9 @@ describe("caminhos de montagem copy | recommended | fresh", () => {
       hasPrior: true,
       priorLabel: "outubro de 2026",
     });
-    expect(offer).toMatch(/Copiar/);
-    expect(offer).toMatch(/recomenda/);
-    expect(offer).toMatch(/do zero/);
+    expect(offer).toMatch(/Apliquei|244/);
+    expect(offer).toMatch(/escolha abaixo|recomenda/i);
+    expect(offer).not.toMatch(/· Copiar[\s\S]*· Criar do zero/);
     expect(looksLikeChooseCopyPath("Copiar outubro")).toBe(true);
     expect(looksLikeChooseRecommendedPath("Criar com recomendações")).toBe(true);
     expect(looksLikeChooseFreshPath("Criar do zero")).toBe(true);
@@ -1366,6 +1370,244 @@ describe("caminhos de montagem copy | recommended | fresh", () => {
       expect(draft.form.startsOn).toBe("2026-11-01");
       expect(draft.form.storeId).toBe("a");
     }
+  });
+});
+
+describe("postura de valor — consultiva vs aceite (P0+)", () => {
+  const pendingProposal = {
+    form: {
+      ...emptyGoalForm("a"),
+      name: "Meta Novembro 2026",
+      startsOn: "2026-11-01",
+      endsOn: "2026-11-30",
+      target: null as number | null,
+    },
+    assembly: {
+      ...emptyGoalAssembly(),
+      periodConfirmed: true,
+      valueDiscussed: true,
+      path: null as "copy" | "recommended" | "fresh" | null,
+    },
+    proposedTarget: 244_600 as number | null,
+    userLockedTarget: false,
+    pendingCommit: null,
+    proposal: {
+      amount: 244_600,
+      scenarios: [
+        { kind: "conservative" as const, amount: 225_000, label: "Conservadora" },
+        { kind: "recommended" as const, amount: 244_600, label: "Recomendada" },
+        { kind: "challenging" as const, amount: 269_000, label: "Desafiadora" },
+      ],
+      evidence: [{ kind: "observed" as const, label: "YoY novembro" }],
+      caveats: [],
+      confidence: "medium" as const,
+      rationale: "mesmo mês ano passado + ritmo recente; sazonal Black Friday",
+      seasonalSummary: "Black Friday embutida",
+      chatBlocks: ["Para novembro de 2026, eu trabalharia com R$ 244.600."],
+    },
+  };
+
+  it("1. pergunta se deve aumentar a meta nao aceita nem avanca", async () => {
+    const q =
+      "Queria colocar uma sobra a mais... Se precisar eu diminuo no meio do mês, o que você acha?";
+    const { draft, spokenReply } = await discussGoal(q, ctx, pendingProposal);
+    expect(draft.form.target).toBeNull();
+    expect(draft.proposedTarget).toBe(244_600);
+    expect(draft.userLockedTarget).toBe(false);
+    expect(draft.assembly?.path).toBeNull();
+    expect(spokenReply).toMatch(/sobra|folga|não apliquei|nao apliquei|meio do m/i);
+    expect(spokenReply).not.toMatch(/escolha abaixo|vamos trabalhar com/i);
+    expect(spokenReply).not.toMatch(/^Apliquei /m);
+  });
+
+  it("2. considera diminuir no meio do mes permanece na etapa de valor", async () => {
+    const { draft, spokenReply } = await discussGoal(
+      "E se eu diminuir no meio do mês se precisar?",
+      ctx,
+      pendingProposal,
+    );
+    expect(draft.form.target).toBeNull();
+    expect(draft.assembly?.path).toBeNull();
+    expect(spokenReply).toMatch(/meio do m|ajust/i);
+    expect(spokenReply).not.toMatch(/escolha abaixo/i);
+    expect(spokenReply).not.toMatch(/^Apliquei /m);
+  });
+
+  it("3. aceite explicito aplica proposedTarget e oferece caminho", async () => {
+    const { draft, spokenReply } = await discussGoal("Aceito a recomendada", ctx, pendingProposal);
+    expect(draft.form.target).toBe(244_600);
+    expect(draft.userLockedTarget).toBe(true);
+    expect(draft.assembly?.path).toBeNull();
+    expect(spokenReply).toMatch(/Apliquei|escolha abaixo/i);
+  });
+
+  it("3b. aceite contextual sem repetir R$ aplica a proposta pendente", async () => {
+    const prev = {
+      ...pendingProposal,
+      proposedTarget: 260_000,
+      proposal: {
+        ...pendingProposal.proposal,
+        amount: 260_000,
+        scenarios: [
+          { kind: "conservative" as const, amount: 240_000, label: "Conservadora" },
+          { kind: "recommended" as const, amount: 260_000, label: "Recomendada" },
+          { kind: "challenging" as const, amount: 286_000, label: "Desafiadora" },
+        ],
+      },
+    };
+    const { draft, spokenReply } = await discussGoal(
+      "Gostei dessa última proposta. Vamos com ela.",
+      ctx,
+      prev,
+    );
+    expect(draft.form.target).toBe(260_000);
+    expect(draft.userLockedTarget).toBe(true);
+    expect(draft.assembly?.path).toBeNull();
+    expect(spokenReply).toMatch(/Apliquei|260|escolha abaixo/i);
+  });
+
+  it("4. contraproposta com R$ aplica o novo valor sem path automatico de copia", async () => {
+    const { draft, spokenReply } = await discussGoal("Quero R$ 260 mil", ctx, pendingProposal);
+    expect(draft.form.target).toBe(260_000);
+    expect(draft.userLockedTarget).toBe(true);
+    expect(draft.assembly?.path).toBeNull();
+    expect(spokenReply).toMatch(/260|Apliquei|escolha abaixo/i);
+  });
+
+  it("5. pede mais informacoes antes de decidir — nao muta", async () => {
+    const { draft, spokenReply } = await discussGoal(
+      "Me explica como você chegou nesse valor?",
+      ctx,
+      pendingProposal,
+    );
+    expect(draft.form.target).toBeNull();
+    expect(draft.proposedTarget).toBe(244_600);
+    expect(spokenReply).toMatch(/proposta|ainda não|ainda nao|cheguei|evid/i);
+    expect(spokenReply).not.toMatch(/escolha abaixo/i);
+    expect(spokenReply).not.toMatch(/^Apliquei /m);
+  });
+
+  it("6. aceita cenario alternativo (desafiadora)", async () => {
+    const { draft } = await discussGoal("Vamos de desafiadora", ctx, pendingProposal);
+    expect(draft.form.target).toBe(269_000);
+    expect(draft.userLockedTarget).toBe(true);
+    expect(draft.assembly?.path).toBeNull();
+  });
+
+  it("7. componente/path so apos valor aceito", async () => {
+    const consult = await discussGoal("O que você acha de aumentar um pouco?", ctx, pendingProposal);
+    expect(consult.draft.form.target).toBeNull();
+    expect(consult.draft.userLockedTarget).toBe(false);
+    expect(consult.spokenReply).not.toMatch(/escolha abaixo/i);
+
+    const accept = await discussGoal("Pode ser", ctx, pendingProposal);
+    expect(accept.draft.form.target).toBe(244_600);
+    expect(accept.draft.userLockedTarget).toBe(true);
+    expect(accept.spokenReply).toMatch(/escolha abaixo/i);
+  });
+
+  it("8. oferta de caminho nao duplica as tres opcoes no texto", async () => {
+    const { spokenReply } = await discussGoal("Fechado", ctx, pendingProposal);
+    expect(spokenReply).toMatch(/escolha abaixo/i);
+    expect(spokenReply).not.toMatch(/· Copiar/);
+    expect(spokenReply).not.toMatch(/· Criar com recomendações/);
+    expect(spokenReply).not.toMatch(/· Criar do zero/);
+  });
+
+  it("9. pergunta consultiva nao modifica o rascunho", async () => {
+    const prev = {
+      ...pendingProposal,
+      form: { ...pendingProposal.form, target: 244_600 },
+      userLockedTarget: true,
+      pathOfferPresented: true,
+      assembly: {
+        ...pendingProposal.assembly,
+        path: null as "copy" | "recommended" | "fresh" | null,
+      },
+      pendingConfigCopy: { from: "2026-10-01", to: "2026-10-31" },
+    };
+    const { draft, spokenReply } = await discussGoal(
+      "Vale a pena subir mais a meta?",
+      ctx,
+      prev,
+    );
+    expect(draft.form.target).toBe(244_600);
+    expect(draft.assembly?.path).toBeNull();
+    expect(draft.form.tiers).toEqual(prev.form.tiers);
+    expect(spokenReply).toMatch(/não apliquei|nao apliquei|folga|sobra|risco/i);
+    expect(spokenReply).not.toMatch(/escolha abaixo/i);
+    expect(spokenReply).not.toMatch(/^Apliquei /m);
+  });
+
+  it("10. mudanca de caminho invalida confirmacoes anteriores", async () => {
+    const ready = {
+      form: {
+        ...emptyGoalForm("a"),
+        name: "Meta Novembro 2026",
+        startsOn: "2026-11-01",
+        endsOn: "2026-11-30",
+        target: 244_600,
+        groups: [
+          { shiftId: "m", name: "Turno 1", pct: 45 },
+          { shiftId: "t", name: "Turno 2", pct: 55 },
+        ],
+        tiers: [
+          { name: "Meta", minAttainmentPct: 50, commissionPct: 1.5, bonus: 50 },
+          { name: "Desafio", minAttainmentPct: 110, commissionPct: 3, bonus: 50 },
+        ],
+      },
+      assembly: {
+        ...emptyGoalAssembly(),
+        periodConfirmed: true,
+        valueDiscussed: true,
+        path: "recommended" as const,
+        confirmedGroups: true,
+        confirmedSpread: true,
+        confirmedTiers: true,
+        confirmedMount: true,
+      },
+      userLockedTarget: true,
+      proposedTarget: 244_600,
+      pendingCommit: null as null,
+    };
+    const { createPendingCommit } = await import("./goalContract");
+    const withPending = {
+      ...ready,
+      pendingCommit: createPendingCommit(ready, "Loja"),
+    };
+    expect(withPending.pendingCommit?.awaitingConfirm).toBe(true);
+
+    const switched = await discussGoal("Na verdade criar do zero", ctx, withPending);
+    expect(switched.draft.assembly?.path).toBe("fresh");
+    expect(switched.draft.assembly?.confirmedMount).toBe(false);
+    expect(switched.draft.assembly?.confirmedGroups).toBe(false);
+    // Fingerprint mudou (grupos zerados) → pending inválido/limpo.
+    expect(
+      switched.draft.pendingCommit == null ||
+        switched.draft.pendingCommit.authorized !== true,
+    ).toBe(true);
+  });
+
+  it("LLM inventando amountCents sem R$ na fala nao trava form.target", async () => {
+    const { emptyGoalOpIntent } = await import("./goalOpIntent");
+    const poisoned = emptyGoalOpIntent({
+      kind: "confirmation",
+      entity: "store_target",
+      amountCents: 244_600,
+      amountRole: "store_base",
+      authorizeApply: true,
+      confidence: "high",
+      notes: "hallucinated_from_context",
+    });
+    const q =
+      "Queria colocar uma sobra a mais... Se precisar eu diminuo no meio do mês, o que você acha?";
+    const { draft, spokenReply } = await discussGoal(q, ctx, pendingProposal, {
+      intent: poisoned,
+    });
+    expect(draft.form.target).toBeNull();
+    expect(draft.userLockedTarget).toBe(false);
+    expect(spokenReply).not.toMatch(/escolha abaixo/i);
+    expect(spokenReply).not.toMatch(/^Apliquei /m);
   });
 });
 

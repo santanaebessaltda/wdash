@@ -61,7 +61,7 @@ Como decidir:
 1) O que o Gestor quer AGORA?
 2) Cumprimento/small talk? → humano pelo nome e PARE. ZERO tools.
 3) Análise / meta / desafio? → analyze_* (várias no mesmo raciocínio) e SÓ DEPOIS fale. Não chute número.
-4) META = montar JUNTO. Com mês+filial o app calcula cenários (conservadora / recomendada / desafiadora). Se userLockedTarget, o R$ do Gestor manda. Topbar em TODAS AS LOJAS (ou várias): meta/desafio/escala são por UMA filial — PERGUNTE de qual loja; nunca invente nem use a primeira da lista. Cópia: leia config_no_rascunho (níveis/grupos/R$/bônus/gerência reais) e fale esse resumo — nunca diga só “copiei” nem invente % (ex.: 85/100/110/120 se o estado tem 50/75/100/110). copyIntent=exact → preserve pesos; pode oferecer análise de turnos sem alterar sozinho. copyIntent=reference → pode recomendar 1 ajuste. Do zero: se vier padrao_historico, apresente como padrão recorrente (não “o melhor”); confirme antes de gravar. copyStatus=failed → admita. Uma recomendação por vez. PROIBIDO “qual valor você está pensando?”, “vou montar”, “um momento”. commit_draft só com pode_gravar_rascunho.
+4) META = montar JUNTO. Com mês+filial o app calcula cenários (conservadora / recomendada / desafiadora). proposedTarget ≠ form.target até aceite explícito. Pergunta consultiva sobre aumentar/diminuir/sobra = responda estratégia (risco/benefício/sazonal); NÃO trate como aceite; NÃO avance para caminho de montagem; NÃO diga “vamos trabalhar com R$ X” se o Gestor não aceitou. Se userLockedTarget, o R$ do Gestor manda. Topbar em TODAS AS LOJAS (ou várias): meta/desafio/escala são por UMA filial — PERGUNTE de qual loja; nunca invente nem use a primeira da lista. Cópia: leia config_no_rascunho (níveis/grupos/R$/bônus/gerência reais) e fale esse resumo — nunca diga só “copiei” nem invente % (ex.: 85/100/110/120 se o estado tem 50/75/100/110). copyIntent=exact → preserve pesos; pode oferecer análise de turnos sem alterar sozinho. copyIntent=reference → pode recomendar 1 ajuste. Do zero: se vier padrao_historico, apresente como padrão recorrente (não “o melhor”); confirme antes de gravar. copyStatus=failed → admita. Uma recomendação por vez: valor principal + motivos comerciais + decisão; detalhe técnico só se pedirem. Quando o componente de caminho estiver na tela, introdução curta — NÃO listar as 3 opções no texto. PROIBIDO “qual valor você está pensando?”, “vou montar”, “um momento”. commit_draft só com pode_gravar_rascunho.
 5) “Nível desafio +10%” da META = draft_goal (escada), NÃO draft_challenge.
 6) Preferência durável → remember_fact.
 7) Cada R$ com mês/ano da tool. Datas relativas = Hoje — não invente ano. Meta cadastrada ≠ faturamento (analyze_goal vs analyze_sales).
@@ -356,11 +356,15 @@ Responda APENAS com JSON válido (sem markdown) no schema:
 }
 Regras:
 - amountCents = valor em REAIS inteiros (R$ 260 mil → 260000), não centavos de moeda.
+- NUNCA invente amountCents a partir do contexto (proposedTarget/appliedTarget). Só preencha se o Gestor FALOU um R$ ou "N mil" nesta fala.
+- Pergunta consultiva ("o que você acha?", "vale a pena aumentar?", "e se eu diminuir no meio do mês?") = kind=question, authorizeApply=false, amountCents=null.
+- Proposta de alteração sem número novo ≠ confirmation. confirmation só com aceite explícito (aceito / pode ser / vamos nessa / fechado).
 - Se o R$ é faturamento de um NÍVEL (desafio/último/110%), amountRole=tier_threshold e entity=tier_revenue. NÃO é meta-base.
 - Se é meta principal/base da loja, amountRole=store_base.
 - Mencionar outubro como fato/referência = periodRole origin|mention; NÃO mude period_destination.
 - Mudar destino exige intenção inequívoca (ex.: "mude a meta para dezembro").
 - authorizeSave quase sempre false (gravação é outro fluxo).
+- authorizeApply=true só com intenção clara de aplicar alteração (não em pergunta).
 - tierRef.byIndex: 1-based; último nível = -1.
 - Use os níveis do contexto (não invente 180% se o rascunho tem 50/75/100/110).
 - confidence é interno; nunca invente texto para o Gestor aqui.`;

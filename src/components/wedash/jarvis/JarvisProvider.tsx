@@ -248,10 +248,12 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
   const syncGoalDraft = useCallback((draft: GoalDraft | null) => {
     goalDraftRef.current = draft;
     persistGoalDraftSession(draft);
+    // Componente só após valor efetivamente aceito (userLockedTarget) — proposedTarget sozinho não basta.
     if (
       draft &&
       draft.assembly?.valueDiscussed &&
       draft.form.target != null &&
+      draft.userLockedTarget === true &&
       draft.assembly.path == null
     ) {
       setAssemblyPathOffer({

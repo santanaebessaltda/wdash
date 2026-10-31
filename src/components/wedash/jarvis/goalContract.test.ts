@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   applyProposedTarget,
+  classifyGoalValueStance,
   createPendingCommit,
   goalDraftFingerprint,
   hasProposalAwaitingAccept,
@@ -13,7 +14,9 @@ import {
   looksLikeRequestSave,
   looksLikeSimulateLevelsAtAmount,
   looksLikeValueInconsistency,
+  parseNamedGoalScenario,
   pendingCommitStillValid,
+  resolveGoalValueDecision,
   speakSimulateLevels,
   speakValueInconsistency,
 } from "./goalContract";
@@ -82,6 +85,65 @@ describe("P0 contrato proposta vs aplicado", () => {
     expect(looksLikeAcceptPendingProposal("Pode ser", true, true)).toBe(false); // save aguardando
     expect(looksLikeAcceptPendingProposal("Sim", false, false)).toBe(false); // sem proposta
     expect(looksLikeAcceptPendingProposal("pode salvar o rascunho", true, false)).toBe(false);
+  });
+
+  it("postura: consultiva / info / aceite / cenario", () => {
+    expect(
+      classifyGoalValueStance(
+        "Queria colocar uma sobra a mais... Se precisar eu diminuo no meio do mês, o que você acha?",
+      ),
+    ).toBe("consultative");
+    expect(classifyGoalValueStance("Vale a pena aumentar a meta?")).toBe("consultative");
+    expect(classifyGoalValueStance("Me explica como chegou nesse valor?")).toBe("ask_info");
+    expect(classifyGoalValueStance("Aceito a recomendada")).toBe("explicit_accept");
+    expect(classifyGoalValueStance("Pode ser")).toBe("explicit_accept");
+    expect(classifyGoalValueStance("Gostei dessa última proposta. Vamos com ela.")).toBe(
+      "explicit_accept",
+    );
+    expect(classifyGoalValueStance("Quero R$ 260 mil")).toBe("counter_amount");
+    expect(parseNamedGoalScenario("Vamos de desafiadora")).toBe("challenging");
+    expect(parseNamedGoalScenario("prefiro a conservadora")).toBe("conservative");
+    expect(
+      looksLikeAcceptPendingProposal(
+        "Queria colocar uma sobra a mais, o que você acha?",
+        true,
+        false,
+      ),
+    ).toBe(false);
+  });
+
+  it("resolveGoalValueDecision: aceite contextual sem R$ vs R$ falado", () => {
+    const acceptCtx = resolveGoalValueDecision({
+      text: "Gostei dessa última proposta. Vamos com ela.",
+      utteredAmount: null,
+      proposedTarget: 260_000,
+      proposalAwaiting: true,
+      saveAwaiting: false,
+    });
+    expect(acceptCtx.stance).toBe("explicit_accept");
+    expect(acceptCtx.applySource).toBe("pending_proposal");
+    expect(acceptCtx.applyAmount).toBe(260_000);
+    expect(acceptCtx.keepDiscussing).toBe(false);
+
+    const consult = resolveGoalValueDecision({
+      text: "O que você acha de aumentar?",
+      utteredAmount: null,
+      proposedTarget: 260_000,
+      proposalAwaiting: true,
+      saveAwaiting: false,
+    });
+    expect(consult.keepDiscussing).toBe(true);
+    expect(consult.applySource).toBe("none");
+
+    const uttered = resolveGoalValueDecision({
+      text: "Quero R$ 270 mil",
+      utteredAmount: 270_000,
+      proposedTarget: 260_000,
+      proposalAwaiting: true,
+      saveAwaiting: false,
+    });
+    expect(uttered.applySource).toBe("uttered");
+    expect(uttered.applyAmount).toBe(270_000);
   });
 
   it("applyProposedTarget seta form.target e limpa pendingCommit", () => {

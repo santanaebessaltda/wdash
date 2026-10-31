@@ -157,6 +157,20 @@ export function looksLikeProceedToSaveOffer(text: string): boolean {
   );
 }
 
+/**
+ * Postura semântica sobre o valor da meta (proposta vs rascunho).
+ * Um classificador — não uma regex isolada por frase comercial.
+ */
+export type GoalValueStance =
+  | "consultative"
+  | "change_proposal"
+  | "explicit_accept"
+  | "refuse"
+  | "counter_amount"
+  | "ask_info"
+  | "proceed"
+  | "neutral";
+
 /** Afirmação natural curta (contexto decide se é aceite de proposta ou de gravação). */
 export function looksLikeNaturalAffirmation(text: string): boolean {
   const p = norm(text).trim();
@@ -178,17 +192,91 @@ export function looksLikeNaturalAffirmation(text: string): boolean {
   );
 }
 
+/**
+ * Classifica a postura do Gestor sobre o valor — antes de mutar ou avançar etapa.
+ * Consultiva / info / alteração ≠ aceite do proposedTarget.
+ */
+export function classifyGoalValueStance(text: string): GoalValueStance {
+  const p = norm(text).trim();
+  if (!p) return "neutral";
+
+  const hasAmount = /r\$\s*[\d.]+|\d[\d.]*\s*mil\b/.test(p);
+
+  // Pedido de detalhe antes de decidir.
+  if (
+    /por que (esse|este|esse valor|essa)|como (voce |vc )?(chegou|calcul|montou)|me (explica|detalha)|mais (detalhe|info|informacao|informação)|de onde (veio|saiu)|mostra (o |a )?(conta|calculo|cálculo|base)|quero (entender|ver) (melhor |mais )?(o |a )?(valor|calculo|cálculo|proposta)/.test(
+      p,
+    )
+  ) {
+    return "ask_info";
+  }
+
+  // Opinião sobre pesos/turnos não é postura de valor da meta.
+  if (
+    /(peso|pesos|turno|turnos|divisao|distribui)/.test(p) &&
+    !/(meta|valor|r\$|sobra|folga|aumentar|diminuir)\b/.test(p)
+  ) {
+    return "neutral";
+  }
+
+  // Opinião / estratégia — mesmo citando aumentar/diminuir.
+  const asksOpinion =
+    /o que (voce|vc) acha|o que acha|voce acha|vc acha|acha (que|melhor)|vale a pena|faz sentido|deveria|me (aconselha|orienta|sugere)|na sua (opiniao|opinião)|concorda|e ai|e aí/.test(
+      p,
+    ) || /\?\s*$/.test(text.trim()) && /(aument|diminu|subir|baixar|sobra|folga|meio do mes|meio do mês)/.test(p);
+
+  const talksBufferOrAdjust =
+    /(sobra|folga|colchao|colchão|folga|buffer|a mais|um pouco mais|um pouco menos|aumentar|diminuir|subir|baixar|reduzir|no meio do mes|no meio do mês|se precisar)/.test(
+      p,
+    );
+
+  if (asksOpinion || (talksBufferOrAdjust && !hasAmount && !looksLikeNaturalAffirmation(text))) {
+    // “quero 260 mil” é contraproposta; “queria sobra, o que acha?” é consultiva.
+    if (hasAmount && /(quero|vamos de|fica|deixar|meta de|colocar)\b/.test(p) && !asksOpinion) {
+      return "counter_amount";
+    }
+    if (asksOpinion || /\?\s*$/.test(text.trim()) || /o que (voce|vc) acha|acha\??/.test(p)) {
+      return "consultative";
+    }
+    if (talksBufferOrAdjust) return "change_proposal";
+  }
+
+  if (
+    /nao quero (essa|esse|a recomend|a proposta)|outra (faixa|proposta|valor)|muito (alto|baixa|baixo)|discordo|prefiro outra|nao topa|não topa/.test(
+      p,
+    )
+  ) {
+    return "refuse";
+  }
+
+  if (hasAmount && /(quero|vamos de|fica|deixar|meta de|coloca[r]?|definir)\b/.test(p)) {
+    return "counter_amount";
+  }
+
+  // Aceite explícito / referência contextual à proposta — antes de “pode seguir”.
+  // Ex.: “Gostei dessa última proposta. Vamos com ela.” (sem repetir o R$).
+  if (looksLikeNaturalAffirmation(text)) return "explicit_accept";
+  if (
+    /aceito (a |o )?(proposta|recomend|valor|meta)|vamos (de |com )?(a )?recomend|fica a recomend|pode (ser|ficar) (a |o )?(recomend|proposta)|fechado (nessa|nessa faixa|no valor)|quero (a |o )?recomend|aplica (a |o )?recomend|usa (a |o )?recomend|vamos com (essa|esse|ela|ele|isso|a recomend|o valor|a proposta)|aplica esse valor|quero esse valor|fica (nesse|com )?(esse |ela |isso )?valor|aplica (esse |o )?valor|mesma faixa|seguir a (mesma )?faixa|seguir a recomend|vamos (na|com a) (mesma )?faixa|topa a recomend|vamos de (a )?conservador|vamos de (a )?desafiad|prefiro a (conservador|recomend|desafiad)|aceito a (conservador|recomend|desafiad)/.test(
+      p,
+    ) ||
+    /gostei (dessa|desta|da|desse|deste)|essa (ultima|última )?proposta|aquela proposta|a (ultima|última )proposta|topa (essa|isso|ela|a proposta)|fica (com |nessa |com essa )?(ela|isso|essa|a proposta)|quero (essa|ela|isso|a proposta)|pode (ser|ficar) (essa|ela|isso)|fechado (nessa|com essa|com ela)/.test(
+      p,
+    )
+  ) {
+    return "explicit_accept";
+  }
+
+  if (looksLikeProceedToSaveOffer(text)) {
+    return "proceed";
+  }
+
+  return "neutral";
+}
+
 /** Aceite explícito da recomendação (formulações longas + naturais). */
 export function looksLikeAcceptProposal(text: string): boolean {
-  const p = norm(text).trim();
-  if (/^(nao|não)\b/.test(p)) return false;
-  if (/outra|diferente|muda o valor|troca o valor/.test(p) && !/nao precisa|não precisa/.test(p)) {
-    return false;
-  }
-  if (looksLikeNaturalAffirmation(text)) return true;
-  return /aceito (a |o )?(proposta|recomend|valor|meta)|vamos (de |com )?(a )?recomend|fica a recomend|pode (ser|ficar) (a |o )?(recomend|proposta)|fechado (nessa|nessa faixa|no valor)|quero (a |o )?recomend|aplica (a |o )?recomend|usa (a |o )?recomend|vamos com (essa|esse|a recomend|o valor)|aplica esse valor|quero esse valor|fica (nesse|com )?(esse )?valor|aplica (esse |o )?valor|mesma faixa|seguir a (mesma )?faixa|seguir a recomend|vamos (na|com a) (mesma )?faixa|topa a recomend/.test(
-    p,
-  );
+  return classifyGoalValueStance(text) === "explicit_accept";
 }
 
 /**
@@ -203,7 +291,217 @@ export function looksLikeAcceptPendingProposal(
 ): boolean {
   if (!proposalAwaiting || saveAwaiting) return false;
   if (looksLikeRequestSave(text)) return false;
-  return looksLikeAcceptProposal(text);
+  return classifyGoalValueStance(text) === "explicit_accept";
+}
+
+/** Cenário nomeado na fala (conservadora / recomendada / desafiadora). */
+export function parseNamedGoalScenario(
+  text: string,
+): "conservative" | "recommended" | "challenging" | null {
+  const p = norm(text).trim();
+  if (/conservador/.test(p)) return "conservative";
+  if (/desafiad/.test(p)) return "challenging";
+  if (/recomendad|mesma faixa|faixa recomend/.test(p)) return "recommended";
+  return null;
+}
+
+/**
+ * Decisão única de valor para o motor (`discussGoal`).
+ * Stance interpreta; o motor só aplica o que esta decisão autoriza.
+ *
+ * - `uttered` → R$ na fala do Gestor (nunca amountCents inventado pelo LLM)
+ * - `pending_proposal` / `named_scenario` → aceite validado da proposta pendente
+ * - `none` + `keepDiscussing` → consultiva/info (sem mutar)
+ */
+export type GoalValueApplySource = "uttered" | "pending_proposal" | "named_scenario" | "none";
+
+export type GoalValueDecision = {
+  stance: GoalValueStance;
+  utteredAmount: number | null;
+  namedScenario: "conservative" | "recommended" | "challenging" | null;
+  applySource: GoalValueApplySource;
+  /** Valor a promover a form.target neste turno (se applySource ≠ none). */
+  applyAmount: number | null;
+  /** Permanecer na etapa de valor (consultiva / info / alteração sem R$). */
+  keepDiscussing: boolean;
+};
+
+export function resolveGoalValueDecision(opts: {
+  text: string;
+  utteredAmount: number | null;
+  proposedTarget: number | null;
+  proposalAwaiting: boolean;
+  saveAwaiting: boolean;
+  scenarios?: { kind: string; amount: number }[] | null;
+}): GoalValueDecision {
+  const stance = classifyGoalValueStance(opts.text);
+  const namedScenario = parseNamedGoalScenario(opts.text);
+  const scenarioAmount =
+    namedScenario != null && opts.scenarios?.length
+      ? (opts.scenarios.find((s) => s.kind === namedScenario)?.amount ?? null)
+      : null;
+
+  const keepDiscussing =
+    stance === "consultative" ||
+    stance === "ask_info" ||
+    (stance === "change_proposal" && opts.utteredAmount == null);
+
+  if (keepDiscussing) {
+    return {
+      stance,
+      utteredAmount: opts.utteredAmount,
+      namedScenario,
+      applySource: "none",
+      applyAmount: null,
+      keepDiscussing: true,
+    };
+  }
+
+  // Aceite: cenário nomeado tem prioridade sobre a recomendada genérica.
+  if (
+    stance === "explicit_accept" &&
+    scenarioAmount != null &&
+    !opts.saveAwaiting
+  ) {
+    return {
+      stance,
+      utteredAmount: opts.utteredAmount,
+      namedScenario,
+      applySource: "named_scenario",
+      applyAmount: scenarioAmount,
+      keepDiscussing: false,
+    };
+  }
+
+  // Aceite contextual da proposta pendente — sem exigir R$ na fala.
+  if (
+    stance === "explicit_accept" &&
+    opts.proposalAwaiting &&
+    opts.proposedTarget != null &&
+    !opts.saveAwaiting &&
+    !looksLikeRequestSave(opts.text)
+  ) {
+    return {
+      stance,
+      utteredAmount: opts.utteredAmount,
+      namedScenario,
+      applySource: "pending_proposal",
+      applyAmount: opts.proposedTarget,
+      keepDiscussing: false,
+    };
+  }
+
+  // Contraproposta / R$ explícito na fala.
+  if (
+    opts.utteredAmount != null &&
+    stance !== "refuse" &&
+    (stance === "counter_amount" || stance === "neutral" || stance === "proceed" || stance === "explicit_accept")
+  ) {
+    return {
+      stance,
+      utteredAmount: opts.utteredAmount,
+      namedScenario,
+      applySource: "uttered",
+      applyAmount: opts.utteredAmount,
+      keepDiscussing: false,
+    };
+  }
+
+  return {
+    stance,
+    utteredAmount: opts.utteredAmount,
+    namedScenario,
+    applySource: "none",
+    applyAmount: null,
+    keepDiscussing: false,
+  };
+}
+
+/**
+ * Resposta consultiva sobre valor — não muta rascunho nem avança etapa.
+ */
+export function speakConsultativeTargetAdvice(opts: {
+  utterance: string;
+  proposed: number | null;
+  applied: number | null;
+  challenging?: number | null;
+  conservative?: number | null;
+  seasonalSummary?: string | null;
+  rationale?: string | null;
+}): string {
+  const p = norm(opts.utterance);
+  const base = opts.proposed ?? opts.applied;
+  const baseLabel = base != null ? brlCent(base) : null;
+  const wantsUp = /(aument|subir|sobra|folga|a mais|mais alto|colchao|colchão)/.test(p);
+  const wantsDown = /(diminu|baixar|reduzir|abaixar|mais baixo)/.test(p);
+  const midMonth = /meio do mes|meio do mês|no meio/.test(p);
+
+  const lines: string[] = [];
+  if (wantsUp && baseLabel) {
+    const chal = opts.challenging != null ? brlCent(opts.challenging) : null;
+    lines.push(
+      `Faz sentido pensar numa sobra em cima de ${baseLabel}: dá folga se a Black Friday ou o ritmo vierem mais fortes.`,
+    );
+    lines.push(
+      `O risco é a equipe sentir a meta inflada e desanimar se o mês abrir fraco. ` +
+        (chal
+          ? `Se quiser folga já no número, a faixa desafiadora fica em ${chal}.`
+          : `Se quiser folga, me diga quanto a mais (ex.: +5% ou um R$).`),
+    );
+  } else if (wantsDown && baseLabel) {
+    const cons = opts.conservative != null ? brlCent(opts.conservative) : null;
+    lines.push(
+      `Reduzir em relação a ${baseLabel} protege o moral da equipe se o mês vier apertado.`,
+    );
+    lines.push(
+      `O risco é deixar dinheiro na mesa se a sazonalidade puxar forte. ` +
+        (cons ? `A faixa conservadora fica em ${cons}.` : `Se quiser baixar, me diga o R$.`),
+    );
+  } else if (baseLabel) {
+    lines.push(
+      `Sobre ${baseLabel}: é a faixa que eu trabalharia com o histórico e o calendário que temos.`,
+    );
+  } else {
+    lines.push(`Ainda não fechei um número no rascunho — posso te dar uma proposta fundamentada.`);
+  }
+
+  if (midMonth) {
+    lines.push(
+      `Ajustar no meio do mês é válido: começa com uma base sólida e revisa com o realizado das primeiras semanas, sem travar a loja agora.`,
+    );
+  }
+
+  if (opts.seasonalSummary?.trim()) {
+    lines.push(`Calendário no cálculo: ${opts.seasonalSummary.trim()}.`);
+  } else if (opts.rationale?.trim()) {
+    lines.push(`Base: ${opts.rationale.trim()}.`);
+  }
+
+  lines.push(
+    `Isso é só opinião — não apliquei nada no rascunho. Quer manter a proposta, subir/baixar com um R$, ou ver outro cenário?`,
+  );
+  return lines.join("\n\n");
+}
+
+/** Pedido de mais detalhe sobre a proposta — sem mutar. */
+export function speakProposalMoreInfo(opts: {
+  proposed: number | null;
+  rationale?: string | null;
+  seasonalSummary?: string | null;
+  evidenceLabels?: string[];
+}): string {
+  const head =
+    opts.proposed != null
+      ? `A proposta ${brlCent(opts.proposed)} ainda não está no rascunho.`
+      : `Ainda não há proposta de valor neste fio.`;
+  const bits: string[] = [head];
+  if (opts.rationale?.trim()) bits.push(`Como cheguei: ${opts.rationale.trim()}.`);
+  if (opts.seasonalSummary?.trim()) bits.push(`Sazonal: ${opts.seasonalSummary.trim()}.`);
+  if (opts.evidenceLabels?.length) {
+    bits.push(`Evidências: ${opts.evidenceLabels.slice(0, 4).join("; ")}.`);
+  }
+  bits.push(`Quer aceitar essa faixa, escolher outro cenário, ou mandar o R$ que prefere?`);
+  return bits.join("\n\n");
 }
 
 /** @deprecated use looksLikeAcceptPendingProposal */
@@ -304,6 +602,14 @@ export function applyProposedTarget(draft: GoalDraft, amount: number): GoalDraft
 
 export function looksLikeAskValueSuggestionP0(text: string): boolean {
   const p = norm(text);
+  // Aceite da recomendada ≠ pedido de nova sugestão.
+  if (
+    /aceito (a |o )?(proposta|recomend)|topa a recomend|vamos (de |com )?(a )?recomend|aplica (a |o )?recomend/.test(
+      p,
+    )
+  ) {
+    return false;
+  }
   return (
     /suger|propor|recomend|ideia de (meta|valor)|quanto (seria|fica|voce|vc)|me (da|dá) (um |uma )?(valor|ideia|numero|número)|pode (suger|calcular|propor|recomend)|basead|historico|histórico|nao sei|não sei|sem ideia|voce sugere|você sugere|valor vc sugere|valor voce sugere|da pra melhorar|da para melhorar|qual valor/.test(
       p,

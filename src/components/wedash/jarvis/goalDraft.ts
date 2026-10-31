@@ -33,7 +33,6 @@ import {
   clearPendingCommit,
   createPendingCommit,
   hasProposalAwaitingAccept,
-  looksLikeAcceptPendingProposal,
   looksLikeAskValueSuggestionP0,
   looksLikeConfirmPendingSave,
   looksLikeProceedToSaveOffer,
@@ -41,6 +40,9 @@ import {
   looksLikeSimulateLevelsAtAmount,
   looksLikeValueInconsistency,
   pendingCommitStillValid,
+  resolveGoalValueDecision,
+  speakConsultativeTargetAdvice,
+  speakProposalMoreInfo,
   speakSimulateLevels,
   speakValueInconsistency,
   type GoalLastSave,
@@ -261,34 +263,25 @@ export function parseGoalAssemblyPath(text: string): GoalAssemblyPath | null {
   return null;
 }
 
-/** Oferta dos três caminhos — JARVIS pode sugerir, nunca executa sozinho. */
+/**
+ * Introdução curta após aceite do valor — as opções ficam no componente.
+ * Não repetir a lista integral no texto (evita duplicidade visual).
+ */
 export function speakGoalAssemblyPathOffer(opts: {
   target: number;
   destLabel: string;
   priorLabel?: string | null;
   hasPrior: boolean;
 }): string {
-  const head =
-    `Perfeito, vamos trabalhar com ${brlCent(opts.target)} para ${opts.destLabel}.\n\n` +
-    `Agora precisamos definir como a equipe vai trabalhar essa meta.\n\n`;
-  if (opts.hasPrior) {
-    const prior = opts.priorLabel ?? "a meta anterior";
-    return (
-      head +
-      `Podemos repetir a configuração de ${prior}, montar uma nova com minhas recomendações ou começar totalmente do zero.\n\n` +
-      `Minha sugestão é criar uma configuração recomendada: aproveitamos o que já funciona nas premiações e revisamos os pesos dos turnos de acordo com as vendas recentes.\n\n` +
-      `Como prefere seguir?\n\n` +
-      `· Copiar ${prior}\n` +
-      `· Criar com recomendações\n` +
-      `· Criar do zero`
-    );
-  }
+  const tip = opts.hasPrior
+    ? `Minha sugestão: criar com recomendações` +
+      (opts.priorLabel ? ` (podemos partir do que já funcionou em ${opts.priorLabel})` : "") +
+      `.`
+    : `Minha sugestão: criar com recomendações a partir do histórico.`;
   return (
-    head +
-    `Não achei meta anterior para copiar nesta filial. Podemos montar com minhas recomendações ou começar do zero.\n\n` +
-    `Como prefere seguir?\n\n` +
-    `· Criar com recomendações\n` +
-    `· Criar do zero`
+    `Apliquei ${brlCent(opts.target)} no rascunho para ${opts.destLabel}.\n\n` +
+    `Agora escolha abaixo como montar a configuração da equipe.\n\n` +
+    tip
   );
 }
 
@@ -1349,33 +1342,42 @@ export async function suggestGoalTarget(
     if (caveats.length >= 2) confidence = confidence === "high" ? "medium" : "low";
 
     const rationale = `${baseBits.join(" + ")}; ${growthLabel}; ${sazonalBit}`;
-    const chatBlocks: string[] = [
-      `Minha recomendação pra ${monthYearTitle(targetFrom)}: ${brlCent(recommended)}.`,
-      `Cenários: conservadora ${brlCent(conservative)} · recomendada ${brlCent(recommended)} · desafiadora ${brlCent(challenging)}.`,
-      `${baseBits.join("; ")}. ${growthLabel.charAt(0).toUpperCase()}${growthLabel.slice(1)}.`,
-    ];
+    // Primeira fala: valor + motivos comerciais + decisão. Detalhe técnico fica em evidence (sob demanda).
+    const reasons: string[] = [];
     if (priorGoal && priorGoal.target > 0) {
       const deltaPct = Math.round(((recommended - priorGoal.target) / priorGoal.target) * 100);
-      chatBlocks.push(
-        `Ponto cego: meta de ${monthYearTitle(priorGoal.from)} era ${brlCent(priorGoal.target)}` +
-          (deltaPct === 0
-            ? " — fico na mesma faixa."
-            : deltaPct > 0
-              ? ` — a recomendada fica ~${deltaPct}% acima.`
-              : ` — a recomendada fica ~${Math.abs(deltaPct)}% abaixo.`),
+      reasons.push(
+        deltaPct === 0
+          ? `fica na mesma faixa da meta de ${monthYearTitle(priorGoal.from)} (${brlCent(priorGoal.target)})`
+          : deltaPct > 0
+            ? `fica ~${deltaPct}% acima da meta de ${monthYearTitle(priorGoal.from)} (${brlCent(priorGoal.target)})`
+            : `fica ~${Math.abs(deltaPct)}% abaixo da meta de ${monthYearTitle(priorGoal.from)} (${brlCent(priorGoal.target)})`,
       );
     }
-    if (bias.lines.length > 0) {
-      chatBlocks.push(
-        sazonalPct !== 0
-          ? `Já embuti ${sazonalBit}. ${speakSeasonalBiasBreakdown(bias)}`
-          : `No calendário: ${speakSeasonalBiasBreakdown(bias)}`,
-      );
+    if (yoyCents > 0) {
+      reasons.push(`olha o mesmo mês do ano passado (${brlCent(yoyCents / 100)})`);
     }
+    if (bias.lines.length > 0 && sazonalPct !== 0) {
+      reasons.push(`já embute ${sazonalBit}`);
+    } else if (last.revenueCents > 0) {
+      reasons.push(`cruza o ritmo recente de ${monthYearTitle(m1)}`);
+    }
+    const reasonLine =
+      reasons.length > 0
+        ? `Por quê: ${reasons.slice(0, 3).join("; ")}.`
+        : `${growthLabel.charAt(0).toUpperCase()}${growthLabel.slice(1)}.`;
+    const chatBlocks: string[] = [
+      `Para ${monthYearTitle(targetFrom)}, eu trabalharia com ${brlCent(recommended)}.`,
+      reasonLine,
+      `Decisão: essa é a faixa recomendada. Ainda não apliquei no rascunho.`,
+    ];
     if (caveats.length) {
-      chatBlocks.push(`Ressalva: ${caveats[0]}`);
+      chatBlocks.push(`Atenção: ${caveats[0]}`);
     }
-    chatBlocks.push("Topa a recomendada, prefere outra faixa, ou ajustamos o número?");
+    chatBlocks.push(
+      `Aceita a recomendada, prefere conservadora (${brlCent(conservative)}) / desafiadora (${brlCent(challenging)}), ou manda outro R$? ` +
+        `Se quiser, te abro a conta completa.`,
+    );
 
     return {
       amount: recommended,
@@ -1436,8 +1438,14 @@ export function naturalGoalAskFromDraft(draft: GoalDraft): string {
   if (!form.storeId) {
     return speakAskGoalStoreFromDraft(draft);
   }
-  if (!a.valueDiscussed || form.target == null) {
+  if (!a.valueDiscussed || form.target == null || !draft.userLockedTarget) {
     const month = form.startsOn ? monthYearTitle(form.startsOn) : "esse mês";
+    if (draft.proposedTarget != null && form.target == null) {
+      return (
+        `${month}: tenho proposta de ${brlCent(draft.proposedTarget)}, ainda fora do rascunho.\n\n` +
+        `Aceita a recomendada, prefere outro cenário, ou manda o R$ que quer?`
+      );
+    }
     return `${month} na mesa.\n\nDeixa eu cruzar histórico e sazonal e já te trago uma proposta — sem você precisar chutar número.`;
   }
   if (a.path === null) {
@@ -1772,16 +1780,47 @@ export async function discussGoal(
 
   const periodSaidNow =
     !opPlan.freezeDestinationPeriod && parseGoalPeriod(lastUser, ctx.today) != null;
-  // Fonte de verdade do R$: só a fala atual — e só se o plano permitir travar meta-base.
+  // R$ só conta se veio na FALA do Gestor — nunca amountCents inventado pelo interpret_goal_op.
+  const utteredAmount = parseGoalTarget(lastUser);
+  // Decisão única de valor (stance → o que o motor pode aplicar). Aceite contextual
+  // usa proposedTarget; R$ livre só se estiver na fala.
+  const proposalAwaitingEarly = hasProposalAwaitingAccept({
+    form: { target: form.target },
+    proposedTarget: prev?.proposedTarget ?? null,
+  });
+  const valueDecision = resolveGoalValueDecision({
+    text: lastUser,
+    utteredAmount,
+    proposedTarget: prev?.proposedTarget ?? null,
+    proposalAwaiting: proposalAwaitingEarly,
+    saveAwaiting: prev?.pendingCommit?.awaitingConfirm === true,
+    scenarios: prev?.proposal?.scenarios ?? null,
+  });
+  const valueStance = valueDecision.stance;
+  // Contraproposta com R$ na fala trava meta-base mesmo se o LLM marcou amountRole=unknown.
+  const counterLocksBase =
+    valueDecision.applySource === "uttered" &&
+    utteredAmount != null &&
+    opIntent.amountRole !== "tier_threshold";
+  const blockDirectLock = opPlan.blockDirectTargetLock && !counterLocksBase;
+  // lockedTarget = só R$ falado (applySource uttered). Aceite de proposta NÃO passa por aqui.
   const lockedTarget =
-    opPlan.blockDirectTargetLock || opIntent.amountRole === "tier_threshold"
+    blockDirectLock || opIntent.amountRole === "tier_threshold"
       ? null
-      : opIntent.amountRole === "store_base" && opIntent.amountCents != null
-        ? opIntent.amountCents
-        : parseGoalTarget(lastUser);
-  const asksSuggestion = looksLikeAskValueSuggestion(lastUser);
+      : valueDecision.applySource === "uttered"
+        ? valueDecision.applyAmount
+        : null;
+  // “Aceito a recomendada” contém “recomend” — não é pedido de nova sugestão.
+  const asksSuggestion =
+    looksLikeAskValueSuggestion(lastUser) &&
+    !valueDecision.keepDiscussing &&
+    valueStance !== "explicit_accept";
 
   form = mergeGoalUtterance(form, question, ctx);
+  // Consultiva / info: merge não pode “aceitar” valor por eco de R$ antigo no blob.
+  if (valueDecision.keepDiscussing && utteredAmount == null) {
+    form = { ...form, target: prev?.form.target ?? null };
+  }
 
   // Origem/menção de mês NÃO pode alterar o destino (novembro permanece novembro).
   if (opPlan.freezeDestinationPeriod && prevStarts) {
@@ -1798,11 +1837,11 @@ export async function discussGoal(
   }
   // Simulação / nível absoluto: merge não pode gravar o R$ em form.target.
   if (
-    (looksLikeSimulateLevelsAtAmount(lastUser) || opPlan.blockDirectTargetLock) &&
+    (looksLikeSimulateLevelsAtAmount(lastUser) || blockDirectLock) &&
     prev?.form.target != null
   ) {
     form = { ...form, target: prev.form.target };
-  } else if (opPlan.blockDirectTargetLock && prev?.form.target == null) {
+  } else if (blockDirectLock && prev?.form.target == null) {
     form = { ...form, target: null };
   }
 
@@ -1814,7 +1853,7 @@ export async function discussGoal(
     proposal = null;
   }
   // R$ como meta-base explícita — nunca quando o R$ é limiar de nível.
-  if (lockedTarget != null && !looksLikeSimulateLevelsAtAmount(lastUser) && !opPlan.blockDirectTargetLock) {
+  if (lockedTarget != null && !looksLikeSimulateLevelsAtAmount(lastUser) && !blockDirectLock) {
     form = { ...form, target: lockedTarget };
     userLockedTarget = true;
   }
@@ -1945,10 +1984,7 @@ export async function discussGoal(
         ]),
         draft: draftProp,
         voice: "silent",
-        spokenReply:
-          `${suggestedEarly.chatBlocks.join("\n\n")}\n\n` +
-          `Isso é proposta — ainda não apliquei no rascunho. ` +
-          `Aceita a recomendada (${brlCent(suggestedEarly.amount)}), prefere outra faixa, ou manda o R$ que quer?`,
+        spokenReply: scrubTechnicalSpeech(suggestedEarly.chatBlocks.join("\n\n")),
       };
     }
     const bias = seasonalBiasForPeriod(form.startsOn!, form.endsOn!);
@@ -2007,22 +2043,30 @@ export async function discussGoal(
     tierRevenueHint = null;
   }
 
-  // Aceite contextual da proposta (pode ser / fechado / vamos nessa / sim) —
-  // só se há proposta pendente e NÃO há confirmação de gravação aguardando.
+  // Aplicação de valor: só via valueDecision (aceite de proposta / cenário / R$ falado).
+  // Aceite contextual NÃO exige R$ na fala — usa proposedTarget. Nunca autoriza gravação.
   let justAcceptedProposal = false;
   {
     const saveAwaiting = prev?.pendingCommit?.awaitingConfirm === true;
-    const proposalAwaiting = hasProposalAwaitingAccept({ form, proposedTarget });
+    const applyDecision = resolveGoalValueDecision({
+      text: lastUser,
+      utteredAmount,
+      proposedTarget,
+      proposalAwaiting: hasProposalAwaitingAccept({ form, proposedTarget }),
+      saveAwaiting,
+      scenarios: proposal?.scenarios ?? null,
+    });
     if (
       lockedTarget == null &&
-      proposedTarget != null &&
-      looksLikeAcceptPendingProposal(lastUser, proposalAwaiting, saveAwaiting)
+      (applyDecision.applySource === "pending_proposal" ||
+        applyDecision.applySource === "named_scenario") &&
+      applyDecision.applyAmount != null
     ) {
-      form = { ...form, target: proposedTarget };
+      form = { ...form, target: applyDecision.applyAmount };
+      proposedTarget = applyDecision.applyAmount;
       userLockedTarget = true;
       assembly = { ...assembly, valueDiscussed: true };
       justAcceptedProposal = true;
-      // Nunca autoriza gravação ao aceitar valor.
     }
   }
   if (lockedTarget != null) {
@@ -2034,6 +2078,16 @@ export async function discussGoal(
   const switchingPath =
     pathChoice != null && assembly.path != null && pathChoice !== assembly.path;
   let pathOfferPresented = prev?.pathOfferPresented === true;
+  // Troca de caminho invalida confirmações de montagem / gravação da config anterior.
+  if (switchingPath) {
+    assembly = {
+      ...assembly,
+      confirmedGroups: false,
+      confirmedSpread: false,
+      confirmedTiers: false,
+      confirmedMount: false,
+    };
+  }
 
   // Copia: só com intenção explícita de copiar / path=copy — nunca por aceite de valor.
   // freezeDestinationPeriod bloqueia reentrada por FATO de escada; pedido explícito de cópia passa.
@@ -2313,7 +2367,7 @@ export async function discussGoal(
   if (
     lockedTarget != null &&
     !looksLikeSimulateLevelsAtAmount(lastUser) &&
-    !opPlan.blockDirectTargetLock
+    !blockDirectLock
   ) {
     form = { ...form, target: lockedTarget };
     assembly = { ...assembly, valueDiscussed: true };
@@ -2327,15 +2381,24 @@ export async function discussGoal(
   let pendingConfigCopy: GoalDraft["pendingConfigCopy"] =
     assembly.path === "copy" && copyStatus === "ok" ? null : (prev?.pendingConfigCopy ?? null);
   let pathOfferPriorLabel: string | null = null;
-  if (
+  // Oferta de caminho: só após valor EFETIVAMENTE aceito (não basta proposedTarget).
+  const valueJustLocked =
+    justAcceptedProposal ||
+    (lockedTarget != null && form.target === lockedTarget && userLockedTarget);
+  const mayOfferAssemblyPath =
     basicsReady &&
     assembly.valueDiscussed &&
     assembly.path == null &&
+    userLockedTarget &&
+    form.target != null &&
     !copiedLadder &&
     form.storeId &&
-    form.startsOn
-  ) {
-    const prior = await findPriorGoalForStore(ctx, form.storeId, form.startsOn);
+    form.startsOn &&
+    !valueDecision.keepDiscussing;
+  if (mayOfferAssemblyPath && form.storeId && form.startsOn && form.target != null) {
+    const storeId = form.storeId;
+    const startsOn = form.startsOn;
+    const prior = await findPriorGoalForStore(ctx, storeId, startsOn);
     if (prior) {
       // Referência disponível para o caminho copy — NÃO seleciona path nem executa cópia.
       pendingConfigCopy = { from: prior.from, to: prior.to };
@@ -2343,14 +2406,17 @@ export async function discussGoal(
     } else {
       pendingConfigCopy = null;
     }
-    pathOfferBlocks = [
-      speakGoalAssemblyPathOffer({
-        target: form.target!,
-        destLabel: monthYearTitle(form.startsOn),
-        hasPrior: prior != null,
-        priorLabel: pathOfferPriorLabel,
-      }),
-    ];
+    // Texto só no turno em que o valor acaba de ser aceito/travado — componente cobre o resto.
+    if (valueJustLocked || !pathOfferPresented) {
+      pathOfferBlocks = [
+        speakGoalAssemblyPathOffer({
+          target: form.target,
+          destLabel: monthYearTitle(startsOn),
+          hasPrior: prior != null,
+          priorLabel: pathOfferPriorLabel,
+        }),
+      ];
+    }
   }
 
   // Confirma proposta do caminho recommended.
@@ -2647,19 +2713,29 @@ export async function discussGoal(
   if (pathOfferBlocks.length) {
     extras.push(`oferta_caminho_montagem:\n${pathOfferBlocks.join("\n")}`);
     extras.push(
-      "instrucao_fala: path ainda null. Ofereça copiar / recomendações / do zero. NÃO execute cópia. NÃO diga 'vou seguir com a cópia'.",
+      "instrucao_fala: path ainda null. Introdução CURTA — o componente mostra as opções. NÃO liste as 3 opções no texto. NÃO execute cópia.",
     );
   }
-  if (assembly.path === null && form.target != null) {
+  if (valueDecision.keepDiscussing) {
     extras.push(
-      "instrucao_fala: Valor já definido. Próximo passo = escolha de caminho (copy|recommended|fresh), não reabrir valor nem anunciar cópia.",
+      "instrucao_fala: Postura consultiva/info — responda a estratégia, NÃO aplique proposedTarget, NÃO avance para caminho de montagem, NÃO diga 'vamos trabalhar com' como se tivesse aceitado.",
+    );
+  }
+  if (assembly.path === null && form.target != null && userLockedTarget) {
+    extras.push(
+      "instrucao_fala: Valor já aceito no rascunho. Próximo passo = escolha de caminho (copy|recommended|fresh) via componente, não reabrir valor nem anunciar cópia.",
+    );
+  } else if (form.target == null && proposedTarget != null) {
+    extras.push(
+      "instrucao_fala: Há proposta pendente. NÃO diga que aplicou. Espere aceite explícito ou outro R$.",
     );
   }
 
   let spokenReply: string | null = null;
   const copyJustApplied = Boolean(sourceWin && (copiedLadder || copyStatus === "failed"));
-  if (opPlan.spokenReply) {
+  if (opPlan.spokenReply && !counterLocksBase && !valueDecision.keepDiscussing) {
     // P1: resposta ao ponto (nível / origem / ambiguidade) antes do fluxo de montagem.
+    // Contraproposta com R$ na fala / consultiva: o motor de valor manda na fala.
     spokenReply = scrubTechnicalSpeech(opPlan.spokenReply);
   } else if (
     form.startsOn &&
@@ -2701,16 +2777,41 @@ export async function discussGoal(
     // Sempre o resumo determinístico — LLM não inventa “Confirma com SIM” sem pending.
     spokenReply = draftOut.pendingCommit?.summary ?? null;
   } else if (
+    valueDecision.keepDiscussing &&
+    valueStance !== "ask_info" &&
+    !looksLikeAskGroupWeightAdvice(lastUser)
+  ) {
+    const chal = proposal?.scenarios.find((s) => s.kind === "challenging")?.amount ?? null;
+    const cons = proposal?.scenarios.find((s) => s.kind === "conservative")?.amount ?? null;
+    spokenReply = scrubTechnicalSpeech(
+      speakConsultativeTargetAdvice({
+        utterance: lastUser,
+        proposed: proposedTarget,
+        applied: form.target,
+        challenging: chal,
+        conservative: cons,
+        seasonalSummary: proposal?.seasonalSummary ?? null,
+        rationale: proposal?.rationale ?? null,
+      }),
+    );
+  } else if (valueStance === "ask_info" && !looksLikeAskGroupWeightAdvice(lastUser)) {
+    spokenReply = scrubTechnicalSpeech(
+      speakProposalMoreInfo({
+        proposed: proposedTarget,
+        rationale: proposal?.rationale ?? null,
+        seasonalSummary: proposal?.seasonalSummary ?? null,
+        evidenceLabels: proposal?.evidence?.map((e) => e.label) ?? [],
+      }),
+    );
+  } else if (
     asksSuggestion &&
     proposedTarget != null &&
     suggestionBlocks.length + (proposal?.chatBlocks.length ?? 0) > 0
   ) {
     const blocks = suggestionBlocks.length ? suggestionBlocks : proposal!.chatBlocks;
     spokenReply = scrubTechnicalSpeech(
-      `${blocks.join("\n\n")}\n\n` +
-        `Proposta: ${brlCent(proposedTarget)} — ainda não está no rascunho` +
-        (form.target != null ? ` (aplicado continua ${brlCent(form.target)})` : "") +
-        `. Aceita a recomendada ou manda outro R$?`,
+      `${blocks.join("\n\n")}` +
+        (form.target != null ? `\n\n(Aplicado no rascunho continua ${brlCent(form.target)}.)` : ""),
     );
   } else if (looksLikeAskGroupWeightAdvice(lastUser)) {
     spokenReply = speakGoalWeightAdvice(draftOut, weightAdviceForSpeak);
