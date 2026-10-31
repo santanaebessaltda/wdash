@@ -255,7 +255,7 @@ export default function GoalsPage() {
 
       <div className="mt-6">
         {showSkeleton ? (
-          <GoalCardsSkeleton count={2} />
+          <GoalCardsSkeleton count={storeRows.length > 1 ? 2 : 1} />
         ) : cards.length === 0 ? (
           <Card className="flex min-h-[280px] flex-col">
             <EmptyBlock

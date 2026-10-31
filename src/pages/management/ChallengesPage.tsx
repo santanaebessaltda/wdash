@@ -309,7 +309,7 @@ export function ChallengesPage() {
 
       <div className="mt-6">
         {showSkeleton ? (
-          <ChallengeCardsSkeleton count={2} />
+          <ChallengeCardsSkeleton count={storeRows.length > 1 ? 2 : 1} />
         ) : cards.length === 0 ? (
           <Card className="flex min-h-[280px] flex-col">
             <EmptyBlock
