@@ -1,5 +1,5 @@
 import { getSupabase } from "@/lib/supabase";
-import type { JarvisContext } from "./context";
+import { friendlyStoreLabel, type JarvisContext } from "./context";
 import { looksLikeLeakedGoalFacts } from "./goalDraft";
 import { compactSeasonalContext } from "./seasonalBrief";
 import { runJarvisTool, type JarvisToolName } from "./llmTools";
@@ -65,9 +65,9 @@ function contextNote(ctx: JarvisContext, session?: JarvisLlmSession | null): str
       ? "nenhuma filial no escopo"
       : networkScope
         ? `TODAS AS LOJAS (rede — Topbar sem filtro de filial): ${ctx.stores
-            .map((s) => `${s.tradeName || s.name} (${s.code || s.id})`)
+            .map((s) => `${friendlyStoreLabel(s)} [id=${s.id}]`)
             .join("; ")}`
-        : ctx.stores.map((s) => `${s.tradeName || s.name} (${s.code || s.id})`).join("; ");
+        : ctx.stores.map((s) => `${friendlyStoreLabel(s)} [id=${s.id}]`).join("; ");
   const lines = [
     `Hoje: ${ctx.today}. Filiais no escopo: ${stores}. Tenant: ${ctx.tenantId}.`,
     `Datas relativas (ano passado, mês passado, últimos N meses) usam a data de Hoje acima — interprete você.`,
@@ -75,6 +75,8 @@ function contextNote(ctx: JarvisContext, session?: JarvisLlmSession | null): str
     `Sazonal/feriados a considerar sozinho (meta/desafio): ${compactSeasonalContext(ctx.today, 2)}.`,
     "Voce redige toda a fala. Tools so executam. Cumprimento = zero tools. Nunca use travessao (—).",
     "Agente: pode chamar varias tools no mesmo raciocinio (vendas, meta, sazonal) antes de propor. Baseie meta/desafio em numeros da tool.",
+    "PROIBIDO encerrar só com 'vou buscar/analisar/consultar os dados'. Sempre chame analyze_* ANTES de falar números ou concluir análise.",
+    "Nome da filial na fala: use o nome amigável do escopo (não o código LOJAWEPINK...).",
     "Memoria de longo prazo: use remember_fact para preferencias/decisoes duraveis. Apagar conversa zera thread, rascunhos e esta memoria.",
   ];
   if (networkScope || ctx.stores.length > 1) {
@@ -132,7 +134,35 @@ function contextNote(ctx: JarvisContext, session?: JarvisLlmSession | null): str
   return lines.join("\n");
 }
 
-/** Um turno com loop de tools (máx. 3). Side effects (rascunho) o caller aplica se o hook nao aplicou. */
+/** Prometeu analisar/buscar dados sem entregar resultado na mesma fala. */
+export function looksLikeUnfinishedAnalysisPromise(text: string): boolean {
+  const n = text
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .trim();
+  if (!n) return false;
+  const promises =
+    /vou (buscar|analisar|consultar|olhar|puxar|verificar|checar|levantar|cruzar)|vamos (analisar|consultar|buscar|olhar)|deixa eu (buscar|analisar|consultar|ver|olhar)|buscando (os )?dados|analisando|consultando|ja (vou )?busc/.test(
+      n,
+    );
+  if (!promises) return false;
+  // Exige desfecho concreto — "vendas" sozinho na frase da promessa não conta.
+  const hasResult =
+    /r\$\s*[\d.]|\d[\d.]*\s*mil\b|faturamento.{0,48}\d|ticket.{0,24}\d|recomendo\s+r\$|recomend(o|ada).{0,24}r\$|nao (achei|encontrei|ha dado)|sem (dado|venda) sincroniz|falhou|tente novamente|dias? com venda|insuficiente|fechou em/.test(
+      n,
+    );
+  return !hasResult;
+}
+
+const ANALYZE_TOOLS = new Set<string>([
+  "analyze_sales",
+  "analyze_goal",
+  "analyze_stock",
+  "analyze_seasonal",
+]);
+
+/** Um turno com loop de tools. Side effects (rascunho) o caller aplica se o hook nao aplicou. */
 export async function jarvisLlmTurn(
   history: LlmChatMessage[],
   ctx: JarvisContext,
@@ -147,6 +177,8 @@ export async function jarvisLlmTurn(
   const messages: LlmChatMessage[] = [...history, { role: "user", content: userText }];
   const sideEffects: LlmSideEffect[] = [];
   const maxRounds = 6;
+  let analyzeToolsRan = false;
+  let forcedAnalysisOnce = false;
 
   for (let round = 0; round < maxRounds; round++) {
     const { data, error } = await sb.functions.invoke("jarvis-ai", {
@@ -168,9 +200,9 @@ export async function jarvisLlmTurn(
     // Non-2xx: o client às vezes só traz "Edge Function returned a non-2xx…"; tenta o body.
     if (error && (!payload || payload.ok === false)) {
       try {
-        const ctx = (error as { context?: Response }).context;
-        if (ctx) {
-          const body = (await ctx.clone().json()) as typeof payload;
+        const errCtx = (error as { context?: Response }).context;
+        if (errCtx) {
+          const body = (await errCtx.clone().json()) as typeof payload;
           if (body && typeof body === "object") payload = body;
         }
       } catch {
@@ -187,8 +219,56 @@ export async function jarvisLlmTurn(
 
     if (payload.type === "message") {
       const raw = (payload.content || "").trim();
-      // Vazio ou vazamento → ok com content vazio; o Provider pede pra mandar de novo.
       const content = raw && !looksLikeLeakedGoalFacts(raw) ? raw : "";
+
+      // Contrato: não aceitar “vou buscar” sem tool real neste turno.
+      if (
+        content &&
+        looksLikeUnfinishedAnalysisPromise(content) &&
+        !analyzeToolsRan &&
+        !forcedAnalysisOnce
+      ) {
+        forcedAnalysisOnce = true;
+        const forceId = `forced-sales-${Date.now().toString(36)}`;
+        messages.push({
+          role: "assistant",
+          content: null,
+          tool_calls: [
+            {
+              id: forceId,
+              type: "function",
+              function: {
+                name: "analyze_sales",
+                arguments: JSON.stringify({ question: userText }),
+              },
+            },
+          ],
+        });
+        try {
+          const ran = await runJarvisTool("analyze_sales", { question: userText }, ctx, userText);
+          analyzeToolsRan = true;
+          messages.push({
+            role: "tool",
+            tool_call_id: forceId,
+            name: "analyze_sales",
+            content: ran.content,
+          });
+          messages.push({
+            role: "user",
+            content:
+              "Os dados da tool analyze_sales já estão acima. Conclua AGORA com números reais: recomendação, dados insuficientes (explique o que falta) ou falha amigável. PROIBIDO dizer só que vai buscar/analisar.",
+          });
+          continue;
+        } catch {
+          return {
+            ok: true,
+            content:
+              "Não consegui consultar as vendas agora. Pode tentar de novo em instantes?",
+            sideEffects,
+          };
+        }
+      }
+
       return { ok: true, content, sideEffects };
     }
 
@@ -205,6 +285,7 @@ export async function jarvisLlmTurn(
             args = {};
           }
           const question = String(args.question ?? args.request ?? userText);
+          if (ANALYZE_TOOLS.has(name)) analyzeToolsRan = true;
           if (name === "draft_goal" && hooks?.onDraftGoal) {
             const content = await hooks.onDraftGoal(question);
             return {
@@ -266,7 +347,32 @@ export async function jarvisLlmTurn(
     return { ok: false, reason: "unexpected_response" };
   }
 
-  return { ok: false, reason: "tool_loop_limit" };
+  // Limite de rodadas: ainda assim entrega desfecho de análise (nunca some no silêncio).
+  if (!analyzeToolsRan) {
+    try {
+      const ran = await runJarvisTool("analyze_sales", { question: userText }, ctx, userText);
+      const body = (ran.content || "").trim();
+      return {
+        ok: true,
+        content:
+          body ||
+          "Não achei venda sincronizada para essa consulta. Vale conferir o sync ou o filtro de filial.",
+        sideEffects,
+      };
+    } catch {
+      return {
+        ok: true,
+        content: "Não consegui consultar as vendas agora. Pode tentar de novo em instantes?",
+        sideEffects,
+      };
+    }
+  }
+  return {
+    ok: true,
+    content:
+      "A consulta ficou longa demais neste turno. Pode tentar de novo? Posso retomar a análise das vendas.",
+    sideEffects,
+  };
 }
 
 /** Whisper via Edge. audioBase64 sem prefixo data:. */

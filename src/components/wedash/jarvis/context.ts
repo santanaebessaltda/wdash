@@ -85,7 +85,7 @@ export function speakAskWriteStore(
     );
   }
   if (ctx.stores.length > 1) {
-    const names = ctx.stores.map((s) => s.tradeName || s.name).join(", ");
+    const names = ctx.stores.map((s) => friendlyStoreLabel(s)).join(", ");
     return `${tip}De qual filial? No filtro estão: ${names}.`;
   }
   return tip ? `${tip}Qual filial?` : `De qual filial quer montar ${noun}?`;
@@ -167,9 +167,49 @@ export function resolveStoresInQuestion(question: string, ctx: JarvisContext): J
   return ctx.stores;
 }
 
+/** Código operacional tipo LOJAWEPINK.CENTRO.CAMPOGRANDE — não é nome de exibição. */
+export function isTechnicalStoreCode(label: string): boolean {
+  const t = label.trim();
+  if (!t) return false;
+  if (/^[A-Z0-9]+(\.[A-Z0-9]+)+$/.test(t)) return true;
+  return /lojawepink|wepink\.|wpink\./i.test(t) && t.includes(".");
+}
+
+/**
+ * Nome amigável para o chat: fantasia/cadastro humano.
+ * Se só houver código ERP, deriva o segmento central (CENTRO → Centro) — sem inventar cidade/shopping.
+ */
+export function friendlyStoreLabel(s: {
+  tradeName?: string;
+  name?: string;
+  code?: string;
+  id: string;
+}): string {
+  const candidates = [s.tradeName, s.name]
+    .map((x) => (x || "").trim())
+    .filter(Boolean);
+  const human = candidates.find((c) => !isTechnicalStoreCode(c) && !/^filial$/i.test(c));
+  if (human) return human;
+  const tech = candidates.find((c) => isTechnicalStoreCode(c));
+  if (tech) {
+    const parts = tech.split(".").map((p) => p.trim()).filter(Boolean);
+    const core =
+      parts.find((p) => !/^loja/i.test(p) && !/wepink|wpink/i.test(p)) ?? parts[1] ?? parts[0];
+    if (core) {
+      const titled = core
+        .toLowerCase()
+        .split(/[_\s]+/)
+        .map((w) => (w ? w.charAt(0).toUpperCase() + w.slice(1) : w))
+        .join(" ");
+      return titled;
+    }
+  }
+  return candidates[0] || s.code || s.id;
+}
+
 export function scopeLabel(stores: JarvisStoreRef[], all: JarvisStoreRef[]): string {
   if (stores.length === 0) return "rede";
   if (stores.length === all.length && all.length > 1) return "rede";
-  if (stores.length === 1) return stores[0]!.tradeName || stores[0]!.name;
+  if (stores.length === 1) return friendlyStoreLabel(stores[0]!);
   return `${stores.length} filiais`;
 }

@@ -611,8 +611,16 @@ export function looksLikeAskValueSuggestionP0(text: string): boolean {
     return false;
   }
   return (
-    /suger|propor|recomend|ideia de (meta|valor)|quanto (seria|fica|voce|vc)|me (da|dá) (um |uma )?(valor|ideia|numero|número)|pode (suger|calcular|propor|recomend)|basead|historico|histórico|nao sei|não sei|sem ideia|voce sugere|você sugere|valor vc sugere|valor voce sugere|da pra melhorar|da para melhorar|qual valor/.test(
+    /suger|propor|recomend|ideia de (meta|valor)|quanto (seria|fica|voce|vc)|me (da|dá) (um |uma )?(valor|ideia|numero|número)|pode (suger|calcular|propor|recomend)|basead|historico|histórico|nao sei|não sei|sem ideia|voce sugere|você sugere|valor vc sugere|valor voce sugere|da pra melhorar|da para melhorar|qual valor|estudar|melhor (meta|valor)|analisar (as )?vendas|definir (a |o )?(melhor )?meta|chegar (n|num)a (melhor )?meta/.test(
       p,
     )
+  );
+}
+
+/** LLM ofereceu salvar/copiar config sem o rascunho estar pronto para isso. */
+export function looksLikePrematureSaveOffer(text: string): boolean {
+  const p = norm(text);
+  return /posso salvar|salvar (a |o )?(mesma )?configura|mesma configura[cç][aã]o como rascunho|grava(r)? (o )?rascunho (igual|igualzinho|da mesma)|copiar (tudo|a config) (pra|para) (essa|esta|a) loja/.test(
+    p,
   );
 }

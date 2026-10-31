@@ -4,6 +4,7 @@ import { fetchGoals } from "@/data/wedash/goalsRepo";
 import { fetchSalesDayAggs } from "@/data/wedash/salesRepo";
 import { brlCent, monthYearTitle } from "@/lib/format";
 import {
+  friendlyStoreLabel,
   matchStoresInText,
   needsStorePickForWrite,
   speakAskWriteStore,
@@ -109,6 +110,8 @@ export type GoalCopiedFrom = {
 
 export type GoalDraft = {
   form: GoalDraftForm;
+  /** Identifica a operação ativa de montagem (nova a cada filial/meta distinta). */
+  operationId?: string;
   /** Janela oferecida (“quer copiar a config do mês X?”); “sim” usa isso. */
   pendingConfigCopy?: { from: string; to: string } | null;
   assembly?: GoalAssembly;
@@ -141,6 +144,30 @@ export type GoalDraft = {
   /** Já ofereceu os 3 caminhos nesta sessão de montagem (evita repetir o texto). */
   pathOfferPresented?: boolean;
 };
+
+export function newGoalOperationId(): string {
+  return `gop-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+/** Pedido explícito de reutilizar config de outra meta/filial. */
+export function looksLikeExplicitConfigReuse(text: string): boolean {
+  const p = norm(text);
+  return (
+    /copiar? (a |o )?(mesma )?configura|mesma configura[cç][aã]o|reutilizar (a )?configura|igual (a|ao) (da |de )?(outra |ultima |última )?|copia (pra|para) (a |o )?(mesma |loja)|aproveitar (a )?mesma (configura|escada|meta)/.test(
+      p,
+    ) || (/mesma (configura|escada|premia)/.test(p) && /copiar|copia|reutilizar|aproveitar|igual/.test(p))
+  );
+}
+
+/** Intenção de iniciar / mudar para outra meta (nova operação). */
+export function looksLikeStartNewGoalOp(text: string): boolean {
+  const p = norm(text);
+  return (
+    /criar (a |da |de |o )?(meta|loja)|montar (a )?meta|nova meta|meta (da|de|pra|para|na)|vamos (criar|montar|fazer) (a |da |de )?meta|agora (vamos |a |da )?meta|outra (loja|filial|meta)/.test(
+      p,
+    ) || /vamos criar da |criar da loja|meta pra loja|meta para (a )?loja/.test(p)
+  );
+}
 
 export function emptyGoalAssembly(): GoalAssembly {
   return {
@@ -1205,12 +1232,24 @@ export async function suggestGoalTarget(
     const evidence: GoalEvidence[] = [];
     const caveats: string[] = [];
 
+    const daysWithSales = preferAllBrand(m1Rows).filter((r) => r.revenueCents > 0).length;
+    const uniqueDays = new Set(
+      preferAllBrand(m1Rows)
+        .filter((r) => r.revenueCents > 0)
+        .map((r) => r.day),
+    ).size;
+    const activeDays = uniqueDays || daysWithSales;
+
     if (yoyCents > 0) {
       evidence.push({
         kind: "observed",
         label: `Faturamento ${monthYearTitle(yoyFrom)} (mesmo mês ano passado)`,
         amount: yoyCents / 100,
       });
+    } else {
+      caveats.push(
+        `Sem YoY de ${monthYearTitle(yoyFrom)} nesta filial — não uso comparação ano passado inexistente.`,
+      );
     }
     if (last.revenueCents > 0) {
       evidence.push({
@@ -1218,6 +1257,15 @@ export async function suggestGoalTarget(
         label: `Faturamento ${monthYearTitle(m1)} (mês recente)`,
         amount: last.revenueCents / 100,
       });
+      if (activeDays > 0 && activeDays < 20) {
+        evidence.push({
+          kind: "observed",
+          label: `${activeDays} dia(s) com venda em ${monthYearTitle(m1)}`,
+        });
+        caveats.push(
+          `Histórico curto (${activeDays} dias com venda): a recomendação usa ritmo observado, não projeção YoY.`,
+        );
+      }
     }
     if (last.ticket != null) {
       evidence.push({
@@ -1822,8 +1870,44 @@ export async function discussGoal(
     form = { ...form, target: prev?.form.target ?? null };
   }
 
+  // Nova operação: outra filial / “criar meta da Loja X” — NÃO herda valor/níveis/confirmações.
+  const prevStoreId = prev?.form.storeId || "";
+  const storeChanged =
+    !!form.storeId && !!prevStoreId && form.storeId !== prevStoreId;
+  const explicitReuse = looksLikeExplicitConfigReuse(lastUser);
+  const startNewOp =
+    looksLikeStartNewGoalOp(lastUser) &&
+    (storeChanged || prev?.lastSave != null || prev?.pendingCommit?.authorized === true);
+  let operationId = prev?.operationId || newGoalOperationId();
+  let resetForNewStore = false;
+  if ((storeChanged || startNewOp) && !explicitReuse) {
+    const keepStore = form.storeId || prevStoreId;
+    const keepStarts = form.startsOn || prev?.form.startsOn || null;
+    const keepEnds =
+      form.endsOn ||
+      (keepStarts ? endOfMonth(keepStarts) : null) ||
+      prev?.form.endsOn ||
+      null;
+    form = {
+      ...emptyGoalForm(keepStore),
+      startsOn: keepStarts,
+      endsOn: keepEnds,
+      name: keepStarts ? defaultGoalName(keepStarts) : "",
+    };
+    assembly = {
+      ...emptyGoalAssembly(),
+      periodConfirmed: Boolean(keepStarts && (periodSaidNow || prev?.assembly?.periodConfirmed)),
+      valueDiscussed: false,
+      path: null,
+    };
+    userLockedTarget = false;
+    proposal = null;
+    operationId = newGoalOperationId();
+    resetForNewStore = true;
+  }
+
   // Origem/menção de mês NÃO pode alterar o destino (novembro permanece novembro).
-  if (opPlan.freezeDestinationPeriod && prevStarts) {
+  if (opPlan.freezeDestinationPeriod && prevStarts && !resetForNewStore) {
     form = { ...form, startsOn: prevStarts, endsOn: prevEnds };
   }
   // Troca inequívoca de destino (ex.: novembro → dezembro).
@@ -1942,7 +2026,9 @@ export async function discussGoal(
     /^(ok[, ]*)?(cria(r)?|vamos criar) (essa |a |o )?meta( agora| ja| já)?[!?.]*$/.test(qn);
 
   // Sem valor ainda: PROPÕE sem aplicar em form.target (P0).
+  // Nova operação (troca de filial): não auto-propõe nem herda copyStatus — fala intro e segue.
   if (
+    !resetForNewStore &&
     lockedTarget == null &&
     !userLockedTarget &&
     !asksSuggestion &&
@@ -2014,7 +2100,11 @@ export async function discussGoal(
     assembly = { ...assembly, valueDiscussed: true };
   }
   // Nova sugestão: só atualiza proposedTarget — não sobrescreve form.target.
-  let proposedTarget: number | null = prev?.proposedTarget ?? null;
+  // Nova operação / troca de filial: não herda proposta nem locks da meta anterior.
+  let proposedTarget: number | null = resetForNewStore ? null : (prev?.proposedTarget ?? null);
+  if (resetForNewStore) {
+    proposal = null;
+  }
   if (asksSuggestion && lockedTarget == null && form.storeId && form.startsOn) {
     const suggested = await suggestGoalTarget(ctx, form.storeId, {
       from: form.startsOn,
@@ -2097,6 +2187,7 @@ export async function discussGoal(
     pathChoice !== "copy" &&
     !looksLikeExplicitConfigCopy(lastUser);
   const selectingCopy =
+    !resetForNewStore &&
     !skipCopyReentry &&
     !justAcceptedProposal &&
     (pathChoice === "copy" ||
@@ -2170,10 +2261,12 @@ export async function discussGoal(
   let skipAssemblyParse = false;
 
   const selectingRecommended =
+    !resetForNewStore &&
     !justAcceptedProposal &&
     (pathChoice === "recommended" ||
       (assembly.path === "fresh" && looksLikeChooseRecommendedPath(lastUser)));
   const selectingFresh =
+    !resetForNewStore &&
     !justAcceptedProposal &&
     (pathChoice === "fresh" ||
       (assembly.path == null &&
@@ -2541,10 +2634,11 @@ export async function discussGoal(
     assembly = { ...assembly, confirmedMount: true };
   }
 
-  const storeName =
-    ctx.network.find((s) => s.id === form.storeId)?.tradeName ??
-    ctx.stores.find((s) => s.id === form.storeId)?.tradeName ??
-    "";
+  const storeRef =
+    ctx.network.find((s) => s.id === form.storeId) ??
+    ctx.stores.find((s) => s.id === form.storeId) ??
+    null;
+  const storeName = storeRef ? friendlyStoreLabel(storeRef) : "";
 
   // Inspecionar rascunho: snapshot sempre no estado (mesmo sem cópia neste turno).
   if (
@@ -2554,18 +2648,32 @@ export async function discussGoal(
     configSnapshotBlocks = buildGoalConfigSnapshot(form, form.target).chatBlocks;
   }
 
+  if (resetForNewStore) {
+    copyStatus = null;
+    copiedFrom = null;
+    copyIntent = null;
+    pendingConfigCopy = null;
+    pathOfferPresented = false;
+    tierRevenueHint = null;
+    configSnapshotBlocks = [];
+    patternBlocks = [];
+    weightAdviceBlocks = [];
+  }
+
   let draftOut: GoalDraft = {
     form,
-    pendingConfigCopy,
+    operationId: operationId || newGoalOperationId(),
+    pendingConfigCopy: resetForNewStore ? null : pendingConfigCopy,
     assembly,
-    copyStatus,
-    copiedFrom,
+    copyStatus: resetForNewStore ? null : (copyStatus ?? null),
+    copiedFrom: resetForNewStore ? null : copiedFrom,
     lastAppliedTurnId: turnId,
     userLockedTarget,
     proposal,
     proposedTarget,
     tierRevenueHint,
-    pendingCommit: prev?.pendingCommit ?? null,
+    pendingCommit: resetForNewStore ? null : (prev?.pendingCommit ?? null),
+    // lastSave = histórico consultivo da operação anterior; não é config aplicada.
     lastSave: prev?.lastSave ?? null,
     copyIntent,
     pathOfferPresented:
@@ -2575,6 +2683,9 @@ export async function discussGoal(
   // Qualquer mudança de fingerprint invalida confirmação pendente.
   if (draftOut.pendingCommit && !pendingCommitStillValid(draftOut)) {
     draftOut = clearPendingCommit(draftOut);
+  }
+  if (resetForNewStore) {
+    draftOut = { ...draftOut, pendingCommit: null, pathOfferPresented: false };
   }
 
   let shouldCommit = false;
@@ -2776,6 +2887,15 @@ export async function discussGoal(
   ) {
     // Sempre o resumo determinístico — LLM não inventa “Confirma com SIM” sem pending.
     spokenReply = draftOut.pendingCommit?.summary ?? null;
+  } else if (resetForNewStore && form.storeId && !asksSuggestion) {
+    const month = form.startsOn ? monthYearTitle(form.startsOn) : null;
+    spokenReply = scrubTechnicalSpeech(
+      `Ok — vamos montar a meta` +
+        (month ? ` de ${month}` : "") +
+        ` para ${storeName || "essa filial"}.\n\n` +
+        `Começamos do zero nesta loja (sem herdar valor nem premiação da meta anterior). ` +
+        `Quer que eu analise as vendas e te proponha um valor, ou você já tem um R$ em mente?`,
+    );
   } else if (
     valueDecision.keepDiscussing &&
     valueStance !== "ask_info" &&
@@ -2864,6 +2984,14 @@ export async function discussGoal(
       `.\n\n` +
       `Estrutura: meta individual, por grupos ou geral da loja? ` +
       `Se quiser, já me diga grupos, níveis, bônus e rateio na mesma mensagem.`;
+  } else if (asksSuggestion && proposedTarget == null && form.storeId) {
+    // Pediu análise/sugestão e a consulta não rendeu proposta — desfecho explícito (nunca “vou buscar”).
+    spokenReply = scrubTechnicalSpeech(
+      `Olhei os dados de ${storeName || "essa filial"}` +
+        (form.startsOn ? ` para ${monthYearTitle(form.startsOn)}` : "") +
+        `, mas não há base sincronizada suficiente para recomendar um valor com segurança. ` +
+        `Pode conferir o sync da loja, me passar um R$ de partida, ou tentar de novo quando houver mais dias com venda.`,
+    );
   }
 
   return {

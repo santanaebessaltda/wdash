@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  friendlyStoreLabel,
+  isTechnicalStoreCode,
   isTopbarNetworkScope,
   matchStoresInText,
   needsStorePickForWrite,
@@ -21,6 +23,26 @@ const centro: JarvisStoreRef = {
   tradeName: "LOJAWEPINK.CENTRO.CAMPOGRANDE",
   code: "00386",
 };
+
+describe("friendlyStoreLabel", () => {
+  it("prefere fantasia humana e humaniza codigo ERP", () => {
+    expect(
+      friendlyStoreLabel({
+        id: "1",
+        tradeName: "Loja Centro",
+        name: "LOJAWEPINK.CENTRO.CAMPOGRANDE",
+      }),
+    ).toBe("Loja Centro");
+    expect(isTechnicalStoreCode("LOJAWEPINK.CENTRO.CAMPOGRANDE")).toBe(true);
+    expect(
+      friendlyStoreLabel({
+        id: "1",
+        tradeName: "LOJAWEPINK.CENTRO.CAMPOGRANDE",
+        name: "LOJAWEPINK.CENTRO.CAMPOGRANDE",
+      }),
+    ).toBe("Centro");
+  });
+});
 
 describe("matchStoresInText", () => {
   it("casa SB pelo nome completo", () => {

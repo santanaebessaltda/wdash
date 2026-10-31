@@ -1652,3 +1652,123 @@ describe("Topbar Todas as lojas — pergunta a filial", () => {
     expect(spokenReply ?? "").not.toMatch(/todas as lojas/i);
   });
 });
+
+describe("nova operacao apos meta salva / troca de filial", () => {
+  const storeA = {
+    id: "a",
+    name: "CAMPO GRANDE",
+    tradeName: "Shopping Campo Grande",
+    code: "00010",
+  };
+  const storeB = {
+    id: "b",
+    name: "LOJAWEPINK.CENTRO.CAMPOGRANDE",
+    tradeName: "Loja Centro",
+    code: "00386",
+  };
+  const ctx = {
+    tenantId: "t",
+    membershipId: "m1",
+    storeIds: [] as string[],
+    stores: [storeA, storeB],
+    network: [storeA, storeB],
+    today: "2026-10-31",
+    managerFirstName: "Romeu",
+  };
+
+  const savedOp = {
+    form: {
+      ...emptyGoalForm("a"),
+      name: "Meta Novembro 2026",
+      startsOn: "2026-11-01",
+      endsOn: "2026-11-30",
+      target: 244_600,
+      groups: [
+        { shiftId: "m", name: "Turno 1", pct: 45 },
+        { shiftId: "t", name: "Turno 2", pct: 55 },
+      ],
+      tiers: [
+        { name: "Meta", minAttainmentPct: 50, commissionPct: 1.5, bonus: 50 },
+        { name: "Desafio", minAttainmentPct: 110, commissionPct: 3, bonus: 50 },
+      ],
+    },
+    operationId: "gop-old",
+    assembly: {
+      ...emptyGoalAssembly(),
+      periodConfirmed: true,
+      valueDiscussed: true,
+      path: "copy" as const,
+      confirmedGroups: true,
+      confirmedSpread: true,
+      confirmedTiers: true,
+      confirmedMount: true,
+    },
+    userLockedTarget: true,
+    proposedTarget: 244_600,
+    lastSave: { id: "g1", target: 244_600, name: "Meta Novembro 2026", at: "2026-10-31T12:00:00Z" },
+    copyStatus: "ok" as const,
+    pendingCommit: null,
+  };
+
+  it("1. criar meta de outra filial inicia operacao isolada", async () => {
+    const { draft, spokenReply } = await discussGoal(
+      "Vamos criar da Loja Centro a meta.",
+      ctx,
+      savedOp,
+    );
+    expect(draft.form.storeId).toBe("b");
+    expect(draft.operationId).not.toBe("gop-old");
+    expect(draft.form.target).toBeNull();
+    expect(draft.form.groups).toHaveLength(0);
+    expect(draft.userLockedTarget).toBe(false);
+    expect(draft.assembly?.path).toBeNull();
+    expect(draft.assembly?.confirmedMount).toBe(false);
+    expect(draft.pendingCommit).toBeFalsy();
+    expect(draft.copyStatus == null || draft.copyStatus === null).toBe(true);
+    expect(spokenReply).toMatch(/Loja Centro|Centro/i);
+    expect(spokenReply).toMatch(/do zero|sem herdar|analis|proponha|R\$/i);
+    expect(spokenReply).not.toMatch(/posso salvar|mesma configura/i);
+    expect(spokenReply).not.toMatch(/LOJAWEPINK/i);
+  });
+
+  it("2. valor e premiacoes nao sao herdados", async () => {
+    const { draft } = await discussGoal("Vamos criar da Loja Centro a meta de novembro", ctx, savedOp);
+    expect(draft.form.target).toBeNull();
+    expect(draft.form.groups).toHaveLength(0);
+    expect(draft.form.tiers.some((t) => t.bonus === 50 && t.minAttainmentPct === 50)).toBe(false);
+    expect(draft.form.tiers.some((t) => t.minAttainmentPct === 110 && t.bonus === 50)).toBe(false);
+  });
+
+  it("3. copia explicita pode reutilizar (nao reseta se pedir mesma config)", async () => {
+    expect(
+      (await import("./goalDraft")).looksLikeExplicitConfigReuse(
+        "Copie a mesma configuração para a Loja Centro",
+      ),
+    ).toBe(true);
+  });
+
+  it("11. isolamento de estado entre operacoes", async () => {
+    const first = await discussGoal("Vamos criar da Loja Centro a meta", ctx, savedOp);
+    expect(first.draft.operationId).toBeTruthy();
+    const second = await discussGoal("Shopping Campo Grande", ctx, first.draft);
+    expect(second.draft.form.storeId).toBe("a");
+    expect(second.draft.form.target).toBeNull();
+    expect(second.draft.operationId).toBeTruthy();
+    expect(second.draft.operationId).not.toBe(first.draft.operationId);
+  });
+
+  it("4/6. pedir melhor meta sem base sincronizada termina com desfecho explicito", async () => {
+    const empty = await discussGoal("Vamos criar da Loja Centro a meta", ctx, savedOp);
+    const { spokenReply, draft } = await discussGoal(
+      "Então quero estudar a melhor meta pra loja.",
+      ctx,
+      empty.draft,
+    );
+    expect(draft.form.storeId).toBe("b");
+    expect(draft.form.target).toBeNull();
+    expect(spokenReply).toBeTruthy();
+    expect(spokenReply).not.toMatch(/vou (buscar|analisar|consultar)/i);
+    expect(spokenReply).toMatch(/Loja Centro|Centro|base sincronizada|R\$|sync|dados/i);
+    expect(spokenReply).not.toMatch(/LOJAWEPINK/i);
+  });
+});

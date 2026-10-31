@@ -27,6 +27,7 @@ import { commitGoal } from "./goalCommit";
 import {
   clearGoalDraftSession,
   discussGoal,
+  emptyGoalAssembly,
   formatGoalFactsForModel,
   goalAssemblyPendingSteps,
   goalCanPersist,
@@ -45,9 +46,12 @@ import {
 } from "./goalDraft";
 import {
   goalDraftFingerprint,
+  looksLikePrematureSaveOffer,
   looksLikeValueInconsistency,
   speakGoalSavedSuccess,
+  speakValueInconsistency,
 } from "./goalContract";
+import { looksLikeUnfinishedAnalysisPromise } from "./llmClient";
 import { classifyJarvisFailure, logJarvisError } from "./jarvisErrors";
 import {
   blobToBase64,
@@ -954,8 +958,48 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
         if (gen !== replyGen.current) return;
         memoryTextRef.current = formatMemoryForModel(refreshed);
 
+        const draftNow = goalDraftRef.current;
+        const runAnalysisSafetyNet = async (): Promise<string> => {
+          try {
+            const { loadSalesBrief } = await import("./salesBrief");
+            const brief = await loadSalesBrief(ctx, q, q);
+            let answer =
+              brief.trim() ||
+              "Não achei venda sincronizada para essa consulta. Vale conferir o sync ou o filtro de filial.";
+            if (draftNow?.form.storeId && draftNow.form.startsOn && !draftNow.userLockedTarget) {
+              const { suggestGoalTarget } = await import("./goalDraft");
+              const suggested = await suggestGoalTarget(ctx, draftNow.form.storeId, {
+                from: draftNow.form.startsOn,
+                to: draftNow.form.endsOn || draftNow.form.startsOn,
+              });
+              if (suggested) {
+                syncGoalDraft({
+                  ...draftNow,
+                  proposal: suggested,
+                  proposedTarget: suggested.amount,
+                  assembly: {
+                    ...(draftNow.assembly ?? emptyGoalAssembly()),
+                    valueDiscussed: true,
+                  },
+                });
+                answer = `${brief.trim()}\n\n${suggested.chatBlocks.join("\n\n")}`;
+              }
+            }
+            return answer;
+          } catch {
+            return "Não consegui consultar as vendas agora. Pode tentar de novo em instantes?";
+          }
+        };
+
         if (!llm.ok) {
           const reason = llm.reason || "erro";
+          // Limite de tools / resposta inesperada no meio de análise: entrega desfecho.
+          if (reason === "tool_loop_limit" || reason === "unexpected_response") {
+            const recovered = await runAnalysisSafetyNet();
+            if (gen !== replyGen.current) return;
+            finish(recovered, { retryOf: q });
+            return;
+          }
           const classified = classifyJarvisFailure(reason);
           logJarvisError("llmTurn", { kind: classified.kind, reason });
           if (reason === "openai_not_configured") {
@@ -970,11 +1014,13 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
         }
 
         let answer = llm.content.trim();
-        const draftNow = goalDraftRef.current;
-        // Correção de valor / inconsistência: nunca vira checklist de grupos.
-        if (draftNow && looksLikeValueInconsistency(q)) {
-          const { speakValueInconsistency } = await import("./goalContract");
+        // Prometeu análise sem resultado — rede de segurança se o loop não forçou a tool.
+        if (looksLikeUnfinishedAnalysisPromise(answer)) {
+          answer = await runAnalysisSafetyNet();
+        } else if (draftNow && looksLikeValueInconsistency(q)) {
           answer = speakValueInconsistency(draftNow);
+        } else if (draftNow && looksLikePrematureSaveOffer(answer) && !goalCanPersist(draftNow)) {
+          answer = naturalGoalAskFromDraft(draftNow);
         } else if (
           draftNow &&
           !looksLikeValueInconsistency(q) &&
