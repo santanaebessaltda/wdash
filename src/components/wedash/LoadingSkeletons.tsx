@@ -743,7 +743,7 @@ export function TeamTableSkeleton({ withShift = true, rows = 3 }: { withShift?: 
 /** Metas: card da listagem (icone + nome/status/periodo + acoes  |  realizado/%  |  barra  |  rodape  |  equipe). */
 export function GoalCardsSkeleton({ count = 2 }: { count?: number }) {
   return (
-    <Busy className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+    <Busy className={`grid grid-cols-1 gap-4 ${count >= 2 ? "lg:grid-cols-2" : ""}`}>
       {Array.from({ length: count }, (_, i) => (
         <div key={i} className="flex flex-col rounded-2xl border border-line bg-bg-2 p-5 shadow-[var(--shadow-vela)]">
           <div className="mb-3.5 flex items-start gap-3.5">
@@ -849,7 +849,7 @@ export function GoalDetailSkeleton() {
 /** Escala: card atual — Escala 6×1 + badges, Editar/…, check vizinhos, grade do mês, rodapé. */
 export function ScheduleCardsSkeleton({ count = 2, people = 5, days = 31 }: { count?: number; people?: number; days?: number }) {
   return (
-    <Busy className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+    <Busy className={`grid grid-cols-1 gap-4 ${count >= 2 ? "lg:grid-cols-2" : ""}`}>
       {Array.from({ length: count }, (_, c) => (
         <Card key={c} className="min-w-0 overflow-hidden">
           <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
@@ -923,7 +923,7 @@ export function ScheduleCardsSkeleton({ count = 2, people = 5, days = 31 }: { co
 /** Desafios: card da listagem (icone + nome/status/periodo + acoes  |  progresso  |  regra + avatares). */
 export function ChallengeCardsSkeleton({ count = 2 }: { count?: number }) {
   return (
-    <Busy className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+    <Busy className={`grid grid-cols-1 gap-4 ${count >= 2 ? "lg:grid-cols-2" : ""}`}>
       {Array.from({ length: count }, (_, i) => (
         <div key={i} className="flex flex-col rounded-2xl border border-line bg-bg-2 p-5 shadow-[var(--shadow-vela)]">
           <div className="mb-3.5 flex items-start gap-3.5">

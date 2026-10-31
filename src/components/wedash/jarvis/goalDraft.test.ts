@@ -844,7 +844,7 @@ describe("P0 proposta 244600 vs 257000", () => {
     expect(draft.pendingCommit?.awaitingConfirm).toBe(true);
     expect(draft.pendingCommit?.authorized).toBe(false);
     expect(shouldCommit).toBeFalsy();
-    expect(spokenReply).toMatch(/SIM|gravar/i);
+    expect(spokenReply).toMatch(/Posso salvar|rascunho/i);
     expect(spokenReply).toMatch(/244/);
   });
 

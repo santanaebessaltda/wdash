@@ -732,13 +732,13 @@ export function TeamPage() {
     const split = present.length > 1;
     return (
       <div className="flex flex-col gap-4">
-        {present.map((status) => (
-          <div key={status}>
-            {split && <p className="mb-2 text-[12px] font-bold uppercase tracking-wide text-t2">{titles[status]}</p>}
-            <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-              {challengeCards
-                .filter((card) => card.view.status === status)
-                .map(({ challenge, view: challengeView, storeNameValue }) => (
+        {present.map((status) => {
+          const section = challengeCards.filter((card) => card.view.status === status);
+          return (
+            <div key={status}>
+              {split && <p className="mb-2 text-[12px] font-bold uppercase tracking-wide text-t2">{titles[status]}</p>}
+              <div className={`grid grid-cols-1 gap-3 ${section.length >= 2 ? "lg:grid-cols-2" : ""}`}>
+                {section.map(({ challenge, view: challengeView, storeNameValue }) => (
                   <ChallengeMiniCard
                     key={challenge.id}
                     challenge={challenge}
@@ -752,9 +752,10 @@ export function TeamPage() {
                     }
                   />
                 ))}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     );
   }

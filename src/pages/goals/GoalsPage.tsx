@@ -272,7 +272,7 @@ export default function GoalsPage() {
             />
           </Card>
         ) : (
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <div className={`grid grid-cols-1 gap-4 ${cards.length >= 2 ? "lg:grid-cols-2" : ""}`}>
             {cards.map(({ summary, store, team }) => (
               <GoalCard
                 key={summary.goal.id}

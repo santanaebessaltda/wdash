@@ -58,11 +58,12 @@ export function newCommitVersionId(): string {
   return `v-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-/** Resumo apresentado ao Gestor antes do SIM de gravação. */
+/** Resumo apresentado ao Gestor antes da confirmação de gravação. */
 export function buildCommitSummary(draft: GoalDraft, storeName: string): string {
   const form = draft.form;
   const dest = form.startsOn ? monthYearTitle(form.startsOn) : "?";
   const alvo = form.target != null ? brlCent(form.target) : "?";
+  const nome = form.name?.trim() || (form.startsOn ? `Meta ${dest}` : "Meta");
   const snap = buildGoalConfigSnapshot(form, form.target);
   const groups =
     snap.groups.length > 0
@@ -72,14 +73,27 @@ export function buildCommitSummary(draft: GoalDraft, storeName: string): string 
     .map((l) => `${l.name} ${l.minAttainmentPct}%/${l.commissionPct}%`)
     .join(" · ");
   return (
-    `Vou gravar o rascunho abaixo. Confira com atenção:\n\n` +
+    `Posso salvar essa configuração como rascunho?\n\n` +
+    `· Nome: ${nome}\n` +
     `· Filial: ${storeName || form.storeId}\n` +
     `· Período: ${dest}\n` +
     `· Valor: ${alvo}\n` +
     `· Grupos: ${groups}\n` +
     `· Níveis: ${levels}\n\n` +
-    `Responda SIM para autorizar gravar exatamente este rascunho. ` +
     `Se mudar qualquer coisa depois, peço confirmação de novo.`
+  );
+}
+
+/** Mensagem pós-save — só com dados reais do backend (sem UUID na fala). */
+export function speakGoalSavedSuccess(opts: {
+  name: string;
+  target: number;
+  asDraft?: boolean;
+}): string {
+  const status = opts.asDraft !== false ? "rascunho" : "meta publicada";
+  return (
+    `Pronto — salvei “${opts.name}” como ${status}, com valor ${brlCent(opts.target)}.\n\n` +
+    `Você pode revisar e publicar quando quiser.`
   );
 }
 
@@ -197,11 +211,24 @@ export function looksLikeAcceptProposalBare(text: string, hasProposed: boolean):
   return looksLikeAcceptPendingProposal(text, hasProposed, false);
 }
 
+/**
+ * Confirmação natural da gravação — só vale com pendingCommit.awaitingConfirm.
+ * Exemplos: Sim, Pode, Fechado, Confirmo, Isso, Vamos nessa.
+ * “Pode salvar” / “salvar rascunho” entram via looksLikeRequestSave no motor (quando awaiting).
+ */
 export function looksLikeConfirmPendingSave(text: string): boolean {
   const p = norm(text).trim();
-  if (/nao|não|espera|ainda nao|ainda não|cancela/.test(p)) return false;
-  // Só afirmação curta. “pode salvar” / “pode seguir” NÃO entram aqui.
-  return /^(sim|ok|fechado|autorizo|confirma|confirmo|pode)([!.?…]*)$/.test(p);
+  if (!p || p.length > 64) return false;
+  if (/nao|não|espera|ainda nao|ainda não|cancela|outra|diferente|muda|troca/.test(p)) {
+    return false;
+  }
+  if (looksLikeNaturalAffirmation(text)) return true;
+  return (
+    /^(sim|ok|fechado|autorizo|confirma|confirmo|pode|isso|essa|esse|beleza|combinado|fechou|bora|topa)([!.?…]*)$/.test(
+      p,
+    ) ||
+    /^(pode ser|vamos nessa|vamos nisso|confirmo|pode ficar|isso mesmo)([!.?…]*)$/.test(p)
+  );
 }
 
 /** Simular níveis com outro R$ — sem mutar o rascunho. */
@@ -235,7 +262,7 @@ export function speakValueInconsistency(draft: GoalDraft): string {
         ? brlCent(draft.proposal.scenarios.find((s) => s.kind === "recommended")!.amount)
         : null;
   const saved = draft.lastSave
-    ? `${brlCent(draft.lastSave.target)} (rascunho id ${draft.lastSave.id.slice(0, 8)}…)`
+    ? `${brlCent(draft.lastSave.target)} (“${draft.lastSave.name}”)`
     : null;
 
   const lines = [

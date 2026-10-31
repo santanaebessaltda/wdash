@@ -824,7 +824,7 @@ export function SchedulePage() {
           </Card>
         ) : (
           <>
-            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <div className={`grid grid-cols-1 gap-4 ${scheduleCards.length >= 2 ? "lg:grid-cols-2" : ""}`}>
               {scheduleCards.map(({ view, item }) => {
                 const monthDays = view.days.filter((row) => startOfMonth(row.day) === item.monthStart);
                 const nameList = (view.directory ?? view.people).map((person) => ({ id: person.id, name: person.name }));

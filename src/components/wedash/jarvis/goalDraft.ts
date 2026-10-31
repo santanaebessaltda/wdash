@@ -130,6 +130,8 @@ export type GoalDraft = {
   lastSave?: GoalLastSave | null;
   /** exact = preservar tudo; reference = pode recomendar ajuste (sem aplicar sozinho). */
   copyIntent?: GoalCopyIntent | null;
+  /** Já ofereceu os 3 caminhos nesta sessão de montagem (evita repetir o texto). */
+  pathOfferPresented?: boolean;
 };
 
 export function emptyGoalAssembly(): GoalAssembly {
@@ -619,10 +621,19 @@ const MONTH_NAMES: Record<string, number> = {
   dezembro: 12,
 };
 
-/** Nome automatico tipo "Maio 2026" / "Novembro 2026". */
+/** Nome automático: "Meta Novembro 2026" (também aceita legado "Novembro 2026" / "Nova meta"). */
 export function isAutoMonthYearName(name: string): boolean {
   const n = norm(name.trim());
-  return Object.keys(MONTH_NAMES).some((m) => new RegExp(`^${m}\\s+20\\d{2}$`).test(n));
+  if (!n || n === "nova meta") return true;
+  return Object.keys(MONTH_NAMES).some(
+    (m) =>
+      new RegExp(`^meta\\s+${m}\\s+20\\d{2}$`).test(n) || new RegExp(`^${m}\\s+20\\d{2}$`).test(n),
+  );
+}
+
+/** Padrão determinístico — nunca depende do LLM. */
+export function defaultGoalName(startsOn: string): string {
+  return `Meta ${monthYearTitle(startsOn)}`;
 }
 
 /**
@@ -769,12 +780,12 @@ export function goalDraftReady(f: GoalDraftForm): boolean {
 }
 
 export function ensureGoalName(f: GoalDraftForm): GoalDraftForm {
-  // Se o periodo mudou (novembro) mas o nome ficou "Maio 2026", sincroniza.
+  // Só sincroniza nome automático com o período. Nome personalizado pelo gestor permanece.
   if (f.startsOn && (!f.name.trim() || isAutoMonthYearName(f.name))) {
-    return { ...f, name: monthYearTitle(f.startsOn) };
+    return { ...f, name: defaultGoalName(f.startsOn) };
   }
   if (f.name.trim()) return f;
-  return { ...f, name: "Nova meta" };
+  return f;
 }
 
 /**
@@ -1513,7 +1524,7 @@ export function formatGoalFactsForModel(
   const nextHint = nextAssemblyHint(form, a);
   const snap = buildGoalConfigSnapshot(form, form.target);
   const payload = {
-    nome: form.name || "Nova meta",
+    nome: form.name || (form.startsOn ? defaultGoalName(form.startsOn) : "Meta"),
     filial: storeName || form.storeId || "?",
     periodo: period,
     periodo_destino: period,
@@ -1673,6 +1684,8 @@ export type DiscussGoalOpts = {
    * Se omitido, busca metas recentes da filial.
    */
   recentConfigs?: ConfigPatternSource[] | null;
+  /** Escolha estruturada do componente (não depende do LLM). */
+  forcedPath?: GoalAssemblyPath | null;
 };
 
 export type DiscussGoalResult = {
@@ -1992,9 +2005,10 @@ export async function discussGoal(
   }
 
   // Caminho de montagem (copy | recommended | fresh) — separado do aceite do valor.
-  const pathChoice = parseGoalAssemblyPath(lastUser);
+  const pathChoice = opts?.forcedPath ?? parseGoalAssemblyPath(lastUser);
   const switchingPath =
     pathChoice != null && assembly.path != null && pathChoice !== assembly.path;
+  let pathOfferPresented = prev?.pathOfferPresented === true;
 
   // Copia: só com intenção explícita de copiar / path=copy — nunca por aceite de valor.
   // freezeDestinationPeriod bloqueia reentrada por FATO de escada; pedido explícito de cópia passa.
@@ -2463,6 +2477,8 @@ export async function discussGoal(
     pendingCommit: prev?.pendingCommit ?? null,
     lastSave: prev?.lastSave ?? null,
     copyIntent,
+    pathOfferPresented:
+      assembly.path != null ? false : pathOfferPresented || pathOfferBlocks.length > 0,
   };
 
   // Qualquer mudança de fingerprint invalida confirmação pendente.
@@ -2480,9 +2496,10 @@ export async function discussGoal(
     // 1) SIM com pending aguardando → autoriza gravação (P0).
     hadAwaitingCommit &&
     draftOut.pendingCommit &&
-    looksLikeConfirmPendingSave(lastUser) &&
+    (looksLikeConfirmPendingSave(lastUser) || looksLikeRequestSave(lastUser)) &&
     pendingCommitStillValid(draftOut) &&
-    !looksLikeAskGroupWeightAdvice(lastUser)
+    !looksLikeAskGroupWeightAdvice(lastUser) &&
+    !justAcceptedProposal
   ) {
     draftOut = {
       ...draftOut,
@@ -2699,14 +2716,21 @@ export async function discussGoal(
         hasPrior: pendingConfigCopy != null,
         priorLabel: pendingConfigCopy ? monthYearTitle(pendingConfigCopy.from) : null,
       });
+    draftOut = { ...draftOut, pathOfferPresented: true };
   } else if (justAcceptedProposal && form.target != null) {
     spokenReply =
       `Apliquei ${brlCent(form.target)} no rascunho.` +
       (assembly.path != null
         ? `\n\n${buildGoalConfigSnapshot(form, form.target).chatBlocks.join("\n\n")}`
         : "");
-  } else if (pathOfferBlocks.length > 0 && form.target != null && assembly.path === null) {
+  } else if (
+    pathOfferBlocks.length > 0 &&
+    form.target != null &&
+    assembly.path === null &&
+    !pathOfferPresented
+  ) {
     spokenReply = pathOfferBlocks[0] ?? null;
+    draftOut = { ...draftOut, pathOfferPresented: true };
   } else if (selectingFresh && assembly.path === "fresh") {
     spokenReply =
       `Ok — vamos montar do zero para ${form.startsOn ? monthYearTitle(form.startsOn) : "a meta"}` +

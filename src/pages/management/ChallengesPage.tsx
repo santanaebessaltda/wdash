@@ -327,17 +327,17 @@ export function ChallengesPage() {
           </Card>
         ) : (
           <div className="flex flex-col gap-6">
-            {statusSections.present.map((status) => (
-              <div key={status}>
-                {statusSections.split && (
-                  <p className="mb-3 text-[12px] font-bold uppercase tracking-wide text-t2">
-                    {statusSections.titles[status]}
-                  </p>
-                )}
-                <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                  {cards
-                    .filter((card) => card.view.status === status)
-                    .map(({ challenge, view, store }) => (
+            {statusSections.present.map((status) => {
+              const section = cards.filter((card) => card.view.status === status);
+              return (
+                <div key={status}>
+                  {statusSections.split && (
+                    <p className="mb-3 text-[12px] font-bold uppercase tracking-wide text-t2">
+                      {statusSections.titles[status]}
+                    </p>
+                  )}
+                  <div className={`grid grid-cols-1 gap-4 ${section.length >= 2 ? "lg:grid-cols-2" : ""}`}>
+                    {section.map(({ challenge, view, store }) => (
                       <ChallengeCard
                         key={challenge.id}
                         challenge={challenge}
@@ -351,9 +351,10 @@ export function ChallengesPage() {
                         onPublish={() => void publishOne(challenge)}
                       />
                     ))}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

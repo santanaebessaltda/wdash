@@ -11,7 +11,8 @@ import {
 import { useLocation, useNavigate } from "react-router-dom";
 import { validateChallengeForm } from "@/data/wedash/challengeForm";
 import { isOwner } from "@/layout/nav-wedash";
-import { brlCent } from "@/lib/format";
+import { monthYearTitle } from "@/lib/format";
+import { paths } from "@/router/paths";
 import { useSession } from "@/session/SessionProvider";
 import { commitChallenge } from "./challengeCommit";
 import {
@@ -39,9 +40,15 @@ import {
   persistGoalDraftSession,
   speakGoalDraftConfig,
   validateGoalDraft,
+  type GoalAssemblyPath,
   type GoalDraft,
 } from "./goalDraft";
-import { looksLikeValueInconsistency } from "./goalContract";
+import {
+  goalDraftFingerprint,
+  looksLikeValueInconsistency,
+  speakGoalSavedSuccess,
+} from "./goalContract";
+import { classifyJarvisFailure, logJarvisError } from "./jarvisErrors";
 import {
   blobToBase64,
   jarvisLlmTurn,
@@ -61,11 +68,18 @@ import {
 } from "./scheduleDraft";
 import { syncScopePeriodFromQuestion } from "./syncPeriod";
 
-export type JarvisMessage = { from: "user" | "jarvis"; text: string };
+export type JarvisMessageLink = { label: string; to: string };
+export type JarvisMessage = {
+  from: "user" | "jarvis";
+  text: string;
+  /** Link determinístico (ex.: editor de metas) — nunca inventado pelo LLM. */
+  link?: JarvisMessageLink | null;
+  /** Texto do usuário para “Tentar novamente” sem duplicar a bolha. */
+  retryOf?: string | null;
+};
 export type JarvisMode = "idle" | "thinking";
 export type JarvisCreated =
   | { kind: "challenge"; id: string; name: string }
-  | { kind: "goal"; id: string; name: string; asDraft?: boolean }
   | { kind: "schedule"; name: string };
 
 const CHAT_HISTORY_KEY = "wedash.jarvis.chat";
@@ -97,6 +111,18 @@ function loadChatHistory(): JarvisMessage[] {
           typeof (m as JarvisMessage).text === "string" &&
           (m as JarvisMessage).text.trim().length > 0,
       )
+      .map((m) => ({
+        from: m.from,
+        text: m.text,
+        link:
+          m.link &&
+          typeof m.link === "object" &&
+          typeof m.link.label === "string" &&
+          typeof m.link.to === "string"
+            ? { label: m.link.label, to: m.link.to }
+            : null,
+        retryOf: typeof m.retryOf === "string" ? m.retryOf : null,
+      }))
       .slice(-CHAT_HISTORY_MAX);
   } catch {
     return [];
@@ -115,6 +141,12 @@ function persistChatHistory(messages: JarvisMessage[]) {
   }
 }
 
+export type AssemblyPathOfferUi = {
+  hasPrior: boolean;
+  priorLabel: string | null;
+  selected: GoalAssemblyPath | null;
+};
+
 type JarvisApi = {
   allowed: boolean;
   messages: JarvisMessage[];
@@ -126,6 +158,10 @@ type JarvisApi = {
   goalDraft: GoalDraft | null;
   scheduleDraft: ScheduleDraft | null;
   createdItem: JarvisCreated | null;
+  /** Oferta dos 3 caminhos — só quando path ainda pendente. */
+  assemblyPathOffer: AssemblyPathOfferUi | null;
+  pathSelectBusy: boolean;
+  selectAssemblyPath: (path: GoalAssemblyPath) => void;
   commitBusy: boolean;
   /** Microfone → grava → Whisper no campo (UI REC estilo Néctar). */
   dictating: boolean;
@@ -135,7 +171,7 @@ type JarvisApi = {
   startDictate: () => void;
   finishDictate: () => void;
   cancelDictate: () => void;
-  reply: (q: string) => void;
+  reply: (q: string, opts?: { retry?: boolean }) => void;
   clearChat: () => void;
   authorizeChallenge: () => void;
   authorizeGoal: () => void;
@@ -170,6 +206,8 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
   const [scheduleDraft, setScheduleDraft] = useState<ScheduleDraft | null>(null);
   const [commitBusy, setCommitBusy] = useState(false);
   const [createdItem, setCreatedItem] = useState<JarvisCreated | null>(null);
+  const [assemblyPathOffer, setAssemblyPathOffer] = useState<AssemblyPathOfferUi | null>(null);
+  const [pathSelectBusy, setPathSelectBusy] = useState(false);
   const [dictating, setDictating] = useState(false);
   const [dictateBusy, setDictateBusy] = useState(false);
   const [dictateSeconds, setDictateSeconds] = useState(0);
@@ -191,6 +229,11 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
   const messagesRef = useRef<JarvisMessage[]>(messages);
   messagesRef.current = messages;
   const memoryTextRef = useRef<string>("Nenhuma memória de longo prazo ainda.");
+  const pendingSpeakExtrasRef = useRef<{ link?: JarvisMessageLink; retryOf?: string } | null>(null);
+  /** Idempotência de gravação: fingerprint → id já salvo. */
+  const completedGoalSavesRef = useRef<Map<string, { id: string; name: string; target: number }>>(
+    new Map(),
+  );
 
   challengeDraftRef.current = challengeDraft;
   // Meta no chat e so-texto: state fica null (sem card), mas o rascunho vive no ref.
@@ -205,11 +248,33 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
   const syncGoalDraft = useCallback((draft: GoalDraft | null) => {
     goalDraftRef.current = draft;
     persistGoalDraftSession(draft);
+    if (
+      draft &&
+      draft.assembly?.valueDiscussed &&
+      draft.form.target != null &&
+      draft.assembly.path == null
+    ) {
+      setAssemblyPathOffer({
+        hasPrior: draft.pendingConfigCopy != null,
+        priorLabel: draft.pendingConfigCopy
+          ? monthYearTitle(draft.pendingConfigCopy.from)
+          : null,
+        selected: null,
+      });
+    } else {
+      setAssemblyPathOffer(null);
+    }
   }, []);
 
   useEffect(() => {
+    // Restaura oferta de caminho após refresh (rascunho na sessão).
+    const d = goalDraftRef.current;
+    if (d) syncGoalDraft(d);
+  }, [syncGoalDraft]);
+
+  useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, mode, challengeDraft, goalDraft, scheduleDraft, createdItem]);
+  }, [messages, mode, challengeDraft, goalDraft, scheduleDraft, createdItem, assemblyPathOffer]);
 
   const storeNameFor = useCallback(
     (storeId: string) => {
@@ -222,26 +287,46 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
   /**
    * Anexa a resposta em bolhas curtas, com “digitando…” entre elas.
    * Sem TTS — só chat. Cancela se replyGen subir (nova pergunta / Limpar).
+   * link/retryOf vão só na última bolha.
    */
-  const speakAnswer = useCallback(async (answer: string) => {
-    const gen = replyGen.current;
-    const blocks = splitJarvisReply(answer);
-    if (blocks.length === 0) {
-      if (gen === replyGen.current) setMode("idle");
-      return;
-    }
-    for (let i = 0; i < blocks.length; i++) {
-      if (gen !== replyGen.current) return;
-      // Checa gen DENTRO do updater: Apagar conversa pode ter rodado entre o await e o setState.
-      setMessages((m) => (gen !== replyGen.current ? m : [...m, { from: "jarvis", text: blocks[i]! }]));
-      if (i < blocks.length - 1) {
-        setMode("thinking");
-        await sleepMs(typingDelayMs(blocks[i + 1]!));
-        if (gen !== replyGen.current) return;
+  const speakAnswer = useCallback(
+    async (answer: string, extras?: { link?: JarvisMessageLink | null; retryOf?: string | null }) => {
+      const gen = replyGen.current;
+      const fromPending = pendingSpeakExtrasRef.current;
+      pendingSpeakExtrasRef.current = null;
+      const link = extras?.link ?? fromPending?.link ?? null;
+      const retryOf = extras?.retryOf ?? fromPending?.retryOf ?? null;
+      const blocks = splitJarvisReply(answer);
+      if (blocks.length === 0) {
+        if (gen === replyGen.current) setMode("idle");
+        return;
       }
-    }
-    if (gen === replyGen.current) setMode("idle");
-  }, []);
+      for (let i = 0; i < blocks.length; i++) {
+        if (gen !== replyGen.current) return;
+        const isLast = i === blocks.length - 1;
+        setMessages((m) =>
+          gen !== replyGen.current
+            ? m
+            : [
+                ...m,
+                {
+                  from: "jarvis" as const,
+                  text: blocks[i]!,
+                  link: isLast ? link : null,
+                  retryOf: isLast ? retryOf : null,
+                },
+              ],
+        );
+        if (i < blocks.length - 1) {
+          setMode("thinking");
+          await sleepMs(typingDelayMs(blocks[i + 1]!));
+          if (gen !== replyGen.current) return;
+        }
+      }
+      if (gen === replyGen.current) setMode("idle");
+    },
+    [],
+  );
 
 
   const tearDownDictateHardware = useCallback(() => {
@@ -510,15 +595,30 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
       if (!goalCanPersist(draft)) {
         const missing = missingGoalLabels(validateGoalDraft(draft.form));
         const msg = !draft.pendingCommit?.authorized
-          ? "Ainda falta autorizar esta versão. Diz “pode seguir” ou “salvar o rascunho” pra eu mostrar o resumo; aí responde SIM."
+          ? "Ainda falta confirmar esta versão. Peça para salvar o rascunho — eu mostro o resumo e você confirma."
           : missing.length
             ? `Ainda não dá pra gravar a meta. Falta: ${missing.join(", ")}.`
             : "A configuração mudou depois do resumo — peço confirmação de novo.";
         if (silent) return msg;
-        speakAnswer(msg);
+        void speakAnswer(msg);
         return;
       }
       const targetSaved = draft.form.target!;
+      const fp = goalDraftFingerprint(draft.form);
+      const already = completedGoalSavesRef.current.get(fp);
+      if (already) {
+        const msg = speakGoalSavedSuccess({
+          name: already.name,
+          target: already.target,
+          asDraft: true,
+        });
+        pendingSpeakExtrasRef.current = {
+          link: { label: "Abrir no editor de metas", to: paths.goalEdit(already.id) },
+        };
+        if (silent) return msg;
+        void speakAnswer(msg);
+        return;
+      }
       setCommitBusy(true);
       setMode("thinking");
       const res = await commitGoal(session.tenantId, draft.form, { published: false });
@@ -530,23 +630,31 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
             ? { ...draft.pendingCommit, authorized: false, awaitingConfirm: true }
             : null,
         });
-        if (silent) return res.reason;
-        speakAnswer(res.reason);
+        const classified = classifyJarvisFailure(res.reason, { duringSave: true });
+        logJarvisError("authorizeGoal", { kind: classified.kind, reason: res.reason });
+        if (silent) return classified.message;
+        void speakAnswer(classified.message);
         return;
       }
+      completedGoalSavesRef.current.set(fp, {
+        id: res.id,
+        name: res.name,
+        target: targetSaved,
+      });
       setGoalDraft(null);
       syncGoalDraft(null);
       clearGoalDraftSession();
-      setCreatedItem({ kind: "goal", id: res.id, name: res.name, asDraft: true });
-      const periodLabel =
-        draft.form.startsOn && draft.form.endsOn
-          ? ` (${draft.form.startsOn.slice(8, 10)}/${draft.form.startsOn.slice(5, 7)} a ${draft.form.endsOn.slice(8, 10)}/${draft.form.endsOn.slice(5, 7)})`
-          : "";
-      const msg =
-        `Pronto. Salvei o rascunho “${res.name}”${periodLabel} com valor ${brlCent(targetSaved)} ` +
-        `(id ${res.id.slice(0, 8)}…). Abre o link, revisa e publica quando quiser.`;
+      setCreatedItem(null);
+      const msg = speakGoalSavedSuccess({
+        name: res.name,
+        target: targetSaved,
+        asDraft: true,
+      });
+      pendingSpeakExtrasRef.current = {
+        link: { label: "Abrir no editor de metas", to: paths.goalEdit(res.id) },
+      };
       if (silent) return msg;
-      speakAnswer(msg);
+      void speakAnswer(msg);
     },
     [commitBusy, session, speakAnswer, syncGoalDraft],
   );
@@ -603,24 +711,34 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
   );
 
   const reply = useCallback(
-    (question: string) => {
+    (question: string, opts?: { retry?: boolean }) => {
       const q = question.trim();
       if (!q || !session || !isOwner(session.role)) return;
       const gen = ++replyGen.current;
-      setMessages((m) => [...m, { from: "user", text: q }]);
+      if (!opts?.retry) {
+        setMessages((m) => [...m, { from: "user", text: q }]);
+      } else {
+        // Remove botões de retry anteriores desta pergunta para evitar duplicata visual.
+        setMessages((m) =>
+          m.map((msg) => (msg.retryOf === q ? { ...msg, retryOf: null } : msg)),
+        );
+      }
       setDraftText("");
       setMode("thinking");
       setMicHint(null);
       const ctx = jarvisContextFromSession(session, readTopbarStoreIds());
 
       // Fala = só o modelo. App não monta script de conversa.
-      const finish = (answer: string) => {
+      const finish = (answer: string, extras?: { link?: JarvisMessageLink; retryOf?: string }) => {
         if (gen !== replyGen.current) return;
         if (looksLikeLeakedGoalFacts(answer) || !answer.trim()) {
-          speakAnswer("Deu um tropeço na resposta. Manda de novo?");
+          const classified = classifyJarvisFailure("empty_or_leaked");
+          void speakAnswer(classified.message, {
+            retryOf: classified.canRetry ? q : undefined,
+          });
           return;
         }
-        speakAnswer(answer);
+        void speakAnswer(answer, extras);
       };
 
       const applyPeriodHint = () => {
@@ -822,12 +940,16 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
 
         if (!llm.ok) {
           const reason = llm.reason || "erro";
+          const classified = classifyJarvisFailure(reason);
+          logJarvisError("llmTurn", { kind: classified.kind, reason });
           if (reason === "openai_not_configured") {
-            setMicHint("Falta OPENAI_API_KEY no servidor.");
+            setMicHint("Falta configurar a IA no servidor.");
           } else {
-            setMicHint(`IA: ${reason.slice(0, 120)}`);
+            setMicHint(null);
           }
-          finish("A IA tropeçou neste turno. Manda de novo?");
+          finish(classified.message, {
+            retryOf: classified.canRetry ? q : undefined,
+          });
           return;
         }
 
@@ -869,6 +991,45 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
     ],
   );
 
+  const selectAssemblyPath = useCallback(
+    async (path: GoalAssemblyPath) => {
+      if (!session || !isOwner(session.role) || pathSelectBusy || commitBusy) return;
+      const before = goalDraftRef.current;
+      if (!before || before.assembly?.path != null) return;
+      setPathSelectBusy(true);
+      setMode("thinking");
+      setAssemblyPathOffer((o) => (o ? { ...o, selected: path } : o));
+      const ctx = jarvisContextFromSession(session, readTopbarStoreIds());
+      const turnId = `path-${path}-${Date.now()}`;
+      try {
+        const { draft, spokenReply, shouldCommit } = await discussGoal(
+          `Selecionar caminho: ${path}`,
+          ctx,
+          before,
+          { turnId, forcedPath: path },
+        );
+        syncGoalDraft(draft);
+        if (shouldCommit) {
+          const msg = await authorizeGoal({ silent: true });
+          await speakAnswer(msg || "Não consegui gravar a meta.");
+          return;
+        }
+        if (spokenReply) {
+          await speakAnswer(spokenReply);
+        } else {
+          setMode("idle");
+        }
+      } catch (err) {
+        const classified = classifyJarvisFailure(String(err));
+        logJarvisError("selectAssemblyPath", { kind: classified.kind, raw: err });
+        await speakAnswer(classified.message);
+      } finally {
+        setPathSelectBusy(false);
+      }
+    },
+    [authorizeGoal, commitBusy, pathSelectBusy, session, speakAnswer, syncGoalDraft],
+  );
+
   const clearChat = useCallback(() => {
     // Reset total: thread + rascunhos + o que o JARVIS “conhece” deste Gestor.
     replyGen.current += 1;
@@ -887,7 +1048,10 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
     setScheduleDraft(null);
     scheduleDraftRef.current = null;
     setCreatedItem(null);
+    setAssemblyPathOffer(null);
+    setPathSelectBusy(false);
     setCommitBusy(false);
+    completedGoalSavesRef.current.clear();
     memoryTextRef.current = "Nenhuma memória de longo prazo ainda.";
     if (session?.tenantId && session.membershipId) {
       void clearJarvisMemory(session.tenantId, session.membershipId);
@@ -912,6 +1076,9 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
       goalDraft,
       scheduleDraft,
       createdItem,
+      assemblyPathOffer,
+      pathSelectBusy,
+      selectAssemblyPath,
       commitBusy,
       dictating,
       dictateBusy,
@@ -928,23 +1095,24 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
       discardChallenge: () => {
         setChallengeDraft(null);
         challengeDraftRef.current = null;
-        speakAnswer("Beleza, descartei o desafio.");
+        void speakAnswer("Beleza, descartei o desafio.");
       },
       discardGoal: () => {
         setGoalDraft(null);
         syncGoalDraft(null);
-        speakAnswer("Beleza, descartei a meta.");
+        void speakAnswer("Beleza, descartei a meta.");
       },
       discardSchedule: () => {
         setScheduleDraft(null);
         scheduleDraftRef.current = null;
-        speakAnswer("Beleza, descartei a escala.");
+        void speakAnswer("Beleza, descartei a escala.");
       },
       storeNameFor,
       endRef,
     }),
     [
       allowed,
+      assemblyPathOffer,
       authorizeChallenge,
       authorizeGoal,
       authorizeSchedule,
@@ -963,11 +1131,14 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
       messages,
       micHint,
       mode,
+      pathSelectBusy,
       reply,
       scheduleDraft,
+      selectAssemblyPath,
       speakAnswer,
       startDictate,
       storeNameFor,
+      syncGoalDraft,
     ],
   );
 

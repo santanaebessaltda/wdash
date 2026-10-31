@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
-import { Avatar, Dropdown } from "@/components/ui";
+import { Avatar, Button, Dropdown } from "@/components/ui";
 import { validateChallengeForm } from "@/data/wedash/challengeForm";
 import { cn } from "@/lib/cn";
 import { padBottom } from "@/lib/safeArea";
@@ -9,6 +9,7 @@ import { paths } from "@/router/paths";
 import { SendIcon } from "@/pages/apps/icons";
 import { Icon, icons } from "@/pages/users/Icons";
 import { ChallengeProposalCard } from "./ChallengeProposalCard";
+import { GoalAssemblyPathCard } from "./GoalAssemblyPathCard";
 import { ScheduleProposalCard } from "./ScheduleProposalCard";
 import {
   challengeDraftReady,
@@ -135,12 +136,45 @@ export function JarvisFloat() {
                               : "rounded-[4px_16px_16px_16px] bg-bg-3 text-t0",
                           )}
                         >
-                          {m.text}
+                          <span className="whitespace-pre-wrap">{m.text}</span>
+                          {m.from === "jarvis" && m.link ? (
+                            <Link
+                              to={m.link.to}
+                              className="mt-2 block font-bold text-acc hover:underline"
+                              onClick={() => setOpen(false)}
+                            >
+                              {m.link.label}
+                            </Link>
+                          ) : null}
+                          {m.from === "jarvis" && m.retryOf ? (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              className="mt-2"
+                              disabled={busy}
+                              onClick={() => j.reply(m.retryOf!, { retry: true })}
+                            >
+                              Tentar novamente
+                            </Button>
+                          ) : null}
                         </div>
                       </div>
                     </div>
                     );
                   })}
+                  {j.assemblyPathOffer ? (
+                    <div className="flex gap-2.5">
+                      <span className="w-8 shrink-0" aria-hidden />
+                      <GoalAssemblyPathCard
+                        hasPrior={j.assemblyPathOffer.hasPrior}
+                        priorLabel={j.assemblyPathOffer.priorLabel}
+                        selected={j.assemblyPathOffer.selected}
+                        busy={busy || j.pathSelectBusy || j.commitBusy}
+                        onSelect={j.selectAssemblyPath}
+                      />
+                    </div>
+                  ) : null}
                   {j.mode === "thinking" ? (
                     <div className="flex gap-2.5">
                       <Avatar name="JARVIS" size="sm" className="mt-0.5" />
@@ -187,35 +221,20 @@ export function JarvisFloat() {
                   {j.createdItem ? (
                     <div className="rounded-[14px] border border-ok/30 bg-ok-soft/40 px-3.5 py-3 text-[13px]">
                       <p className="font-semibold text-t0">
-                        {j.createdItem.kind === "goal"
-                          ? j.createdItem.asDraft
-                            ? `Rascunho salvo: ${j.createdItem.name}`
-                            : `Meta criada: ${j.createdItem.name}`
-                          : j.createdItem.kind === "challenge"
-                            ? `Desafio criado: ${j.createdItem.name}`
-                            : `Escala gerada: ${j.createdItem.name}`}
+                        {j.createdItem.kind === "challenge"
+                          ? `Desafio criado: ${j.createdItem.name}`
+                          : `Escala gerada: ${j.createdItem.name}`}
                       </p>
                       <Link
                         to={
-                          j.createdItem.kind === "goal"
-                            ? j.createdItem.asDraft
-                              ? paths.goalEdit(j.createdItem.id)
-                              : paths.goalDetail(j.createdItem.id)
-                            : j.createdItem.kind === "challenge"
-                              ? paths.management.challengeDetail(j.createdItem.id)
-                              : paths.management.schedule
+                          j.createdItem.kind === "challenge"
+                            ? paths.management.challengeDetail(j.createdItem.id)
+                            : paths.management.schedule
                         }
                         className="mt-1 inline-block font-bold text-acc hover:underline"
                         onClick={() => setOpen(false)}
                       >
-                        Abrir{" "}
-                        {j.createdItem.kind === "goal"
-                          ? j.createdItem.asDraft
-                            ? "rascunho no editor"
-                            : "meta"
-                          : j.createdItem.kind === "challenge"
-                            ? "desafio"
-                            : "escala"}
+                        Abrir {j.createdItem.kind === "challenge" ? "desafio" : "escala"}
                       </Link>
                     </div>
                   ) : null}
