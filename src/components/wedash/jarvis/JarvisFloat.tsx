@@ -74,7 +74,7 @@ export function JarvisFloat() {
                 portal
                 items={[
                   {
-                    label: "Apagar tudo (conversa e memória)",
+                    label: "Apagar tudo",
                     danger: true,
                     onClick: () => j.clearChat(),
                   },
